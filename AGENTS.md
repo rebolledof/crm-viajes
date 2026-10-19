@@ -31,6 +31,18 @@ CRM SaaS para agencias de viajes (React, Next.js y TypeScript). El dueño del pr
 - Datos sintéticos en desarrollo; nunca claves, documentos personales ni datos reales en el repositorio.
 - No conectes cuentas reales, no envíes mensajes reales desde pruebas y no ejecutes migraciones destructivas sin autorización de Felipe.
 
+## Comandos
+
+`npm run lint`, `npm run typecheck`, `npm test` (unitarias), `npm run test:integration` (necesita PostgreSQL local, ver `docs/operations/instalacion.md`), `npm run build`. Todos deben pasar antes de abrir un PR.
+
+## Estructura y convenciones
+
+- `src/domain`: reglas puras con pruebas unitarias. `src/server`: casos de uso que reciben una transacción `Tx`. `src/app`: pantallas y Server Actions.
+- Toda consulta de usuario va dentro de `withUser(getDb(), user, tx => ...)`. Nunca consultes con `getDb()` directamente en una petición de usuario.
+- Un cambio de esquema es una migración nueva en `supabase/migrations/` (nunca edites una ya aplicada) más el ajuste de `src/db/schema.ts`.
+- Cada tabla nueva lleva `agency_id`, RLS y pruebas de acceso cruzado en `tests/integration`.
+- Textos de la interfaz en español.
+
 ## Al terminar cada sesión
 
 Actualiza spec, plan y tasks afectados; esquema y migraciones; ADR si hubo una decisión duradera; `CHANGELOG.md` y `project-status.md`. Informa qué cambió, cómo se probó, qué quedó pendiente y cuál es el siguiente paso.

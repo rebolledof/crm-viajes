@@ -14,10 +14,10 @@ Agencias minoristas pequeñas y medianas de habla hispana, con varios asesores, 
 
 ## Alcance del MVP piloto
 
-Login y roles; contactos; oportunidades con embudo y tareas; cotizador con versiones y PDF; formulario web; importación CSV; botón de WhatsApp con mensaje prellenado; auditoría, exportación y copias de seguridad.
+Login y roles; contactos; oportunidades con embudo y tareas; bandeja unificada de chat web, formulario y correo con responsable y alertas de sin responder; respuestas guardadas; cotizador con versiones y PDF; botón de WhatsApp con mensaje prellenado; importación CSV; auditoría, exportación y copias de seguridad.
 
 ## Fuera del MVP
 
-API oficial de WhatsApp, bot, IA asistida, reservas completas, cuentas por cobrar y pagar, conciliación bancaria, planes del SaaS, gestor web y circuitos. Ver `roadmap.md`.
+API oficial de WhatsApp, Instagram y Messenger, bot de preguntas frecuentes, IA asistida, reservas completas, cuentas por cobrar y pagar, conciliación bancaria, planes del SaaS, gestor web y circuitos. Ver `roadmap.md`.
 
 Fuente: briefing maestro v1.0 del 12 de octubre de 2026 (guardado en los archivos del proyecto, fuera del repositorio).
