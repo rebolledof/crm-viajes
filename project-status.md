@@ -15,12 +15,13 @@
 
 ## No verificado todavía
 
-- Login y registro contra un proyecto real de Supabase (falta conectar las claves).
+- Login y registro contra el proyecto de pruebas `crm-viajes-pruebas` de Supabase (migración aplicada el 19 oct 2026; falta probarlo en la vista previa de Vercel).
 - Recorrido E2E con Playwright: llega con las pantallas de negocio en S02.
 
 ## Pendiente
 
-- Felipe: pasar las claves de Supabase a Vercel y aplicar la migración (ver `docs/operations/instalacion.md`).
+- Felipe: completar `NEXT_PUBLIC_SITE_URL` en Vercel y las *Redirect URLs* de Supabase con la dirección de Vercel; probar registro, agencia e invitación en la vista previa.
+- Antes del piloto con datos reales: pasar Supabase y Vercel a planes Pro (el plan Hobby de Vercel no permite uso comercial y el gratuito de Supabase no tiene copias).
 - Felipe: iniciar la verificación de Meta Business (ahora es crítica para la bandeja).
 - Felipe: canales que usa la agencia, volumen de mensajes y dirección de su web.
 
