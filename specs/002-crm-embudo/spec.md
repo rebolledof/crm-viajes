@@ -21,13 +21,17 @@ Hoy un asesor no tiene un sitio único donde ver quién es el cliente, qué viaj
 2. **Duplicados**: al crear o editar, si el teléfono o el correo ya existe en la agencia se avisa y se ofrece abrir el existente. Los nombres parecidos no se fusionan solos.
 3. **Consentimiento** por canal (WhatsApp, correo, teléfono) y finalidad (servicio, promociones): otorgado o retirado, con fecha, origen y quién lo registró. Nunca se borra el historial.
 4. **Oportunidades**: contacto, origen, responsable, etapa, destino, producto de interés, fechas o flexibilidad, número de viajeros, presupuesto y moneda, prioridad y observaciones. Lo que no se sabe queda como "Desconocido".
-5. **Embudo** con las etapas del briefing: nuevo, pendiente de contacto, contactado, en calificación, calificado, preparando propuesta, propuesta enviada, negociación, ganado y perdido. Las etapas de propuesta muestran el aviso "sin cotización formal en el sistema" hasta S04.
+5. **Embudo propio de cada agencia**: el administrador crea, renombra, ordena y desactiva etapas. Cada etapa es de tipo abierta, ganada o perdida. Al crear la agencia se cargan como propuesta las etapas del briefing (nuevo, pendiente de contacto, contactado, en calificación, calificado, preparando propuesta, propuesta enviada, negociación, ganado y perdido). Una oportunidad puede pasar de cualquier etapa a cualquier otra, saltándose las intermedias.
 6. **Cierre**: perdido exige motivo (precio, sin disponibilidad, cambio de planes, sin respuesta, competencia, otro con nota). Ganado exige una evidencia escrita (por ejemplo, número de reserva o comprobante externo). Una oportunidad cerrada se puede reabrir con motivo.
 7. **Tablero** de oportunidades por etapa, con filtro por responsable, y lista con búsqueda.
 8. **Tareas**: tipo (llamada, seguimiento, recordatorio, correo, reunión, tarea), responsable, fecha y hora, prioridad, estado y resultado al completarla. La próxima acción de una oportunidad es su tarea abierta más próxima.
 9. **Mi día**: mis tareas vencidas y de hoy, y mis oportunidades abiertas sin próxima acción.
 10. **Botón de WhatsApp** en la ficha: abre WhatsApp con el número preferido y un mensaje prellenado editable, y registra la actividad en la ficha.
 11. **Historial** de la ficha: creación, cambios de etapa, responsable, tareas y aperturas de WhatsApp, con quién y cuándo.
+
+## Después de ganado (fuera de S02)
+
+Felipe explicó el 19 oct 2026 que tras la aceptación del cliente hay etapas internas: pedir los servicios a cada proveedor (solicitudes automáticas o parciales, control de solicitado y respondido, relación entre solicitudes y respuestas), cobrar al cliente (también por partes) y pagar a los proveedores. Eso se especifica aparte (fase C del plan) y no entra en este sprint.
 
 ## Alcance excluido
 
@@ -49,6 +53,9 @@ Bandeja de mensajes y asignación automática (S03), cotizaciones (S04), importa
 - RF-212: El botón de WhatsApp no se ofrece si el contacto retiró el consentimiento de WhatsApp para servicio; en ese caso se muestra el motivo.
 - RF-213: Cada creación, cambio de etapa, cambio de responsable, cierre, reapertura, cambio de consentimiento y apertura de WhatsApp queda en la auditoría (RF-14).
 - RF-214: Un asesor puede asignar tareas y oportunidades solo a miembros activos de su agencia.
+- RF-215: Las etapas son de cada agencia; solo el administrador las crea, renombra, ordena o desactiva. Siempre debe quedar al menos una etapa activa de cada tipo (abierta, ganada, perdida).
+- RF-216: Una oportunidad puede moverse a cualquier etapa activa de su agencia, sin pasar por las intermedias; cada movimiento queda en el historial.
+- RF-217: Desactivar una etapa no cambia las oportunidades que ya están en ella; solo deja de ofrecerse para nuevos movimientos.
 
 ## Criterios de aceptación
 
@@ -65,10 +72,13 @@ Bandeja de mensajes y asignación automática (S03), cotizaciones (S04), importa
 - AC-211 (RF-212): Dado un contacto que retiró el consentimiento de WhatsApp para servicio, entonces la ficha no ofrece el botón y explica por qué.
 - AC-212 (RF-213): Dado un cambio de etapa de "contactado" a "calificado" hecho por Ana, entonces la auditoría y el historial muestran a Ana, la hora y ambas etapas.
 - AC-213 (RF-214): Dado un asesor de la agencia A, cuando asigna una tarea a un usuario que no es miembro activo de A, entonces se rechaza.
+- AC-214 (RF-215): Dada la agencia A que renombra "en calificación" a "Perfilando", entonces la agencia B sigue viendo "en calificación" y un asesor de A no puede renombrar etapas.
+- AC-215 (RF-215): Dada una agencia con una sola etapa de tipo ganada, cuando el administrador intenta desactivarla, entonces se rechaza.
+- AC-216 (RF-216): Dada una oportunidad en "nuevo", cuando el asesor la pasa directamente a "propuesta enviada", entonces se acepta y el historial muestra el salto.
+- AC-217 (RF-217): Dadas tres oportunidades en "negociación", cuando el administrador desactiva esa etapa, entonces las tres siguen en ella y la etapa ya no aparece al mover otras.
 
 ## Decisiones tomadas por defecto (cambiables)
 
-- Las etapas del embudo son fijas en S02; renombrarlas o agregar etapas por agencia queda para cuando la agencia lo pida.
 - Los motivos de pérdida son los seis del briefing; el administrador podrá editarlos más adelante.
 - Teléfono por defecto de Colombia (+57) cuando no se escribe el indicativo.
 - El mensaje prellenado de WhatsApp es "Hola {nombre}, te escribo de {agencia} por tu viaje a {destino}." y el asesor lo puede editar antes de abrir.
@@ -76,7 +86,6 @@ Bandeja de mensajes y asignación automática (S03), cotizaciones (S04), importa
 
 ## Preguntas para Felipe
 
-- ¿Los nombres de las etapas te sirven tal cual o la agencia usa otros?
 - ¿Qué cuenta como evidencia de "ganado" para la agencia: número de reserva del proveedor, comprobante de pago, otra cosa?
 
 ## Trazabilidad
@@ -96,3 +105,4 @@ Bandeja de mensajes y asignación automática (S03), cotizaciones (S04), importa
 | RF-212 | AC-211 | CRM-006 |
 | RF-213 | AC-212 | RF-14 |
 | RF-214 | AC-213 | 5.3 |
+| RF-215, RF-216, RF-217 | AC-214 a AC-217 | 6.2 (embudo configurable), Felipe 19 oct 2026 |
