@@ -10,13 +10,16 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   return (
     <div className="min-h-screen bg-slate-50">
       <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3">
           <Link href="/app" className="font-semibold text-slate-900">
             CRM Viajes
           </Link>
           {active && (
-            <nav className="flex gap-4 text-sm text-slate-700">
-              <Link href="/app" className="hover:text-sky-700">Inicio</Link>
+            <nav className="flex flex-wrap gap-4 text-sm text-slate-700">
+              <Link href="/app" className="hover:text-sky-700">Mi día</Link>
+              <Link href="/app/contactos" className="hover:text-sky-700">Contactos</Link>
+              <Link href="/app/oportunidades" className="hover:text-sky-700">Oportunidades</Link>
+              {can(active.role, "pipeline.manage") && <Link href="/app/embudo" className="hover:text-sky-700">Embudo</Link>}
               {can(active.role, "team.manage") && <Link href="/app/equipo" className="hover:text-sky-700">Equipo</Link>}
               {can(active.role, "audit.read") && <Link href="/app/auditoria" className="hover:text-sky-700">Auditoría</Link>}
             </nav>
@@ -41,7 +44,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
           </div>
         </div>
       </header>
-      <main className="mx-auto max-w-5xl px-4 py-8">{children}</main>
+      <main className="mx-auto max-w-6xl px-4 py-8">{children}</main>
     </div>
   );
 }
