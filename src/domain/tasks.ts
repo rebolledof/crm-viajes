@@ -56,3 +56,15 @@ export function dueState(dueAt: Date, now: Date, timeZone = AGENCY_TIME_ZONE): D
   if (dueAt.getTime() < endOfLocalDay(now, timeZone).getTime()) return "hoy";
   return "proxima";
 }
+
+/** Convierte el valor de un <input type="datetime-local"> (hora de Colombia, UTC-5 fijo) a Date. */
+export function parseBogotaDateTime(value: string): Date | null {
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value)) return null;
+  const d = new Date(`${value}:00-05:00`);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+/** Valor para un <input type="datetime-local"> en hora de Colombia. */
+export function toBogotaInput(d: Date): string {
+  return new Date(d.getTime() - 5 * 3600_000).toISOString().slice(0, 16);
+}

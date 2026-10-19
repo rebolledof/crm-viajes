@@ -98,3 +98,13 @@ describe("botón de WhatsApp (RF-212, AC-211)", () => {
     expect(whatsappAllowed([{ channel: "whatsapp", purpose: "servicio", status: "retirado" }])).toBe(false);
   });
 });
+
+describe("fechas de tareas en hora de Colombia", async () => {
+  const { parseBogotaDateTime, toBogotaInput } = await import("@/domain/tasks");
+  it("ida y vuelta del campo de fecha y hora", () => {
+    const d = parseBogotaDateTime("2026-11-02T09:30");
+    expect(d?.toISOString()).toBe("2026-11-02T14:30:00.000Z");
+    expect(toBogotaInput(d!)).toBe("2026-11-02T09:30");
+    expect(parseBogotaDateTime("mañana")).toBeNull();
+  });
+});
