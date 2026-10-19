@@ -1,6 +1,6 @@
 # Estado del proyecto
 
-Última actualización: 18 de octubre de 2026 · Sprint S00 Arranque (19 oct a 1 nov), con S01 adelantado
+Última actualización: 19 de octubre de 2026 · Sprint S00 Arranque (19 oct a 1 nov), con S01 adelantado
 
 ## Hecho
 
@@ -13,14 +13,16 @@
 
 `npm run lint`, `npm run typecheck`, `npm test`, `npm run test:integration`, `npm run build`: todos sin errores. `next start` sirve /login (200) y redirige /app a /login sin sesión.
 
+## Verificado manualmente
+
+- 19 oct 2026, Felipe en la vista previa de Vercel contra `crm-viajes-pruebas`: registro, confirmación de correo, creación de agencia y aceptación de invitación.
+
 ## No verificado todavía
 
-- Login y registro contra el proyecto de pruebas `crm-viajes-pruebas` de Supabase (migración aplicada el 19 oct 2026; falta probarlo en la vista previa de Vercel).
 - Recorrido E2E con Playwright: llega con las pantallas de negocio en S02.
 
 ## Pendiente
 
-- Felipe: completar `NEXT_PUBLIC_SITE_URL` en Vercel y las *Redirect URLs* de Supabase con la dirección de Vercel; probar registro, agencia e invitación en la vista previa.
 - Antes del piloto con datos reales: pasar Supabase y Vercel a planes Pro (el plan Hobby de Vercel no permite uso comercial y el gratuito de Supabase no tiene copias).
 - Felipe: iniciar la verificación de Meta Business (ahora es crítica para la bandeja).
 - Felipe: canales que usa la agencia, volumen de mensajes y dirección de su web.
