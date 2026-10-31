@@ -43,6 +43,7 @@ export function budget(amount: string | null, currency: string | null): string {
 }
 
 const OK_MESSAGES: Record<string, string> = {
+  clave: "Contraseña actualizada.",
   creado: "Contacto creado.",
   guardado: "Cambios guardados.",
   consentimiento: "Consentimiento registrado.",

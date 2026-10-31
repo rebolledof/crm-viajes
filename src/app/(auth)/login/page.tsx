@@ -5,6 +5,7 @@ import { signInAction } from "../actions";
 
 const ERRORS: Record<string, string> = {
   credenciales: "El correo o la contraseña no coinciden.",
+  enlace: "El enlace venció o ya se usó. Pide uno nuevo en \"Olvidé mi contraseña\".",
   sin_confirmar: "Todavía no confirmaste tu correo. Abre el enlace que te enviamos al registrarte.",
   datos: "Escribe un correo válido y una contraseña de al menos 8 caracteres.",
 };
@@ -27,6 +28,9 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
         </Field>
         <button className={buttonClass}>Entrar</button>
       </form>
+      <p className="text-sm">
+        <Link className={linkButtonClass} href="/recuperar">Olvidé mi contraseña</Link>
+      </p>
       <p className="text-sm text-slate-600">
         ¿No tienes cuenta?{" "}
         <Link className={linkButtonClass} href={`/registro?next=${encodeURIComponent(next)}`}>

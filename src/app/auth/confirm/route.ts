@@ -19,5 +19,5 @@ export async function GET(request: NextRequest) {
       ? await supabase.auth.verifyOtp({ token_hash: tokenHash, type })
       : { error: new Error("missing") };
 
-  return NextResponse.redirect(new URL(error ? "/login?error=credenciales" : next, origin));
+  return NextResponse.redirect(new URL(error ? "/login?error=enlace" : next, origin));
 }
