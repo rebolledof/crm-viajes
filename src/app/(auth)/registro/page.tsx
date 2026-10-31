@@ -5,7 +5,11 @@ import { signUpAction } from "../actions";
 
 const ERRORS: Record<string, string> = {
   datos: "Escribe un correo válido y una contraseña de 8 a 72 caracteres.",
-  registro: "No se pudo crear la cuenta. Si ya tienes una, inicia sesión.",
+  registro: "No se pudo crear la cuenta. Intenta de nuevo en unos minutos; si sigue, avísanos.",
+  limite_correos: "Se enviaron demasiados correos de confirmación en poco tiempo. Espera una hora y vuelve a intentarlo.",
+  clave_debil: "La contraseña es muy fácil de adivinar. Usa una más larga, con letras y números.",
+  ya_existe: "Ya hay una cuenta con ese correo. Inicia sesión.",
+  correo_invalido: "Ese correo no es válido para crear una cuenta.",
 };
 
 export default async function RegistroPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {

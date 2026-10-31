@@ -15,4 +15,5 @@
 - Cierre ganado con evidencia, perdido con motivo (y nota si es "otro") y reapertura con razón; todo en historial y auditoría.
 - Presupuesto con importe exacto y moneda (COP o USD); campos desconocidos se muestran como "Desconocido".
 - Tareas con resultado obligatorio al completar, próxima acción en el tablero y pantalla "Mi día" con la alerta "sin próxima acción".
+- La pantalla de registro explica el motivo cuando Supabase rechaza la cuenta (límite de correos, contraseña débil, correo existente).
 - Botón de WhatsApp con mensaje prellenado y editable que respeta el consentimiento y queda en la ficha.

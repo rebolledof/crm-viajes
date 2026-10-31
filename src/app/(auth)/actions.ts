@@ -3,6 +3,7 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import { signUpProblem } from "@/domain/auth-errors";
 import { safeNext } from "@/lib/supabase/env";
 import { createSupabaseServer } from "@/lib/supabase/server";
 
@@ -38,7 +39,11 @@ export async function signUpAction(formData: FormData) {
     ...parsed.data,
     options: { emailRedirectTo: `${origin}/auth/confirm?next=${encodeURIComponent(next)}` },
   });
-  if (error) back("/registro", "registro", next);
+  if (error) {
+    // Solo el código y el estado: nunca el correo ni la contraseña en los logs.
+    console.error("signUp falló", { code: error.code, status: error.status });
+    back("/registro", signUpProblem(error.code, error.status), next);
+  }
   if (!data.session) redirect(`/login?aviso=confirma&next=${encodeURIComponent(next)}`);
   redirect(next);
 }

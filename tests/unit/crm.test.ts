@@ -1,4 +1,5 @@
 // SPEC-002 · reglas puras: teléfonos, dinero, cierre, tareas y WhatsApp
+import { signUpProblem } from "@/domain/auth-errors";
 import { describe, expect, it } from "vitest";
 import { formatMoney, parseAmount } from "@/domain/money";
 import { formatPhone, normalizePhone } from "@/domain/phone";
@@ -106,5 +107,16 @@ describe("fechas de tareas en hora de Colombia", async () => {
     expect(d?.toISOString()).toBe("2026-11-02T14:30:00.000Z");
     expect(toBogotaInput(d!)).toBe("2026-11-02T09:30");
     expect(parseBogotaDateTime("mañana")).toBeNull();
+  });
+});
+
+describe("signUpProblem", () => {
+  it("explica los rechazos conocidos de Supabase Auth", () => {
+    expect(signUpProblem("over_email_send_rate_limit")).toBe("limite_correos");
+    expect(signUpProblem(undefined, 429)).toBe("limite_correos");
+    expect(signUpProblem("weak_password")).toBe("clave_debil");
+    expect(signUpProblem("user_already_exists")).toBe("ya_existe");
+    expect(signUpProblem("email_address_invalid")).toBe("correo_invalido");
+    expect(signUpProblem("unexpected_failure", 500)).toBe("registro");
   });
 });
