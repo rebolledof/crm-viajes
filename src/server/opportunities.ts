@@ -7,7 +7,7 @@ import { closeRequirement, missingKinds, type LossReason, type StageKind } from 
 import type { Priority } from "@/domain/tasks";
 import { recordAudit, requirePermission } from "./agencies";
 import { logActivity } from "./contacts";
-import { AppError, pgError, rethrowBusiness } from "./errors";
+import { AppError, fieldError, pgError, rethrowBusiness } from "./errors";
 
 export async function listStages(tx: Tx, userId: string, agencyId: string, opts: { includeInactive?: boolean } = {}) {
   await requirePermission(tx, userId, agencyId, "crm.read");
@@ -20,7 +20,7 @@ export async function listStages(tx: Tx, userId: string, agencyId: string, opts:
 
 function stageName(raw: string): string {
   const name = raw.trim();
-  if (!name || name.length > 60) throw new AppError("invalid_input");
+  if (!name || name.length > 60) throw fieldError("invalid_input", "name");
   return name;
 }
 
@@ -108,10 +108,11 @@ function prepareFields(input: Omit<OpportunityInput, "contactId" | "stageId">) {
   }
   const travelStart = blank(input.travelStart);
   const travelEnd = blank(input.travelEnd);
-  if ((travelStart && !ISO_DATE.test(travelStart)) || (travelEnd && !ISO_DATE.test(travelEnd))) throw new AppError("invalid_input");
-  if (travelStart && travelEnd && travelEnd < travelStart) throw new AppError("invalid_input");
+  if (travelStart && !ISO_DATE.test(travelStart)) throw fieldError("invalid_input", "travelStart");
+  if (travelEnd && !ISO_DATE.test(travelEnd)) throw fieldError("invalid_input", "travelEnd");
+  if (travelStart && travelEnd && travelEnd < travelStart) throw fieldError("invalid_input", "travelEnd");
   const travelers = input.travelers ?? null;
-  if (travelers !== null && (!Number.isInteger(travelers) || travelers < 1 || travelers > 999)) throw new AppError("invalid_input");
+  if (travelers !== null && (!Number.isInteger(travelers) || travelers < 1 || travelers > 999)) throw fieldError("invalid_input", "travelers");
   return {
     ownerId: input.ownerId ?? null,
     source: blank(input.source),

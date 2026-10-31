@@ -1,4 +1,5 @@
-import { Field, Notice, buttonClass, inputClass } from "@/components/ui";
+import { ActionForm, Input } from "@/components/form";
+import { Field, Notice, buttonClass } from "@/components/ui";
 import { ERROR_MESSAGES, isErrorCode } from "@/server/errors";
 import { createAgencyAction } from "../../actions";
 
@@ -11,12 +12,12 @@ export default async function NuevaAgenciaPage({ searchParams }: { searchParams:
         Quedarás como administrador y podrás invitar a tu equipo. Si te invitaron a una agencia existente, abre el enlace de la invitación.
       </p>
       {isErrorCode(sp.error) && <Notice tone="error">{ERROR_MESSAGES[sp.error]}</Notice>}
-      <form action={createAgencyAction} className="flex flex-col gap-4">
+      <ActionForm action={createAgencyAction} className="flex flex-col gap-4">
         <Field label="Nombre de la agencia">
-          <input id="name" name="name" required minLength={2} maxLength={120} placeholder="Viajes del Caribe" className={inputClass} />
+          <Input id="name" name="name" required minLength={2} maxLength={120} placeholder="Viajes del Caribe" />
         </Field>
         <button className={buttonClass}>Crear agencia</button>
-      </form>
+      </ActionForm>
     </div>
   );
 }

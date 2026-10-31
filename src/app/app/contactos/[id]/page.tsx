@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { Field, Notice, buttonClass, inputClass, linkButtonClass } from "@/components/ui";
+import { ActionForm, Input, Select } from "@/components/form";
+import { Field, Notice, buttonClass, linkButtonClass } from "@/components/ui";
 import { getDb, withUser } from "@/db/client";
 import { can } from "@/domain/permissions";
 import { STAGE_KIND_LABELS } from "@/domain/pipeline";
@@ -138,29 +139,29 @@ export default async function ContactoPage({ params, searchParams }: { params: P
           </table>
         </div>
         {canWrite && (
-          <form action={recordConsentAction} className="flex flex-wrap items-end gap-3 rounded-lg border border-slate-200 bg-white p-4">
+          <ActionForm action={recordConsentAction} className="flex flex-wrap items-end gap-3 rounded-lg border border-slate-200 bg-white p-4">
             <input type="hidden" name="contactId" value={c.id} />
             <Field label="Canal">
-              <select name="channel" className={inputClass}>
+              <Select name="channel">
                 {Object.entries(CHANNEL_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-              </select>
+              </Select>
             </Field>
             <Field label="Finalidad">
-              <select name="purpose" className={inputClass}>
+              <Select name="purpose">
                 {Object.entries(PURPOSE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-              </select>
+              </Select>
             </Field>
             <Field label="Estado">
-              <select name="status" className={inputClass}>
+              <Select name="status">
                 <option value="otorgado">Otorgado</option>
                 <option value="retirado">Retirado</option>
-              </select>
+              </Select>
             </Field>
             <Field label="Cómo lo dijo">
-              <input name="source" required placeholder="Por WhatsApp el 19 de octubre" className={inputClass} />
+              <Input name="source" required placeholder="Por WhatsApp el 19 de octubre" />
             </Field>
             <button className={buttonClass}>Registrar</button>
-          </form>
+          </ActionForm>
         )}
       </section>
 

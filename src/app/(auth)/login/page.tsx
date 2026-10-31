@@ -1,14 +1,9 @@
 import Link from "next/link";
-import { Field, Notice, buttonClass, inputClass, linkButtonClass } from "@/components/ui";
+import { ActionForm, Input } from "@/components/form";
+import { AUTH_MESSAGES } from "@/domain/auth-errors";
+import { Field, Notice, buttonClass, linkButtonClass } from "@/components/ui";
 import { safeNext } from "@/lib/supabase/env";
 import { signInAction } from "../actions";
-
-const ERRORS: Record<string, string> = {
-  credenciales: "El correo o la contraseña no coinciden.",
-  enlace: "El enlace venció o ya se usó. Pide uno nuevo en \"Olvidé mi contraseña\".",
-  sin_confirmar: "Todavía no confirmaste tu correo. Abre el enlace que te enviamos al registrarte.",
-  datos: "Escribe un correo válido y una contraseña de al menos 8 caracteres.",
-};
 
 export default async function LoginPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const sp = await searchParams;
@@ -16,18 +11,18 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   return (
     <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center gap-6 px-4">
       <h1 className="text-2xl font-semibold text-slate-900">Iniciar sesión</h1>
-      {sp.error && <Notice tone="error">{ERRORS[sp.error] ?? "No se pudo iniciar sesión."}</Notice>}
+      {sp.error && <Notice tone="error">{AUTH_MESSAGES[sp.error] ?? "No se pudo iniciar sesión."}</Notice>}
       {sp.aviso === "confirma" && <Notice>Te enviamos un correo para confirmar tu cuenta. Ábrelo y vuelve aquí.</Notice>}
-      <form action={signInAction} className="flex flex-col gap-4">
+      <ActionForm action={signInAction} className="flex flex-col gap-4">
         <input type="hidden" name="next" value={next} />
         <Field label="Correo">
-          <input id="email" name="email" type="email" autoComplete="email" required className={inputClass} />
+          <Input id="email" name="email" type="email" autoComplete="email" required />
         </Field>
         <Field label="Contraseña">
-          <input id="password" name="password" type="password" autoComplete="current-password" required minLength={8} className={inputClass} />
+          <Input id="password" name="password" type="password" autoComplete="current-password" required minLength={8} />
         </Field>
         <button className={buttonClass}>Entrar</button>
-      </form>
+      </ActionForm>
       <p className="text-sm">
         <Link className={linkButtonClass} href="/recuperar">Olvidé mi contraseña</Link>
       </p>

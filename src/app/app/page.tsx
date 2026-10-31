@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { Field, Notice, buttonClass, inputClass } from "@/components/ui";
+import { ActionForm, Input } from "@/components/form";
+import { Field, Notice, buttonClass } from "@/components/ui";
 import { getDb, withUser } from "@/db/client";
 import { ROLE_LABELS, can } from "@/domain/permissions";
 import { requireActiveAgency } from "@/server/session";
@@ -72,12 +73,12 @@ export default async function AppHome({ searchParams }: { searchParams: SearchPa
       {can(active.role, "agency.update") && (
         <section className="rounded-lg border border-slate-200 bg-white p-4">
           <h2 className="mb-3 font-medium text-slate-900">Datos de la agencia</h2>
-          <form action={renameAgencyAction} className="flex flex-wrap items-end gap-3">
+          <ActionForm action={renameAgencyAction} className="flex flex-wrap items-end gap-3">
             <Field label="Nombre">
-              <input id="name" name="name" defaultValue={active.agencyName} required minLength={2} maxLength={120} className={inputClass} />
+              <Input id="name" name="name" defaultValue={active.agencyName} required minLength={2} maxLength={120} />
             </Field>
             <button className={buttonClass}>Guardar</button>
-          </form>
+          </ActionForm>
         </section>
       )}
     </div>

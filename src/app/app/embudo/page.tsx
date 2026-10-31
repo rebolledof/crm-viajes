@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
-import { Field, Notice, buttonClass, inputClass } from "@/components/ui";
+import { ActionForm, Input, Select } from "@/components/form";
+import { Field, Notice, buttonClass } from "@/components/ui";
 import { getDb, withUser } from "@/db/client";
 import { STAGE_KINDS, STAGE_KIND_LABELS } from "@/domain/pipeline";
 import { can } from "@/domain/permissions";
@@ -41,35 +42,35 @@ export default async function EmbudoPage({ searchParams }: { searchParams: Searc
                 </form>
               ))}
             </div>
-            <form action={updateStageAction} className="flex flex-1 flex-wrap items-center gap-2">
+            <ActionForm action={updateStageAction} className="flex flex-1 flex-wrap items-center gap-2">
               <input type="hidden" name="stageId" value={s.id} />
               <label className="sr-only" htmlFor={`name-${s.id}`}>Nombre</label>
-              <input id={`name-${s.id}`} name="name" defaultValue={s.name} required maxLength={60} className={`${inputClass} flex-1`} />
+              <Input id={`name-${s.id}`} name="name" defaultValue={s.name} required maxLength={60} className="flex-1" />
               <button className={small}>Renombrar</button>
-            </form>
+            </ActionForm>
             <span className="text-xs text-slate-600">{STAGE_KIND_LABELS[s.kind]}</span>
-            <form action={updateStageAction}>
+            <ActionForm action={updateStageAction}>
               <input type="hidden" name="stageId" value={s.id} />
               <input type="hidden" name="active" value={s.active ? "false" : "true"} />
               <button className={small}>{s.active ? "Desactivar" : "Activar"}</button>
-            </form>
+            </ActionForm>
           </li>
         ))}
       </ol>
       {stages.length === 0 && <Notice>La agencia no tiene etapas.</Notice>}
-      <form action={createStageAction} className="flex flex-wrap items-end gap-3 rounded-lg border border-slate-200 bg-white p-4">
+      <ActionForm action={createStageAction} className="flex flex-wrap items-end gap-3 rounded-lg border border-slate-200 bg-white p-4">
         <Field label="Nueva etapa">
-          <input name="name" required maxLength={60} className={inputClass} />
+          <Input name="name" required maxLength={60} />
         </Field>
         <Field label="Tipo">
-          <select name="kind" defaultValue="abierta" className={inputClass}>
+          <Select name="kind" defaultValue="abierta">
             {STAGE_KINDS.map((k) => (
               <option key={k} value={k}>{STAGE_KIND_LABELS[k]}</option>
             ))}
-          </select>
+          </Select>
         </Field>
         <button className={buttonClass}>Agregar</button>
-      </form>
+      </ActionForm>
     </div>
   );
 }

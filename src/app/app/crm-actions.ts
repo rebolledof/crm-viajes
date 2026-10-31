@@ -8,7 +8,8 @@ import { getDb, withUser } from "@/db/client";
 import { isLossReason, isStageKind } from "@/domain/pipeline";
 import { isPriority, isTaskKind, parseBogotaDateTime } from "@/domain/tasks";
 import { createContact, openWhatsapp, recordConsent, updateContact, type ContactInput } from "@/server/contacts";
-import { AppError, ERROR_MESSAGES, type ErrorCode } from "@/server/errors";
+import type { FormState } from "@/components/form";
+import { AppError, CODE_FIELDS, ERROR_MESSAGES, errorMessage, type ErrorCode } from "@/server/errors";
 import { createOpportunity, createStage, moveOpportunity, reorderStages, updateOpportunity, updateStage } from "@/server/opportunities";
 import { requireActiveAgency } from "@/server/session";
 import { cancelTask, completeTask, createTask } from "@/server/tasks";
@@ -29,14 +30,30 @@ function withParam(path: string, key: string, value: string): string {
   return `${path}${path.includes("?") ? "&" : "?"}${key}=${encodeURIComponent(value)}`;
 }
 
-async function run<T>(fn: () => Promise<T>): Promise<{ ok: true; value: T } | { ok: false; code: ErrorCode; detail?: string }> {
+type Failure = { ok: false; code: ErrorCode; detail?: string; field?: string };
+
+async function run<T>(fn: () => Promise<T>): Promise<{ ok: true; value: T } | Failure> {
   try {
     return { ok: true, value: await fn() };
   } catch (err) {
-    if (err instanceof AppError) return { ok: false, code: err.code, detail: err.detail };
+    if (err instanceof AppError) return { ok: false, code: err.code, detail: err.detail, field: err.field ?? CODE_FIELDS[err.code] };
     console.error(err);
     throw err;
   }
+}
+
+/** Respuesta de error que conserva lo escrito y señala el campo (RF de usabilidad, AGENTS.md). */
+function failed(fd: FormData, f: Pick<Failure, "code" | "field">, extra: Partial<FormState> = {}): FormState {
+  const values: Record<string, string[]> = {};
+  for (const [k, v] of fd.entries()) {
+    if (k.startsWith("$") || typeof v !== "string") continue;
+    (values[k] ??= []).push(v);
+  }
+  return { error: errorMessage(f.code, f.field), field: f.field, values, at: Date.now(), ...extra };
+}
+
+function duplicateLink(r: Failure): Partial<FormState> {
+  return r.code === "duplicate_contact" && r.detail ? { link: { href: `/app/contactos/${r.detail}`, label: "Abrir el contacto existente" } } : {};
 }
 
 async function ctx() {
@@ -58,37 +75,31 @@ function contactInput(fd: FormData): ContactInput {
   };
 }
 
-export async function createContactAction(fd: FormData) {
+export async function createContactAction(_prev: FormState, fd: FormData): Promise<FormState> {
   const { user, agencyId, db } = await ctx();
   const r = await run(() => withUser(db, user, (tx) => createContact(tx, user.id, agencyId, contactInput(fd))));
-  if (!r.ok) {
-    const path = withParam("/app/contactos/nuevo", "error", r.code);
-    redirect(r.detail ? withParam(path, "existente", r.detail) : path);
-  }
+  if (!r.ok) return failed(fd, r, duplicateLink(r));
   revalidatePath("/app/contactos");
   redirect(`/app/contactos/${r.value}?ok=creado`);
 }
 
-export async function updateContactAction(fd: FormData) {
+export async function updateContactAction(_prev: FormState, fd: FormData): Promise<FormState> {
   const { user, agencyId, db } = await ctx();
   const id = str(fd, "contactId");
   const r = await run(() => withUser(db, user, (tx) => updateContact(tx, user.id, agencyId, id, contactInput(fd))));
-  if (!r.ok) {
-    const path = withParam(`/app/contactos/${id}/editar`, "error", r.code);
-    redirect(r.detail ? withParam(path, "existente", r.detail) : path);
-  }
+  if (!r.ok) return failed(fd, r, duplicateLink(r));
   revalidatePath(`/app/contactos/${id}`);
   redirect(`/app/contactos/${id}?ok=guardado`);
 }
 
-export async function recordConsentAction(fd: FormData) {
+export async function recordConsentAction(_prev: FormState, fd: FormData): Promise<FormState> {
   const { user, agencyId, db } = await ctx();
   const id = str(fd, "contactId");
   const channel = str(fd, "channel");
   const purpose = str(fd, "purpose");
   const status = str(fd, "status");
   if (!["whatsapp", "correo", "telefono"].includes(channel) || !["servicio", "promociones"].includes(purpose) || !["otorgado", "retirado"].includes(status)) {
-    redirect(withParam(`/app/contactos/${id}`, "error", "invalid_input"));
+    return failed(fd, { code: "invalid_input" });
   }
   const r = await run(() =>
     withUser(db, user, (tx) =>
@@ -100,7 +111,7 @@ export async function recordConsentAction(fd: FormData) {
       }),
     ),
   );
-  if (!r.ok) redirect(withParam(`/app/contactos/${id}`, "error", r.code));
+  if (!r.ok) return failed(fd, r);
   revalidatePath(`/app/contactos/${id}`);
   redirect(`/app/contactos/${id}?ok=consentimiento`);
 }
@@ -136,25 +147,25 @@ function opportunityFields(fd: FormData) {
   };
 }
 
-export async function createOpportunityAction(fd: FormData) {
+export async function createOpportunityAction(_prev: FormState, fd: FormData): Promise<FormState> {
   const { user, agencyId, db } = await ctx();
   const contactId = str(fd, "contactId");
   const r = await run(() => withUser(db, user, (tx) => createOpportunity(tx, user.id, agencyId, { contactId, stageId: opt(fd, "stageId"), ...opportunityFields(fd) })));
-  if (!r.ok) redirect(withParam(`/app/oportunidades/nueva?contactId=${encodeURIComponent(contactId)}`, "error", r.code));
+  if (!r.ok) return failed(fd, r);
   revalidatePath("/app/oportunidades");
   redirect(`/app/oportunidades/${r.value}?ok=creada`);
 }
 
-export async function updateOpportunityAction(fd: FormData) {
+export async function updateOpportunityAction(_prev: FormState, fd: FormData): Promise<FormState> {
   const { user, agencyId, db } = await ctx();
   const id = str(fd, "opportunityId");
   const r = await run(() => withUser(db, user, (tx) => updateOpportunity(tx, user.id, agencyId, id, opportunityFields(fd))));
-  if (!r.ok) redirect(withParam(`/app/oportunidades/${id}/editar`, "error", r.code));
+  if (!r.ok) return failed(fd, r);
   revalidatePath(`/app/oportunidades/${id}`);
   redirect(`/app/oportunidades/${id}?ok=guardada`);
 }
 
-export async function moveOpportunityAction(fd: FormData) {
+export async function moveOpportunityAction(_prev: FormState, fd: FormData): Promise<FormState> {
   const { user, agencyId, db } = await ctx();
   const id = str(fd, "opportunityId");
   const reason = str(fd, "lostReason");
@@ -170,19 +181,19 @@ export async function moveOpportunityAction(fd: FormData) {
     ),
   );
   const to = back(fd, `/app/oportunidades/${id}`);
-  if (!r.ok) redirect(withParam(to, "error", r.code));
+  if (!r.ok) return failed(fd, r);
   revalidatePath("/app/oportunidades");
   revalidatePath(`/app/oportunidades/${id}`);
   redirect(withParam(to, "ok", "etapa"));
 }
 
-export async function createTaskAction(fd: FormData) {
+export async function createTaskAction(_prev: FormState, fd: FormData): Promise<FormState> {
   const { user, agencyId, db } = await ctx();
   const to = back(fd, "/app");
   const kind = str(fd, "kind");
   const priority = str(fd, "priority");
   const dueAt = parseBogotaDateTime(str(fd, "dueAt"));
-  if (!isTaskKind(kind) || !dueAt) redirect(withParam(to, "error", "invalid_input"));
+  if (!isTaskKind(kind) || !dueAt) return failed(fd, { code: "invalid_input", field: "dueAt" });
   const r = await run(() =>
     withUser(db, user, (tx) =>
       createTask(tx, user.id, agencyId, {
@@ -196,40 +207,40 @@ export async function createTaskAction(fd: FormData) {
       }),
     ),
   );
-  if (!r.ok) redirect(withParam(to, "error", r.code));
+  if (!r.ok) return failed(fd, r);
   revalidatePath(to.split("?")[0]);
   redirect(withParam(to, "ok", "tarea"));
 }
 
-export async function completeTaskAction(fd: FormData) {
+export async function completeTaskAction(_prev: FormState, fd: FormData): Promise<FormState> {
   const { user, agencyId, db } = await ctx();
   const to = back(fd, "/app");
   const r = await run(() => withUser(db, user, (tx) => completeTask(tx, user.id, agencyId, str(fd, "taskId"), str(fd, "result"))));
-  if (!r.ok) redirect(withParam(to, "error", r.code));
+  if (!r.ok) return failed(fd, r);
   revalidatePath(to.split("?")[0]);
   redirect(withParam(to, "ok", "completada"));
 }
 
-export async function cancelTaskAction(fd: FormData) {
+export async function cancelTaskAction(_prev: FormState, fd: FormData): Promise<FormState> {
   const { user, agencyId, db } = await ctx();
   const to = back(fd, "/app");
   const r = await run(() => withUser(db, user, (tx) => cancelTask(tx, user.id, agencyId, str(fd, "taskId"), str(fd, "reason"))));
-  if (!r.ok) redirect(withParam(to, "error", r.code));
+  if (!r.ok) return failed(fd, r);
   revalidatePath(to.split("?")[0]);
   redirect(withParam(to, "ok", "cancelada"));
 }
 
-export async function createStageAction(fd: FormData) {
+export async function createStageAction(_prev: FormState, fd: FormData): Promise<FormState> {
   const { user, agencyId, db } = await ctx();
   const kind = str(fd, "kind");
-  if (!isStageKind(kind)) redirect("/app/embudo?error=invalid_input");
+  if (!isStageKind(kind)) return failed(fd, { code: "invalid_input", field: "kind" });
   const r = await run(() => withUser(db, user, (tx) => createStage(tx, user.id, agencyId, { name: str(fd, "name"), kind })));
-  if (!r.ok) redirect(`/app/embudo?error=${r.code}`);
+  if (!r.ok) return failed(fd, r);
   revalidatePath("/app/embudo");
   redirect("/app/embudo?ok=creada");
 }
 
-export async function updateStageAction(fd: FormData) {
+export async function updateStageAction(_prev: FormState, fd: FormData): Promise<FormState> {
   const { user, agencyId, db } = await ctx();
   const active = fd.get("active");
   const name = fd.get("name");
@@ -241,7 +252,7 @@ export async function updateStageAction(fd: FormData) {
       }),
     ),
   );
-  if (!r.ok) redirect(`/app/embudo?error=${r.code}`);
+  if (!r.ok) return failed(fd, r);
   revalidatePath("/app/embudo");
   redirect("/app/embudo?ok=guardada");
 }

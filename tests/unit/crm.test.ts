@@ -1,4 +1,6 @@
 // SPEC-002 · reglas puras: teléfonos, dinero, cierre, tareas y WhatsApp
+import { prepareContact } from "@/server/contacts";
+import { AppError, ERROR_MESSAGES, errorMessage } from "@/server/errors";
 import { signUpProblem } from "@/domain/auth-errors";
 import { describe, expect, it } from "vitest";
 import { formatMoney, parseAmount } from "@/domain/money";
@@ -118,5 +120,29 @@ describe("signUpProblem", () => {
     expect(signUpProblem("user_already_exists")).toBe("ya_existe");
     expect(signUpProblem("email_address_invalid")).toBe("correo_invalido");
     expect(signUpProblem("unexpected_failure", 500)).toBe("registro");
+  });
+});
+
+describe("errores ligados a un campo", () => {
+  it("señala el teléfono y el correo exactos que fallaron", () => {
+    const base = { fullName: "Ana", phones: [], emails: [], tags: [] };
+    const fieldOf = (input: Parameters<typeof prepareContact>[0]) => {
+      try {
+        prepareContact(input);
+      } catch (err) {
+        return err instanceof AppError ? `${err.code}:${err.field}` : "otro";
+      }
+      return "sin error";
+    };
+    expect(fieldOf({ ...base, phones: [{ raw: "300 123 4567" }, { raw: "12" }] })).toBe("invalid_phone:phone.1");
+    expect(fieldOf({ ...base, emails: ["", "no-es-correo"] })).toBe("invalid_input:email.1");
+    expect(fieldOf({ ...base, fullName: "  " })).toBe("invalid_input:fullName");
+    expect(fieldOf({ ...base, language: "esp" })).toBe("invalid_input:language");
+  });
+
+  it("usa un mensaje propio del campo cuando lo hay", () => {
+    expect(errorMessage("invalid_input", "email.1")).toBe("Ese correo no tiene un formato válido.");
+    expect(errorMessage("invalid_input", "campo_sin_mensaje")).toBe(ERROR_MESSAGES.invalid_input);
+    expect(errorMessage("invalid_phone", "phone.0")).toBe(ERROR_MESSAGES.invalid_phone);
   });
 });

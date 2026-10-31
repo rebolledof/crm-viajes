@@ -7,7 +7,7 @@ import { normalizeEmail } from "@/domain/invitations";
 import { normalizePhone } from "@/domain/phone";
 import { DEFAULT_WHATSAPP_TEMPLATE, fillWhatsappTemplate, whatsappAllowed, whatsappLink } from "@/domain/whatsapp";
 import { recordAudit, requirePermission } from "./agencies";
-import { AppError, pgError, rethrowBusiness } from "./errors";
+import { AppError, fieldError, pgError, rethrowBusiness } from "./errors";
 
 export type Channel = "whatsapp" | "correo" | "telefono";
 export type Purpose = "servicio" | "promociones";
@@ -31,23 +31,23 @@ const CONTACT_ID = sql.raw('"contacts"."id"');
 /** Valida y normaliza; el primer teléfono y el primer correo quedan como preferidos. */
 export function prepareContact(input: ContactInput) {
   const fullName = input.fullName.trim();
-  if (!fullName || fullName.length > 160) throw new AppError("invalid_input");
+  if (!fullName || fullName.length > 160) throw fieldError("invalid_input", "fullName");
   const phones: { e164: string; label: string | null }[] = [];
-  for (const p of input.phones) {
+  for (const [i, p] of input.phones.entries()) {
     if (!p.raw.trim()) continue;
     const e164 = normalizePhone(p.raw);
-    if (!e164) throw new AppError("invalid_phone");
+    if (!e164) throw fieldError("invalid_phone", `phone.${i}`);
     if (!phones.some((x) => x.e164 === e164)) phones.push({ e164, label: blank(p.label) });
   }
   const emails: string[] = [];
-  for (const raw of input.emails) {
+  for (const [i, raw] of input.emails.entries()) {
     if (!raw.trim()) continue;
     const email = normalizeEmail(raw);
-    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new AppError("invalid_input");
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw fieldError("invalid_input", `email.${i}`);
     if (!emails.includes(email)) emails.push(email);
   }
   const language = blank(input.language)?.toLowerCase() ?? null;
-  if (language && !/^[a-z]{2}$/.test(language)) throw new AppError("invalid_input");
+  if (language && !/^[a-z]{2}$/.test(language)) throw fieldError("invalid_input", "language");
   const tags = [...new Set((input.tags ?? []).map((t) => t.trim().toLowerCase()).filter(Boolean))].slice(0, 20);
   return {
     fullName,
@@ -215,7 +215,7 @@ export async function recordConsent(
 ): Promise<void> {
   await requirePermission(tx, userId, agencyId, "crm.write");
   const source = input.source.trim();
-  if (!source) throw new AppError("invalid_input");
+  if (!source) throw fieldError("invalid_input", "source");
   const [c] = await tx.select({ id: contacts.id }).from(contacts).where(and(eq(contacts.id, contactId), eq(contacts.agencyId, agencyId)));
   if (!c) throw new AppError("not_found");
   await tx.insert(contactConsents).values({ agencyId, contactId, channel: input.channel, purpose: input.purpose, status: input.status, source, actorId: userId });

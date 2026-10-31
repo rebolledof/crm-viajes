@@ -5,7 +5,7 @@ import { contacts, opportunities, pipelineStages, tasks } from "@/db/schema";
 import { endOfLocalDay, isPriority, isTaskKind, type Priority, type TaskKind } from "@/domain/tasks";
 import { recordAudit, requirePermission } from "./agencies";
 import { logActivity } from "./contacts";
-import { AppError, rethrowBusiness } from "./errors";
+import { AppError, fieldError, rethrowBusiness } from "./errors";
 
 export type TaskInput = {
   contactId: string;
@@ -20,7 +20,8 @@ export type TaskInput = {
 export async function createTask(tx: Tx, userId: string, agencyId: string, input: TaskInput): Promise<string> {
   await requirePermission(tx, userId, agencyId, "crm.write");
   const title = input.title.trim();
-  if (!title || title.length > 200 || !isTaskKind(input.kind) || Number.isNaN(input.dueAt.getTime())) throw new AppError("invalid_input");
+  if (!title || title.length > 200) throw fieldError("invalid_input", "title");
+  if (!isTaskKind(input.kind) || Number.isNaN(input.dueAt.getTime())) throw fieldError("invalid_input", "dueAt");
   if (input.priority && !isPriority(input.priority)) throw new AppError("invalid_input");
   const [contact] = await tx.select({ id: contacts.id }).from(contacts).where(and(eq(contacts.id, input.contactId), eq(contacts.agencyId, agencyId)));
   if (!contact) throw new AppError("not_found");
@@ -56,7 +57,7 @@ export async function completeTask(tx: Tx, userId: string, agencyId: string, tas
 export async function cancelTask(tx: Tx, userId: string, agencyId: string, taskId: string, reason: string): Promise<void> {
   await requirePermission(tx, userId, agencyId, "crm.write");
   const text = reason.trim();
-  if (!text) throw new AppError("invalid_input");
+  if (!text) throw fieldError("invalid_input", "reason");
   const [row] = await tx
     .update(tasks)
     .set({ status: "cancelada", result: text })

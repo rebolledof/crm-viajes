@@ -29,11 +29,49 @@ export class AppError extends Error {
     public readonly code: ErrorCode,
     /** Dato extra para la interfaz, por ejemplo el contacto que ya existe. */
     public readonly detail?: string,
+    /** Campo del formulario que causó el error, por ejemplo "phone.1" (nombre e índice). */
+    public readonly field?: string,
   ) {
     super(code);
     this.name = "AppError";
   }
 }
+
+/** Error de validación ligado a un campo, para resaltarlo en el formulario. */
+export function fieldError(code: ErrorCode, field: string): AppError {
+  return new AppError(code, undefined, field);
+}
+
+/** Mensajes más precisos cuando se sabe qué campo falló. */
+const FIELD_MESSAGES: Record<string, string> = {
+  "invalid_input:fullName": "Escribe el nombre (máximo 160 caracteres).",
+  "invalid_input:email": "Ese correo no tiene un formato válido.",
+  "invalid_input:language": "El idioma va con 2 letras, por ejemplo es o en.",
+  "invalid_input:travelStart": "Revisa la fecha de ida.",
+  "invalid_input:travelEnd": "La fecha de regreso no puede ser anterior a la de ida.",
+  "invalid_input:travelers": "Los viajeros deben ser un número entre 1 y 999.",
+  "invalid_input:title": "Escribe qué hay que hacer (máximo 200 caracteres).",
+  "invalid_input:dueAt": "Elige la fecha y hora de vencimiento.",
+  "invalid_input:source": "Escribe cómo dio o retiró el permiso el contacto.",
+  "invalid_input:reason": "Escribe el motivo.",
+  "invalid_input:name": "Escribe un nombre de 1 a 60 caracteres.",
+};
+
+export function errorMessage(code: ErrorCode, field?: string): string {
+  const base = field?.split(".")[0];
+  return (base && FIELD_MESSAGES[`${code}:${base}`]) || ERROR_MESSAGES[code];
+}
+
+/** Campo al que pertenece cada error que siempre viene del mismo campo. */
+export const CODE_FIELDS: Partial<Record<ErrorCode, string>> = {
+  invalid_amount: "budgetAmount",
+  lost_reason_required: "lostReason",
+  lost_note_required: "lostNote",
+  won_evidence_required: "wonEvidence",
+  reopen_reason_required: "reason",
+  result_required: "result",
+  stage_name_taken: "name",
+};
 
 export function isErrorCode(value: unknown): value is ErrorCode {
   return typeof value === "string" && value in ERROR_MESSAGES;
