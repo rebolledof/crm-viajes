@@ -24,7 +24,7 @@ export async function signInAction(formData: FormData) {
   if (!parsed.success) back("/login", "datos", next);
   const supabase = await createSupabaseServer();
   const { error } = await supabase.auth.signInWithPassword(parsed.data);
-  if (error) back("/login", "credenciales", next);
+  if (error) back("/login", error.code === "email_not_confirmed" ? "sin_confirmar" : "credenciales", next);
   redirect(next);
 }
 

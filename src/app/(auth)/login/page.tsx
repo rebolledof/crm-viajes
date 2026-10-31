@@ -5,6 +5,7 @@ import { signInAction } from "../actions";
 
 const ERRORS: Record<string, string> = {
   credenciales: "El correo o la contraseña no coinciden.",
+  sin_confirmar: "Todavía no confirmaste tu correo. Abre el enlace que te enviamos al registrarte.",
   datos: "Escribe un correo válido y una contraseña de al menos 8 caracteres.",
 };
 
