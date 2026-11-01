@@ -7,7 +7,7 @@ import { acceptInvitation, createAgency, createInvitation, revokeMembership } fr
 import { createContact, getContactDetail, listContacts, openWhatsapp, recordConsent, updateContact } from "../../src/server/contacts";
 import { AppError } from "../../src/server/errors";
 import { createOpportunity, createStage, getOpportunity, listOpportunities, listStages, moveOpportunity, reorderStages, updateOpportunity, updateStage } from "../../src/server/opportunities";
-import { completeTask, createTask, listTasks, myDay } from "../../src/server/tasks";
+import { cancelTask, completeTask, createTask, listTasks, myDay } from "../../src/server/tasks";
 import { as, createUser, testDb } from "./helpers";
 
 const t = testDb();
@@ -350,5 +350,60 @@ describe("etapas propias de cada agencia (AC-214 a AC-217)", () => {
     const order = [id, ...all.map((s) => s.id).filter((x) => x !== id)];
     await as(t.db, adminA, (tx) => reorderStages(tx, adminA.id, agencyA, order));
     expect((await as(t.db, adminA, (tx) => listStages(tx, adminA.id, agencyA, { includeInactive: true })))[0].name).toBe("Esperando pago");
+  });
+});
+
+describe("hallazgos de la prueba independiente de S02", () => {
+  it("lo de una persona retirada se puede completar, cancelar, mover y editar", async () => {
+    const leaving = await createUser(t.admin, "salida-a");
+    await join(adminA, agencyA, leaving, "asesor");
+    const cId = await newContact(leaving, agencyA, "Marta Gil");
+    const oId = await as(t.db, leaving, (tx) => createOpportunity(tx, leaving.id, agencyA, { contactId: cId, destination: "Quito" }));
+    const t1 = await as(t.db, leaving, (tx) => createTask(tx, leaving.id, agencyA, { contactId: cId, opportunityId: oId, kind: "llamada", title: "Llamar", dueAt: new Date() }));
+    const t2 = await as(t.db, leaving, (tx) => createTask(tx, leaving.id, agencyA, { contactId: cId, kind: "correo", title: "Escribir", dueAt: new Date() }));
+    const contactado = await stageId(adminA, agencyA, "Contactado");
+    await as(t.db, adminA, (tx) => revokeMembership(tx, adminA.id, agencyA, leaving.id));
+
+    await as(t.db, adminA, (tx) => completeTask(tx, adminA.id, agencyA, t1, "La llamé yo"));
+    await as(t.db, adminA, (tx) => cancelTask(tx, adminA.id, agencyA, t2, "Ya no aplica"));
+    await as(t.db, adminA, (tx) => moveOpportunity(tx, adminA.id, agencyA, oId, { stageId: contactado }));
+    await as(t.db, adminA, (tx) => updateContact(tx, adminA.id, agencyA, cId, { fullName: "Marta Gil Rueda", phones: [], emails: [] }));
+    // Pero no se le puede volver a asignar nada.
+    await expectCode(as(t.db, adminA, (tx) => createOpportunity(tx, adminA.id, agencyA, { contactId: cId, ownerId: leaving.id })), "not_active_member");
+    await expectCode(as(t.db, adminA, (tx) => createTask(tx, adminA.id, agencyA, { contactId: cId, kind: "llamada", title: "x", assigneeId: leaving.id, dueAt: new Date() })), "not_active_member");
+  });
+
+  it("una tarea con una oportunidad de otro contacto da un error de negocio", async () => {
+    const c1 = await newContact(asesorA, agencyA, "Iván Mora");
+    const c2 = await newContact(asesorA, agencyA, "Lucía Mora");
+    const o2 = await as(t.db, asesorA, (tx) => createOpportunity(tx, asesorA.id, agencyA, { contactId: c2 }));
+    await expectCode(as(t.db, asesorA, (tx) => createTask(tx, asesorA.id, agencyA, { contactId: c1, opportunityId: o2, kind: "llamada", title: "x", dueAt: new Date() })), "task_contact_mismatch");
+  });
+
+  it("un identificador malformado responde 'no encontrado', no un error interno", async () => {
+    const cId = await newContact(asesorA, agencyA, "Nora Vélez");
+    await expectCode(as(t.db, asesorA, (tx) => completeTask(tx, asesorA.id, agencyA, "no-es-uuid", "x")), "not_found");
+    await expectCode(as(t.db, asesorA, (tx) => cancelTask(tx, asesorA.id, agencyA, "no-es-uuid", "x")), "not_found");
+    await expectCode(as(t.db, asesorA, (tx) => createTask(tx, asesorA.id, agencyA, { contactId: "x", kind: "llamada", title: "x", dueAt: new Date() })), "not_found");
+    await expectCode(as(t.db, asesorA, (tx) => createTask(tx, asesorA.id, agencyA, { contactId: cId, opportunityId: "x", kind: "llamada", title: "x", dueAt: new Date() })), "not_found");
+    await expectCode(as(t.db, asesorA, (tx) => createOpportunity(tx, asesorA.id, agencyA, { contactId: "x" })), "not_found");
+    const oId = await as(t.db, asesorA, (tx) => createOpportunity(tx, asesorA.id, agencyA, { contactId: cId }));
+    await expectCode(as(t.db, asesorA, (tx) => moveOpportunity(tx, asesorA.id, agencyA, oId, { stageId: "x" })), "not_found");
+    await expectCode(as(t.db, asesorA, (tx) => moveOpportunity(tx, asesorA.id, agencyA, "x", { stageId: "x" })), "not_found");
+  });
+
+  it("WhatsApp no registra el mensaje en una oportunidad de otro contacto", async () => {
+    const c1 = await newContact(asesorA, agencyA, "Raúl Peña", "3001112233");
+    const c2 = await newContact(asesorA, agencyA, "Rosa Peña", "3001112244");
+    const o2 = await as(t.db, asesorA, (tx) => createOpportunity(tx, asesorA.id, agencyA, { contactId: c2 }));
+    await expectCode(as(t.db, asesorA, (tx) => openWhatsapp(tx, asesorA.id, agencyA, c1, { opportunityId: o2, message: "Hola" })), "not_found");
+  });
+
+  it("la búsqueda de contactos encuentra por parte del teléfono", async () => {
+    const cId = await newContact(asesorA, agencyA, "Julia Ortiz", "310 987 6543");
+    const found = await as(t.db, asesorA, (tx) => listContacts(tx, asesorA.id, agencyA, "876 54"));
+    expect(found.map((c) => c.id)).toContain(cId);
+    const none = await as(t.db, asesorA, (tx) => listContacts(tx, asesorA.id, agencyA, "12"));
+    expect(none.map((c) => c.id)).not.toContain(cId);
   });
 });

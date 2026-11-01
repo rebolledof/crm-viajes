@@ -1,3 +1,4 @@
+import { firstParams } from "@/domain/params";
 import Link from "next/link";
 import { ActionForm, Input } from "@/components/form";
 import { AUTH_MESSAGES } from "@/domain/auth-errors";
@@ -5,7 +6,7 @@ import { Field, Notice, buttonClass, linkButtonClass } from "@/components/ui";
 import { requestPasswordResetAction } from "../actions";
 
 export default async function RecuperarPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
-  const sp = await searchParams;
+  const sp = firstParams(await searchParams);
   return (
     <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center gap-6 px-4">
       <h1 className="text-2xl font-semibold text-slate-900">Recuperar contraseña</h1>

@@ -1,3 +1,4 @@
+import { firstParams } from "@/domain/params";
 import { redirect } from "next/navigation";
 import { getDb, withUser } from "@/db/client";
 import { can } from "@/domain/permissions";
@@ -9,7 +10,7 @@ import { ContactForm, Flash, type SearchParams } from "../../crm-ui";
 export default async function NuevoContactoPage({ searchParams }: { searchParams: SearchParams }) {
   const { user, active } = await requireActiveAgency();
   if (!can(active.role, "crm.write")) redirect("/app/contactos?error=permission_denied");
-  const sp = await searchParams;
+  const sp = firstParams(await searchParams);
   const members = await withUser(getDb(), user, (tx) => activeMembers(tx, user.id, active.agencyId));
   return (
     <div className="flex flex-col gap-6">

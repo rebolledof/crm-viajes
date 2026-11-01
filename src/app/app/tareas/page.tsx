@@ -1,3 +1,4 @@
+import { firstParams } from "@/domain/params";
 import Link from "next/link";
 import { Notice, buttonClass, inputClass, linkButtonClass } from "@/components/ui";
 import { getDb, withUser } from "@/db/client";
@@ -17,7 +18,7 @@ const GROUPS = [
 /** Módulo de Tareas (RF-218): todas las tareas de la agencia con filtros. */
 export default async function TareasPage({ searchParams }: { searchParams: SearchParams }) {
   const { user, active } = await requireActiveAgency();
-  const sp = await searchParams;
+  const sp = firstParams(await searchParams);
   const members = await withUser(getDb(), user, (tx) => activeMembers(tx, user.id, active.agencyId));
   const owner = sp.responsable ?? "mias";
   const status: TaskStatus = (TASK_STATUSES as readonly string[]).includes(sp.estado ?? "") ? (sp.estado as TaskStatus) : "abierta";

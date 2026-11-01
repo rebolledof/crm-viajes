@@ -1,3 +1,4 @@
+import { firstParams } from "@/domain/params";
 import Link from "next/link";
 import { ActionForm, Input } from "@/components/form";
 import { AUTH_MESSAGES } from "@/domain/auth-errors";
@@ -6,7 +7,7 @@ import { safeNext } from "@/lib/supabase/env";
 import { signUpAction } from "../actions";
 
 export default async function RegistroPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
-  const sp = await searchParams;
+  const sp = firstParams(await searchParams);
   const next = safeNext(sp.next);
   return (
     <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center gap-6 px-4">

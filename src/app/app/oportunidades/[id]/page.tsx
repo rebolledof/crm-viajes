@@ -1,3 +1,4 @@
+import { firstParams } from "@/domain/params";
 import Link from "next/link";
 import { Notice, linkButtonClass } from "@/components/ui";
 import { getDb, withUser } from "@/db/client";
@@ -18,7 +19,7 @@ const UNKNOWN = "Desconocido";
 export default async function OportunidadPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: SearchParams }) {
   const { user, active } = await requireActiveAgency();
   const { id } = await params;
-  const sp = await searchParams;
+  const sp = firstParams(await searchParams);
   const [data, stages, members] = await loadOr404(id, () =>
     withUser(getDb(), user, (tx) => Promise.all([getOpportunity(tx, user.id, active.agencyId, id), listStages(tx, user.id, active.agencyId), activeMembers(tx, user.id, active.agencyId)])),
   );

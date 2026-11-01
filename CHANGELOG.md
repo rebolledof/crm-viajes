@@ -24,3 +24,18 @@
 - El login avisa cuando falta confirmar el correo.
 - La pantalla de registro explica el motivo cuando Supabase rechaza la cuenta (límite de correos, contraseña débil, correo existente).
 - Botón de WhatsApp con mensaje prellenado y editable que respeta el consentimiento y queda en la ficha.
+- Regla de prueba independiente en AGENTS.md: otro agente con un modelo distinto prueba cada cambio antes del merge y luego se actualiza el tablero.
+- La búsqueda de contactos encuentra por parte del teléfono (desde 4 dígitos).
+- La auditoría muestra en español los eventos de contactos, oportunidades, etapas y tareas, con "de etapa a etapa" y la razón.
+- Los campos obligatorios llevan un asterisco rojo.
+
+### Corregido (prueba independiente de S02, 1 nov 2026)
+
+- Las tareas, oportunidades y contactos de una persona retirada de la agencia ya se pueden completar, cancelar, mover y editar; antes daban error. Asignarle algo nuevo sigue prohibido (migración 20261103000000).
+- Un parámetro repetido en la URL (?q=a&q=b) ya no rompe las listas.
+- Un identificador alterado en un formulario o en la URL responde "no encontrado" en vez de un error interno.
+- Una tarea con una oportunidad de otro contacto muestra un mensaje claro; WhatsApp ya no registra el mensaje en una oportunidad de otro contacto.
+- Una fecha que no existe (30 de febrero) se rechaza en vez de correrse al mes siguiente.
+- Al editar, un responsable que ya no está en la agencia se conserva en vez de borrarse.
+- El campo de viajeros acepta hasta 999, igual que el servidor.
+- Oportunidades sin resultados explica qué hacer (cambiar el filtro o crear una desde un contacto).

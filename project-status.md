@@ -27,6 +27,7 @@
 
 ## Pendiente
 
+- Aplicar en Supabase de pruebas la migración 20261103000000 (solo reemplaza funciones de triggers), con permiso de Felipe.
 - Antes del piloto: conectar un servicio de correo propio (SMTP) en Supabase; el correo incluido solo envía unos 2 por hora y bloqueó el registro y la recuperación de contraseña el 31 oct.
 - Antes del piloto con datos reales: pasar Supabase y Vercel a planes Pro (el plan Hobby de Vercel no permite uso comercial y el gratuito de Supabase no tiene copias).
 - Felipe: iniciar la verificación de Meta Business (ahora es crítica para la bandeja).

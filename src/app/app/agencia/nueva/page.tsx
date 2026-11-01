@@ -1,10 +1,11 @@
+import { firstParams } from "@/domain/params";
 import { ActionForm, Input } from "@/components/form";
 import { Field, Notice, buttonClass } from "@/components/ui";
 import { ERROR_MESSAGES, isErrorCode } from "@/server/errors";
 import { createAgencyAction } from "../../actions";
 
 export default async function NuevaAgenciaPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
-  const sp = await searchParams;
+  const sp = firstParams(await searchParams);
   return (
     <div className="mx-auto flex max-w-md flex-col gap-6">
       <h1 className="text-2xl font-semibold text-slate-900">Crea tu agencia</h1>

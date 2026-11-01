@@ -1,3 +1,4 @@
+import { firstParams } from "@/domain/params";
 import { redirect } from "next/navigation";
 import { getDb, withUser } from "@/db/client";
 import { can } from "@/domain/permissions";
@@ -11,7 +12,7 @@ export default async function EditarOportunidadPage({ params, searchParams }: { 
   const { user, active } = await requireActiveAgency();
   const { id } = await params;
   if (!can(active.role, "crm.write")) redirect(`/app/oportunidades/${id}?error=permission_denied`);
-  const sp = await searchParams;
+  const sp = firstParams(await searchParams);
   const [data, members] = await loadOr404(id, () =>
     withUser(getDb(), user, (tx) => Promise.all([getOpportunity(tx, user.id, active.agencyId, id), activeMembers(tx, user.id, active.agencyId)])),
   );

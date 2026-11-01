@@ -1,3 +1,4 @@
+import { firstParams } from "@/domain/params";
 import Link from "next/link";
 import { Notice, inputClass, buttonClass } from "@/components/ui";
 import { getDb, withUser } from "@/db/client";
@@ -9,7 +10,7 @@ import { Flash, budget, fechaHora, formatDay, memberName, type SearchParams } fr
 
 export default async function OportunidadesPage({ searchParams }: { searchParams: SearchParams }) {
   const { user, active } = await requireActiveAgency();
-  const sp = await searchParams;
+  const sp = firstParams(await searchParams);
   const owner = sp.responsable ?? "mias";
   const [stages, members] = await withUser(getDb(), user, (tx) => Promise.all([listStages(tx, user.id, active.agencyId), activeMembers(tx, user.id, active.agencyId)]));
   const ownerId = owner === "todas" ? undefined : (members.find((m) => m.userId === owner)?.userId ?? user.id);
@@ -39,7 +40,13 @@ export default async function OportunidadesPage({ searchParams }: { searchParams
       <p className="text-sm text-slate-600">
         Para crear una oportunidad abre la ficha del contacto. <Link href="/app/contactos" className="text-sky-700 underline">Ir a contactos</Link>
       </p>
-      {opps.length === 0 && <Notice>No hay oportunidades con este filtro.</Notice>}
+      {opps.length === 0 && (
+        <Notice>
+          {owner === "todas"
+            ? "La agencia todavía no tiene oportunidades. Abre un contacto y usa \"Nueva oportunidad\"."
+            : <>No tienes oportunidades a tu nombre. Cambia el filtro a <Link href="/app/oportunidades?responsable=todas" className="text-sky-700 underline">Todas</Link> o crea una desde la ficha de un contacto.</>}
+        </Notice>
+      )}
       <div className="-mx-4 overflow-x-auto px-4 pb-2">
         <div className="flex gap-3">
           {stages.map((s) => {

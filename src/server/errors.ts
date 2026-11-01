@@ -1,3 +1,5 @@
+import { isUuid } from "@/domain/params";
+
 /** Errores de negocio estables (briefing 15.3). El mensaje es para la persona usuaria. */
 export const ERROR_MESSAGES = {
   permission_denied: "No tienes permiso para hacer esto.",
@@ -20,6 +22,7 @@ export const ERROR_MESSAGES = {
   whatsapp_blocked: "El contacto retiró el permiso para escribirle por WhatsApp.",
   no_phone: "El contacto no tiene teléfono.",
   reopen_reason_required: "Para reabrir una oportunidad cerrada escribe el motivo.",
+  task_contact_mismatch: "Esa oportunidad es de otro contacto. Elige una del mismo contacto o ninguna.",
 } as const;
 
 export type ErrorCode = keyof typeof ERROR_MESSAGES;
@@ -35,6 +38,11 @@ export class AppError extends Error {
     super(code);
     this.name = "AppError";
   }
+}
+
+/** Un identificador malformado (formulario alterado, URL editada) es "no encontrado", no un error interno. */
+export function requireIds(...ids: (string | null | undefined)[]): void {
+  for (const id of ids) if (id != null && !isUuid(id)) throw new AppError("not_found");
 }
 
 /** Error de validación ligado a un campo, para resaltarlo en el formulario. */
@@ -71,6 +79,7 @@ export const CODE_FIELDS: Partial<Record<ErrorCode, string>> = {
   reopen_reason_required: "reason",
   result_required: "result",
   stage_name_taken: "name",
+  task_contact_mismatch: "opportunityId",
 };
 
 export function isErrorCode(value: unknown): value is ErrorCode {

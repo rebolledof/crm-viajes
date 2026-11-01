@@ -1,3 +1,4 @@
+import { firstParams } from "@/domain/params";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { linkButtonClass } from "@/components/ui";
@@ -12,7 +13,7 @@ import { Flash, OpportunityForm, loadOr404, type SearchParams } from "../../crm-
 
 export default async function NuevaOportunidadPage({ searchParams }: { searchParams: SearchParams }) {
   const { user, active } = await requireActiveAgency();
-  const sp = await searchParams;
+  const sp = firstParams(await searchParams);
   const contactId = sp.contactId ?? "";
   if (!can(active.role, "crm.write")) redirect("/app/oportunidades?error=permission_denied");
   const [detail, stages, members] = await loadOr404(contactId, () =>
