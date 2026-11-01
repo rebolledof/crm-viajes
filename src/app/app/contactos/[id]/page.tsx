@@ -30,6 +30,8 @@ export default async function ContactoPage({ params, searchParams }: { params: P
   const now = new Date();
   const back = `/app/contactos/${c.id}`;
   const preferredPhone = detail.phones[0];
+  const openOpps = detail.opportunities.filter((o) => o.stageKind === "abierta").map((o) => ({ id: o.id, label: `${o.destination || "Sin destino"} · ${o.stageName}` }));
+  const oppLabel = new Map(detail.opportunities.map((o) => [o.id, o.destination || "Sin destino"]));
 
   return (
     <div className="flex flex-col gap-6">
@@ -101,7 +103,23 @@ export default async function ContactoPage({ params, searchParams }: { params: P
         ) : (
           <ul className="flex flex-col gap-2">
             {detail.openTasks.map((t) => (
-              <TaskItem key={t.id} task={t} now={now} back={back} canWrite={canWrite} members={members} />
+              <TaskItem
+                key={t.id}
+                task={t}
+                now={now}
+                back={back}
+                canWrite={canWrite}
+                members={members}
+                extra={
+                  <p className="text-sm text-slate-600">
+                    {t.opportunityId ? (
+                      <Link href={`/app/oportunidades/${t.opportunityId}`} className="text-sky-700 hover:underline">Oportunidad: {oppLabel.get(t.opportunityId)}</Link>
+                    ) : (
+                      "Sin oportunidad"
+                    )}
+                  </p>
+                }
+              />
             ))}
           </ul>
         )}
@@ -109,7 +127,7 @@ export default async function ContactoPage({ params, searchParams }: { params: P
           <details className="rounded-lg border border-slate-200 bg-white p-4">
             <summary className="cursor-pointer text-sm font-medium text-sky-700">Nueva tarea</summary>
             <div className="mt-3">
-              <NewTaskForm contactId={c.id} members={members} userId={user.id} back={back} now={now} />
+              <NewTaskForm contactId={c.id} opportunities={openOpps} members={members} userId={user.id} back={back} now={now} />
             </div>
           </details>
         )}

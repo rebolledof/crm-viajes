@@ -228,6 +228,17 @@ describe("tareas y Mi día (AC-209, AC-210, AC-213)", () => {
     expect(other.due.map((d) => d.task.id)).not.toContain(taskId);
   });
 
+  it("una tarea de otro día aparece en las próximas de Mi día, no en las de hoy", async () => {
+    const cId = await newContact(asesorA, agencyA, "Tomás Prieto");
+    const oId = await as(t.db, asesorA, (tx) => createOpportunity(tx, asesorA.id, agencyA, { contactId: cId, destination: "Lima" }));
+    const later = new Date(Date.now() + 3 * 24 * 3600_000);
+    const taskId = await as(t.db, asesorA, (tx) => createTask(tx, asesorA.id, agencyA, { contactId: cId, opportunityId: oId, kind: "llamada", title: "Confirmar hotel", dueAt: later }));
+    const day = await as(t.db, asesorA, (tx) => myDay(tx, asesorA.id, agencyA, new Date()));
+    expect(day.due.map((d) => d.task.id)).not.toContain(taskId);
+    expect(day.upcoming.map((d) => d.task.id)).toContain(taskId);
+    expect(day.withoutNextAction.map((o) => o.id)).not.toContain(oId);
+  });
+
   it("completar sin resultado se rechaza, también en la base", async () => {
     const cId = await newContact(asesorA, agencyA, "Elena Castro");
     const taskId = await as(t.db, asesorA, (tx) => createTask(tx, asesorA.id, agencyA, { contactId: cId, kind: "llamada", title: "Llamar", dueAt: new Date() }));

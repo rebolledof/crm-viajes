@@ -248,7 +248,27 @@ export function OpportunityForm({
   );
 }
 
-export function NewTaskForm({ contactId, opportunityId, members, userId, back, now }: { contactId: string; opportunityId?: string; members: Member[]; userId: string; back: string; now: Date }) {
+/**
+ * Desde la oportunidad, la tarea queda ligada a ella. Desde la ficha del contacto se elige la
+ * oportunidad (por defecto la abierta más reciente) para que cuente como su próxima acción.
+ */
+export function NewTaskForm({
+  contactId,
+  opportunityId,
+  opportunities,
+  members,
+  userId,
+  back,
+  now,
+}: {
+  contactId: string;
+  opportunityId?: string;
+  opportunities?: { id: string; label: string }[];
+  members: Member[];
+  userId: string;
+  back: string;
+  now: Date;
+}) {
   const tomorrow = new Date(now.getTime() + 24 * 3600_000);
   return (
     <ActionForm action={createTaskAction} className="grid gap-3 sm:grid-cols-2">
@@ -260,6 +280,18 @@ export function NewTaskForm({ contactId, opportunityId, members, userId, back, n
           <Input name="title" required maxLength={200} placeholder="Llamar para confirmar fechas" />
         </Field>
       </div>
+      {!opportunityId && opportunities && opportunities.length > 0 && (
+        <div className="sm:col-span-2">
+          <Field label="Oportunidad">
+            <Select name="opportunityId" defaultValue={opportunities[0].id}>
+              {opportunities.map((o) => (
+                <option key={o.id} value={o.id}>{o.label}</option>
+              ))}
+              <option value="">Ninguna (tarea solo del contacto)</option>
+            </Select>
+          </Field>
+        </div>
+      )}
       <Field label="Tipo">
         <Select name="kind" defaultValue="seguimiento">
           {TASK_KINDS.map((k) => (

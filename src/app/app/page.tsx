@@ -70,6 +70,33 @@ export default async function AppHome({ searchParams }: { searchParams: SearchPa
         )}
       </section>
 
+      <section className="flex flex-col gap-3">
+        <h2 className="font-medium text-slate-900">Próximas tareas ({day.upcoming.length})</h2>
+        {day.upcoming.length === 0 ? (
+          <Notice>No tienes tareas para los próximos días.</Notice>
+        ) : (
+          <ul className="flex flex-col gap-2">
+            {day.upcoming.map(({ task, contactName, destination }) => (
+              <TaskItem
+                key={task.id}
+                task={task}
+                now={now}
+                back="/app"
+                canWrite={canWrite}
+                members={members}
+                extra={
+                  <p className="text-sm">
+                    <Link href={task.opportunityId ? `/app/oportunidades/${task.opportunityId}` : `/app/contactos/${task.contactId}`} className="text-sky-700 hover:underline">
+                      {contactName}{destination ? ` · ${destination}` : ""}
+                    </Link>
+                  </p>
+                }
+              />
+            ))}
+          </ul>
+        )}
+      </section>
+
       {can(active.role, "agency.update") && (
         <section className="rounded-lg border border-slate-200 bg-white p-4">
           <h2 className="mb-3 font-medium text-slate-900">Datos de la agencia</h2>

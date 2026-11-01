@@ -1,5 +1,5 @@
 // SPEC-002 · Tareas, próxima acción y "Mi día".
-import { and, asc, eq, isNull, lt, sql } from "drizzle-orm";
+import { and, asc, eq, gte, isNull, lt, sql } from "drizzle-orm";
 import type { Tx } from "@/db/client";
 import { contacts, opportunities, pipelineStages, tasks } from "@/db/schema";
 import { endOfLocalDay, isPriority, isTaskKind, type Priority, type TaskKind } from "@/domain/tasks";
@@ -79,6 +79,15 @@ export async function myDay(tx: Tx, userId: string, agencyId: string, now: Date)
     .leftJoin(opportunities, eq(opportunities.id, tasks.opportunityId))
     .where(and(eq(tasks.agencyId, agencyId), eq(tasks.assigneeId, userId), eq(tasks.status, "abierta"), lt(tasks.dueAt, end)))
     .orderBy(asc(tasks.dueAt));
+  // Lo que viene después de hoy, para que una tarea futura no "desaparezca" de la vista diaria.
+  const upcoming = await tx
+    .select({ task: tasks, contactName: contacts.fullName, destination: opportunities.destination })
+    .from(tasks)
+    .innerJoin(contacts, eq(contacts.id, tasks.contactId))
+    .leftJoin(opportunities, eq(opportunities.id, tasks.opportunityId))
+    .where(and(eq(tasks.agencyId, agencyId), eq(tasks.assigneeId, userId), eq(tasks.status, "abierta"), gte(tasks.dueAt, end)))
+    .orderBy(asc(tasks.dueAt))
+    .limit(50);
   const withoutNextAction = await tx
     .select({ id: opportunities.id, contactId: opportunities.contactId, contactName: contacts.fullName, destination: opportunities.destination, stageName: pipelineStages.name, updatedAt: opportunities.updatedAt })
     .from(opportunities)
@@ -87,7 +96,7 @@ export async function myDay(tx: Tx, userId: string, agencyId: string, now: Date)
     .leftJoin(tasks, and(eq(tasks.opportunityId, opportunities.id), eq(tasks.status, "abierta")))
     .where(and(eq(opportunities.agencyId, agencyId), eq(opportunities.ownerId, userId), eq(pipelineStages.kind, "abierta"), isNull(tasks.id)))
     .orderBy(asc(opportunities.updatedAt));
-  return { due, withoutNextAction, endOfDay: end };
+  return { due, upcoming, withoutNextAction, endOfDay: end };
 }
 
 /** Miembros activos para elegir responsable o asignado. */

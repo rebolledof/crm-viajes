@@ -15,6 +15,8 @@
 - Cierre ganado con evidencia, perdido con motivo (y nota si es "otro") y reapertura con razón; todo en historial y auditoría.
 - Presupuesto con importe exacto y moneda (COP o USD); campos desconocidos se muestran como "Desconocido".
 - Tareas con resultado obligatorio al completar, próxima acción en el tablero y pantalla "Mi día" con la alerta "sin próxima acción".
+- Una tarea creada desde la ficha del contacto queda ligada a una oportunidad (por defecto la abierta más reciente), para que cuente como su próxima acción.
+- Mi día muestra también las próximas tareas, no solo las de hoy y vencidas.
 - Los formularios conservan lo escrito cuando hay un error y resaltan el campo con el problema (contactos, oportunidades, tareas, etapas, consentimiento, agencia, invitaciones, login y registro).
 - Regla de usabilidad en AGENTS.md: lista que se revisa en cada pantalla.
 - Recuperar contraseña: enlace "Olvidé mi contraseña" en el login, correo con enlace y pantalla para elegir la nueva.
