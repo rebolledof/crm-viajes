@@ -2,13 +2,15 @@
 import { and, eq } from "drizzle-orm";
 import { afterAll, describe, expect, it } from "vitest";
 import type { SessionUser } from "../../src/db/client";
-import { activities, followupTemplates, tasks } from "../../src/db/schema";
+import { activities, agencySettings, followupSteps, followupTemplates, tasks } from "../../src/db/schema";
 import { acceptInvitation, createAgency, createInvitation } from "../../src/server/agencies";
 import { createContact } from "../../src/server/contacts";
-import { AppError } from "../../src/server/errors";
+import { AppError, pgError } from "../../src/server/errors";
 import { addStep, createTemplate, listTemplates, updateSettings, updateTemplate } from "../../src/server/followups";
 import { createOpportunity, listStages, moveOpportunity, updateOpportunity } from "../../src/server/opportunities";
-import { cancelTask, completeTask, createTask, updateTask } from "../../src/server/tasks";
+import { cancelTask, completeTask, createTask, openTaskLink, updateTask } from "../../src/server/tasks";
+import { recordConsent } from "../../src/server/contacts";
+import { revokeMembership } from "../../src/server/agencies";
 import { as, createUser, testDb } from "./helpers";
 
 const t = testDb();
@@ -30,6 +32,14 @@ async function newAgency(name: string): Promise<Agency> {
 
 async function expectCode(p: Promise<unknown>, code: string) {
   await expect(p).rejects.toSatisfy((e: unknown) => e instanceof AppError && e.code === code);
+}
+
+/** Error de la base (trigger o RLS), por su mensaje o código. */
+async function expectDb(p: Promise<unknown>, text: string) {
+  await expect(p).rejects.toSatisfy((e: unknown) => {
+    const pg = pgError(e);
+    return pg?.message === text || pg?.code === text || (pg?.message ?? "").includes(text);
+  });
 }
 
 async function stage(a: Agency, name: string) {
@@ -207,8 +217,8 @@ describe("permisos de las tareas automáticas", () => {
     await expectCode(as(t.db, a.asesor, (tx) => updateTask(tx, a.asesor.id, a.id, first.id, { dueAt: later })), "task_locked");
     await expectCode(as(t.db, a.asesor, (tx) => cancelTask(tx, a.asesor.id, a.id, first.id, "No aplica")), "task_locked");
     // Segunda barrera: la base rechaza el cambio aunque se salte el servidor.
-    await expect(as(t.db, a.asesor, (tx) => tx.update(tasks).set({ dueAt: later }).where(eq(tasks.id, first.id)))).rejects.toThrow();
-    await expect(as(t.db, a.asesor, (tx) => tx.update(tasks).set({ status: "cancelada", result: "x" }).where(eq(tasks.id, first.id)))).rejects.toThrow();
+    await expectDb(as(t.db, a.asesor, (tx) => tx.update(tasks).set({ dueAt: later }).where(eq(tasks.id, first.id))), "task_locked");
+    await expectDb(as(t.db, a.asesor, (tx) => tx.update(tasks).set({ status: "cancelada", result: "x" }).where(eq(tasks.id, first.id))), "task_locked");
     await as(t.db, a.asesor, (tx) => completeTask(tx, a.asesor.id, a.id, first.id, "Le escribí y respondió"));
     await as(t.db, a.admin, (tx) => updateTask(tx, a.admin.id, a.id, second.id, { dueAt: later }));
     const [row] = await t.db.select().from(tasks).where(eq(tasks.id, second.id));
@@ -225,7 +235,7 @@ describe("permisos de las tareas automáticas", () => {
     expect(row).toMatchObject({ message: "Hola {nombre}, ¿hablamos hoy?", priority: "media" });
     await expectCode(as(t.db, a.asesor, (tx) => updateTask(tx, a.asesor.id, a.id, first.id, { assigneeId: a.asesor2.id })), "task_locked");
     await expectCode(as(t.db, a.asesor, (tx) => cancelTask(tx, a.asesor.id, a.id, first.id, "No aplica")), "task_locked");
-    await expect(as(t.db, a.asesor, (tx) => tx.update(tasks).set({ assigneeId: a.asesor2.id }).where(eq(tasks.id, first.id)))).rejects.toThrow();
+    await expectDb(as(t.db, a.asesor, (tx) => tx.update(tasks).set({ assigneeId: a.asesor2.id }).where(eq(tasks.id, first.id))), "task_locked");
   });
 
   it("un paso bloqueado manda sobre la plantilla libre", async () => {
@@ -273,5 +283,82 @@ describe("quién administra plantillas (AC-220, AC-229)", () => {
     const other = await newOpp(a, a.asesor2, "Cliente de Luis");
     expect((await oppTasks(mine.oppId)).map((x) => x.title)).toContain("Llamada VIP");
     expect((await oppTasks(other.oppId)).map((x) => x.title)).not.toContain("Llamada VIP");
+  });
+});
+
+describe("hallazgos de la prueba independiente", () => {
+  it("con el responsable retirado, S02 ya exige reasignar antes de mover (RF-214); al reasignar, las tareas van al nuevo", async () => {
+    const a = await newAgency("Revocado");
+    const { oppId } = await newOpp(a, a.asesor2, "Cliente huérfano", { stageId: await stage(a, "Contactado") });
+    await as(t.db, a.admin, (tx) => revokeMembership(tx, a.admin.id, a.id, a.asesor2.id));
+    const propuesta = await stage(a, "Propuesta enviada");
+    await expectCode(as(t.db, a.asesor, (tx) => moveOpportunity(tx, a.asesor.id, a.id, oppId, { stageId: propuesta })), "not_active_member");
+    expect(await oppTasks(oppId)).toHaveLength(0);
+    await as(t.db, a.asesor, (tx) => updateOpportunity(tx, a.asesor.id, a.id, oppId, { ownerId: a.asesor.id, destination: "Cancún" }));
+    await as(t.db, a.asesor, (tx) => moveOpportunity(tx, a.asesor.id, a.id, oppId, { stageId: propuesta }));
+    const list = await oppTasks(oppId);
+    expect(list).toHaveLength(3);
+    expect(list.every((x) => x.assigneeId === a.asesor.id)).toBe(true);
+  });
+
+  it("la espera de un paso tiene un tope por unidad, en el servidor y en la base", async () => {
+    const a = await newAgency("Topes");
+    const tpl = await as(t.db, a.admin, (tx) => createTemplate(tx, a.admin.id, a.id, { name: "Larga", trigger: "creada", editLevel: "libre" }));
+    await expectCode(as(t.db, a.admin, (tx) => addStep(tx, a.admin.id, a.id, tpl, { kind: "tarea", title: "Muy lejos", delayAmount: 20000, delayUnit: "horas_habiles" })), "invalid_input");
+    await expect(as(t.db, a.admin, (tx) => tx.insert(followupSteps).values({ agencyId: a.id, templateId: tpl, position: 0, kind: "tarea", title: "x", delayAmount: 20000, delayUnit: "horas_habiles" }))).rejects.toThrow();
+    // El máximo permitido sigue funcionando.
+    await as(t.db, a.admin, (tx) => addStep(tx, a.admin.id, a.id, tpl, { kind: "tarea", title: "Al tope", delayAmount: 2000, delayUnit: "horas_habiles" }));
+    const { oppId } = await newOpp(a, a.asesor, "Paciente");
+    expect((await oppTasks(oppId)).map((x) => x.title)).toContain("Al tope");
+  });
+
+  it("un asesor no reabre una tarea automática no libre que se canceló o completó", async () => {
+    const a = await newAgency("Reabrir");
+    const { oppId } = await newOpp(a, a.asesor, "Olga Paz");
+    await as(t.db, a.asesor, async (tx) => moveOpportunity(tx, a.asesor.id, a.id, oppId, { stageId: await stage(a, "Contactado") }));
+    const [cancelled] = await oppTasks(oppId);
+    expect(cancelled.status).toBe("cancelada");
+    await expectDb(as(t.db, a.asesor, (tx) => tx.update(tasks).set({ status: "abierta", result: null }).where(eq(tasks.id, cancelled.id))), "task_locked");
+  });
+
+  it("con las plantillas personales apagadas, las existentes dejan de aplicarse", async () => {
+    const a = await newAgency("Apagar personales");
+    const on = { weekdayStart: "08:00", weekdayEnd: "18:00", saturdayStart: "08:00", saturdayEnd: "12:00", allowPersonalTemplates: true };
+    await as(t.db, a.admin, (tx) => updateSettings(tx, a.admin.id, a.id, on));
+    const tpl = await as(t.db, a.asesor, (tx) => createTemplate(tx, a.asesor.id, a.id, { name: "VIP", trigger: "creada", editLevel: "libre", personal: true }));
+    await as(t.db, a.asesor, (tx) => addStep(tx, a.asesor.id, a.id, tpl, { kind: "llamada", title: "Llamada VIP", delayAmount: 0, delayUnit: "minutos" }));
+    await as(t.db, a.admin, (tx) => updateSettings(tx, a.admin.id, a.id, { ...on, allowPersonalTemplates: false }));
+    const { oppId } = await newOpp(a, a.asesor, "Sin VIP");
+    expect((await oppTasks(oppId)).map((x) => x.title)).not.toContain("Llamada VIP");
+  });
+
+  it("un asesor no escribe pasos de la agencia ni los ajustes directo en la base, y otra agencia no los lee", async () => {
+    const a = await newAgency("Barreras");
+    const b = await newAgency("Barreras B");
+    const tpl = await template(a, "Negociación: cierre");
+    await expect(as(t.db, a.asesor, (tx) => tx.insert(followupSteps).values({ agencyId: a.id, templateId: tpl.id, position: 9, kind: "tarea", title: "Intruso" }))).rejects.toThrow();
+    expect(await as(t.db, a.asesor, (tx) => tx.update(followupSteps).set({ title: "Cambiado" }).where(eq(followupSteps.templateId, tpl.id)).returning())).toEqual([]);
+    expect(await as(t.db, a.asesor, (tx) => tx.delete(followupSteps).where(eq(followupSteps.templateId, tpl.id)).returning())).toEqual([]);
+    expect(await as(t.db, a.asesor, (tx) => tx.update(agencySettings).set({ allowPersonalTemplates: true }).where(eq(agencySettings.agencyId, a.id)).returning())).toEqual([]);
+    expect(await as(t.db, b.admin, (tx) => tx.select().from(followupSteps).where(eq(followupSteps.agencyId, a.id)))).toEqual([]);
+    expect(await as(t.db, b.admin, (tx) => tx.select().from(agencySettings).where(eq(agencySettings.agencyId, a.id)))).toEqual([]);
+  });
+
+  it("abrir una tarea de WhatsApp o correo rellena el mensaje, respeta el consentimiento y no sirve para tareas cerradas", async () => {
+    const a = await newAgency("Abrir");
+    const contactId = await as(t.db, a.asesor, (tx) => createContact(tx, a.asesor.id, a.id, { fullName: "Lucía Mar", phones: [{ raw: "310 555 0101" }], emails: ["lucia@ejemplo.test"] }));
+    const oppId = await as(t.db, a.asesor, (tx) => createOpportunity(tx, a.asesor.id, a.id, { contactId, destination: "Lisboa" }));
+    const list = await oppTasks(oppId);
+    const wa = list.find((x) => x.kind === "whatsapp")!;
+    const mail = list.find((x) => x.kind === "correo")!;
+    const r1 = await as(t.db, a.asesor, (tx) => openTaskLink(tx, a.asesor.id, a.id, wa.id));
+    expect(r1.channel).toBe("whatsapp");
+    expect(decodeURIComponent(r1.link)).toContain("Hola Lucía, recibimos tu solicitud de viaje a Lisboa");
+    const r2 = await as(t.db, a.asesor, (tx) => openTaskLink(tx, a.asesor.id, a.id, mail.id));
+    expect(r2.link.startsWith("mailto:lucia@ejemplo.test?subject=")).toBe(true);
+    await as(t.db, a.asesor, (tx) => recordConsent(tx, a.asesor.id, a.id, contactId, { channel: "correo", purpose: "servicio", status: "retirado", source: "Lo pidió por teléfono" }));
+    await expectCode(as(t.db, a.asesor, (tx) => openTaskLink(tx, a.asesor.id, a.id, mail.id)), "email_blocked");
+    await as(t.db, a.asesor, (tx) => completeTask(tx, a.asesor.id, a.id, wa.id, "Enviado"));
+    await expectCode(as(t.db, a.asesor, (tx) => openTaskLink(tx, a.asesor.id, a.id, wa.id)), "not_found");
   });
 });

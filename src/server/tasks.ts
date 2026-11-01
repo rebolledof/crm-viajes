@@ -133,7 +133,7 @@ export async function openTaskLink(tx: Tx, userId: string, agencyId: string, tas
     .innerJoin(contacts, eq(contacts.id, tasks.contactId))
     .innerJoin(agencies, eq(agencies.id, tasks.agencyId))
     .leftJoin(opportunities, eq(opportunities.id, tasks.opportunityId))
-    .where(and(eq(tasks.id, taskId), eq(tasks.agencyId, agencyId)));
+    .where(and(eq(tasks.id, taskId), eq(tasks.agencyId, agencyId), eq(tasks.status, "abierta")));
   if (!row) throw new AppError("not_found");
   const { task } = row;
   const values = { nombre: row.contactName, agencia: row.agencyName, destino: row.destination };

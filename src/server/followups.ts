@@ -158,12 +158,15 @@ export type StepInput = {
   locked?: boolean;
 };
 
+/** Tope de espera por unidad; la base tiene el mismo `check`. */
+export const MAX_DELAY: Record<DelayUnit, number> = { minutos: 525600, horas_habiles: 2000, dias_habiles: 500, dias: 730 };
+
 function prepareStep(input: StepInput) {
   const title = input.title.trim();
   if (!title || title.length > 200) throw fieldError("invalid_input", "title");
   if (!isTaskKind(input.kind)) throw fieldError("invalid_input", "kind");
   if (!isDelayUnit(input.delayUnit)) throw fieldError("invalid_input", "delayUnit");
-  if (!Number.isInteger(input.delayAmount) || input.delayAmount < 0 || input.delayAmount > 525600) throw fieldError("invalid_input", "delayAmount");
+  if (!Number.isInteger(input.delayAmount) || input.delayAmount < 0 || input.delayAmount > MAX_DELAY[input.delayUnit]) throw fieldError("invalid_input", "delayAmount");
   const rawAt = input.atTime?.trim() || null;
   const atTime = rawAt ? parseTime(rawAt) : null;
   if (rawAt && (!atTime || (input.delayUnit !== "dias_habiles" && input.delayUnit !== "dias"))) throw fieldError("invalid_input", "atTime");

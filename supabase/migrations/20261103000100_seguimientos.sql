@@ -51,7 +51,8 @@ create table public.followup_steps (
   position integer not null check (position >= 0),
   kind public.task_kind not null,
   title text not null check (length(btrim(title)) between 1 and 200),
-  delay_amount integer not null default 0 check (delay_amount between 0 and 525600),
+  -- Topes por unidad: un año en minutos, 2000 horas hábiles, 500 días hábiles, 730 días.
+  delay_amount integer not null default 0 check (delay_amount >= 0),
   delay_unit public.delay_unit not null default 'minutos',
   at_time time,
   priority public.priority not null default 'media',
@@ -60,7 +61,9 @@ create table public.followup_steps (
   created_at timestamptz not null default now(),
   unique (agency_id, id),
   foreign key (agency_id, template_id) references public.followup_templates (agency_id, id) on delete cascade,
-  check (at_time is null or delay_unit in ('dias_habiles', 'dias'))
+  check (at_time is null or delay_unit in ('dias_habiles', 'dias')),
+  check (delay_amount <= case delay_unit when 'minutos' then 525600 when 'horas_habiles' then 2000
+                                         when 'dias_habiles' then 500 else 730 end)
 );
 create index followup_steps_template_idx on public.followup_steps (template_id, position);
 
@@ -185,7 +188,7 @@ begin
   elsif p_unit = 'horas_habiles' then
     v_cur := app.next_open(v_local, s);
     v_rem := p_amount * 60;
-    for i in 1..1000 loop
+    for i in 1..5000 loop
       v_avail := extract(epoch from ((v_cur::date + app.day_end(v_cur::date, s)) - v_cur)) / 60;
       if v_rem <= v_avail then
         v_res := v_cur + make_interval(mins => v_rem::int);
@@ -205,7 +208,8 @@ begin
     end if;
     v_res := app.next_open(greatest(v_day + coalesce(p_at, v_local::time), v_local), s);
   end if;
-  return v_res at time zone s.time_zone;
+  -- Nunca vacío: si algo no cuadra, el primer instante laborable.
+  return coalesce(v_res, app.next_open(v_local, s)) at time zone s.time_zone;
 end;
 $$;
 
@@ -222,6 +226,7 @@ declare
   v_tpl record;
   v_step record;
   v_created integer;
+  v_assignee uuid;
 begin
   -- Cambio de responsable: las tareas automáticas abiertas del anterior pasan al nuevo.
   if tg_op = 'UPDATE' and new.owner_id is not null and new.owner_id is distinct from old.owner_id then
@@ -235,6 +240,11 @@ begin
   end if;
 
   select * into v_stage from public.pipeline_stages where id = new.stage_id;
+  -- El responsable, o quien hizo el cambio si el responsable ya no es miembro activo.
+  v_assignee := case when exists (
+      select 1 from public.memberships m
+      where m.agency_id = new.agency_id and m.user_id = new.owner_id and m.revoked_at is null)
+    then new.owner_id else v_actor end;
 
   -- Cancelación: llegó a la etapa de parada (o posterior), se cerró, o salió de la etapa cerrada que la disparó.
   if tg_op = 'UPDATE' then
@@ -263,7 +273,7 @@ begin
   for v_tpl in
     select ft.* from public.followup_templates ft
     where ft.agency_id = new.agency_id and ft.active
-      and (ft.owner_id is null or ft.owner_id = new.owner_id)
+      and (ft.owner_id is null or (ft.owner_id = new.owner_id and app.personal_templates_allowed(new.agency_id)))
       and (
         (ft.trigger = 'creada' and tg_op = 'INSERT')
         or (ft.trigger = 'etapa' and ft.stage_id = new.stage_id)
@@ -284,7 +294,7 @@ begin
         select 1 from public.tasks x where x.opportunity_id = new.id and x.step_id = v_step.id and x.status = 'abierta');
       insert into public.tasks (agency_id, contact_id, opportunity_id, kind, title, assignee_id, due_at, priority,
                                 created_by, template_id, step_id, trigger_stage_id, message, edit_level)
-      values (new.agency_id, new.contact_id, new.id, v_step.kind, v_step.title, coalesce(new.owner_id, v_actor),
+      values (new.agency_id, new.contact_id, new.id, v_step.kind, v_step.title, v_assignee,
               app.followup_due(now(), v_step.delay_amount, v_step.delay_unit, v_step.at_time, new.agency_id),
               v_step.priority, v_actor, v_tpl.id, v_step.id, new.stage_id, v_step.message,
               case when v_step.locked then 'bloqueada'::public.edit_level else v_tpl.edit_level end);
@@ -318,6 +328,8 @@ begin
     return new;
   end if;
   if (new.status = 'cancelada' and old.status <> 'cancelada')
+     or (old.status <> 'abierta' and new.status is distinct from old.status)
+     or (old.status = 'abierta' and new.status = 'abierta' and new.result is distinct from old.result)
      or new.kind is distinct from old.kind
      or new.title is distinct from old.title
      or new.assignee_id is distinct from old.assignee_id

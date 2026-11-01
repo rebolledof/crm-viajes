@@ -13,7 +13,7 @@
 
 ## Comandos verificados
 
-1 nov 2026 en la rama de S02b: lint, typecheck, 40 unitarias, 62 de integración y build sin errores.
+1 nov 2026 en la rama de S02b: lint, typecheck, 40 unitarias, 68 de integración y build sin errores. Prueba independiente con otro modelo (Sonnet) hecha; hallazgos corregidos con prueba.
 
 19 oct 2026 en `s02-crm`: lint, typecheck, 33 unitarias, 45 de integración y build sin errores.
 
@@ -46,4 +46,4 @@ Ninguno de código. La política de datos personales bloquea cargar datos reales
 
 ## Siguiente tarea
 
-Felipe prueba S02 y S02b en la vista previa (T-021 y T-039). Para eso hay que aplicar las migraciones nuevas en `crm-viajes-pruebas`, con su permiso. Después, S03 Bandeja unificada.
+Felipe prueba S02 y S02b en la vista previa (T-021 y T-059). Para eso hay que aplicar las migraciones nuevas en `crm-viajes-pruebas`, con su permiso. Después, S03 Bandeja unificada.

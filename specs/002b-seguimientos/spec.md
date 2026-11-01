@@ -72,6 +72,9 @@ Envío automático de mensajes o correos (fase B), pasos que cuentan desde la fe
 - Horario: lunes a viernes 8:00 a 18:00, sábado 8:00 a 12:00, sin festivos. Pendiente de confirmar por Felipe.
 - Todos los pasos se crean al disparar (no uno a uno al completar el anterior); así "Mi día" muestra lo que viene.
 - Las tareas de pasos sin hora fija conservan la hora del disparo cuando cuentan en días.
+- Si el administrador apaga las plantillas personales, las existentes dejan de aplicarse (no se borran).
+- Tope de espera por paso: 525600 minutos, 2000 horas hábiles, 500 días hábiles o 730 días calendario.
+- Una tarea automática no libre no se puede reabrir ni cambiar su resultado por un asesor; el administrador sí.
 - Las plantillas no se borran: se desactivan. Los pasos sí se pueden borrar; las tareas ya creadas no cambian.
 
 ## Trazabilidad

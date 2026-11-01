@@ -61,7 +61,7 @@ const FIELD_MESSAGES: Record<string, string> = {
   "invalid_input:reason": "Escribe el motivo.",
   "invalid_input:name": "Escribe un nombre de 1 a 60 caracteres.",
   "invalid_input:templateName": "Escribe un nombre de 1 a 80 caracteres.",
-  "invalid_input:delayAmount": "La espera debe ser un número entero entre 0 y 525600.",
+  "invalid_input:delayAmount": "La espera debe ser un número entero: hasta 525600 minutos, 2000 horas hábiles, 500 días hábiles o 730 días.",
   "invalid_input:atTime": "La hora fija solo aplica a días hábiles o calendario y va como 09:00.",
   "invalid_input:message": "El mensaje tiene como máximo 1000 caracteres.",
   "invalid_input:weekdayEnd": "La hora de cierre debe ser posterior a la de apertura.",
