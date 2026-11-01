@@ -16,6 +16,7 @@ const PERMISSIONS = {
   "team.manage": ["admin"],
   "audit.read": ["admin"],
   "pipeline.manage": ["admin"],
+  "followups.manage": ["admin"],
   "crm.write": ["admin", "asesor"],
   "crm.read": ["admin", "asesor", "lectura"],
 } as const satisfies Record<string, readonly Role[]>;

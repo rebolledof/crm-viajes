@@ -90,7 +90,7 @@ export default async function OportunidadPage({ params, searchParams }: { params
         ) : (
           <ul className="flex flex-col gap-2">
             {data.openTasks.map((t) => (
-              <TaskItem key={t.id} task={t} now={now} back={back} canWrite={canWrite} members={members} />
+              <TaskItem key={t.id} task={t} now={now} back={back} role={active.role} members={members} />
             ))}
           </ul>
         )}

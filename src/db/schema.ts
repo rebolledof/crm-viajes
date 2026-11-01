@@ -1,6 +1,6 @@
 // Tipos de Drizzle para las tablas de supabase/migrations. El SQL es la fuente de verdad;
 // tests/integration/schema.test.ts comprueba que ambos coinciden.
-import { boolean, date, integer, jsonb, numeric, pgEnum, pgTable, primaryKey, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { boolean, date, integer, jsonb, numeric, pgEnum, pgTable, primaryKey, text, time, timestamp, uuid } from "drizzle-orm/pg-core";
 
 export const agencyRole = pgEnum("agency_role", ["admin", "asesor", "lectura"]);
 
@@ -56,10 +56,13 @@ export const lossReason = pgEnum("loss_reason", ["precio", "sin_disponibilidad",
 export const contactChannel = pgEnum("contact_channel", ["whatsapp", "correo", "telefono"]);
 export const consentPurpose = pgEnum("consent_purpose", ["servicio", "promociones"]);
 export const consentStatus = pgEnum("consent_status", ["otorgado", "retirado"]);
-export const taskKind = pgEnum("task_kind", ["llamada", "seguimiento", "recordatorio", "correo", "reunion", "tarea"]);
+export const taskKind = pgEnum("task_kind", ["llamada", "whatsapp", "seguimiento", "recordatorio", "correo", "reunion", "tarea"]);
 export const taskStatus = pgEnum("task_status", ["abierta", "completada", "cancelada"]);
 export const priority = pgEnum("priority", ["baja", "media", "alta"]);
 export const currencyCode = pgEnum("currency_code", ["COP", "USD"]);
+export const followupTrigger = pgEnum("followup_trigger", ["creada", "etapa", "ganada", "perdida"]);
+export const editLevel = pgEnum("edit_level", ["bloqueada", "ajustable", "libre"]);
+export const delayUnit = pgEnum("delay_unit", ["minutos", "horas_habiles", "dias_habiles", "dias"]);
 
 const createdAt = () => timestamp("created_at", { withTimezone: true }).notNull().defaultNow();
 
@@ -161,6 +164,55 @@ export const tasks = pgTable("tasks", {
   completedAt: timestamp("completed_at", { withTimezone: true }),
   createdBy: uuid("created_by").notNull(),
   createdAt: createdAt(),
+  // SPEC-002b: origen automático, mensaje sugerido y nivel de edición.
+  templateId: uuid("template_id"),
+  stepId: uuid("step_id"),
+  triggerStageId: uuid("trigger_stage_id"),
+  message: text("message"),
+  editLevel: editLevel("edit_level"),
+});
+
+export const agencySettings = pgTable("agency_settings", {
+  agencyId: uuid("agency_id").primaryKey(),
+  timeZone: text("time_zone").notNull().default("America/Bogota"),
+  weekdayStart: time("weekday_start").notNull(),
+  weekdayEnd: time("weekday_end").notNull(),
+  saturdayStart: time("saturday_start"),
+  saturdayEnd: time("saturday_end"),
+  allowPersonalTemplates: boolean("allow_personal_templates").notNull().default(false),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const followupTemplates = pgTable("followup_templates", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  agencyId: uuid("agency_id").notNull(),
+  name: text("name").notNull(),
+  trigger: followupTrigger("trigger").notNull(),
+  stageId: uuid("stage_id"),
+  lossReasons: lossReason("loss_reasons").array().notNull().default([]),
+  stopStageId: uuid("stop_stage_id"),
+  editLevel: editLevel("edit_level").notNull().default("ajustable"),
+  ownerId: uuid("owner_id"),
+  active: boolean("active").notNull().default(true),
+  createdBy: uuid("created_by").notNull(),
+  createdAt: createdAt(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const followupSteps = pgTable("followup_steps", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  agencyId: uuid("agency_id").notNull(),
+  templateId: uuid("template_id").notNull(),
+  position: integer("position").notNull(),
+  kind: taskKind("kind").notNull(),
+  title: text("title").notNull(),
+  delayAmount: integer("delay_amount").notNull().default(0),
+  delayUnit: delayUnit("delay_unit").notNull().default("minutos"),
+  atTime: time("at_time"),
+  priority: priority("priority").notNull().default("media"),
+  message: text("message"),
+  locked: boolean("locked").notNull().default(false),
+  createdAt: createdAt(),
 });
 
 export const activities = pgTable("activities", {
@@ -187,4 +239,7 @@ export const schemaTables = {
   opportunities,
   tasks,
   activities,
+  agency_settings: agencySettings,
+  followup_templates: followupTemplates,
+  followup_steps: followupSteps,
 };

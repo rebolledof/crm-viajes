@@ -1,8 +1,9 @@
 /** Tareas y "Mi día" (SPEC-002 RF-210, RF-211). */
-export const TASK_KINDS = ["llamada", "seguimiento", "recordatorio", "correo", "reunion", "tarea"] as const;
+export const TASK_KINDS = ["llamada", "whatsapp", "seguimiento", "recordatorio", "correo", "reunion", "tarea"] as const;
 export type TaskKind = (typeof TASK_KINDS)[number];
 export const TASK_KIND_LABELS: Record<TaskKind, string> = {
   llamada: "Llamada",
+  whatsapp: "WhatsApp",
   seguimiento: "Seguimiento",
   recordatorio: "Recordatorio",
   correo: "Correo",

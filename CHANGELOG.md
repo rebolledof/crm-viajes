@@ -24,3 +24,11 @@
 - El login avisa cuando falta confirmar el correo.
 - La pantalla de registro explica el motivo cuando Supabase rechaza la cuenta (límite de correos, contraseña débil, correo existente).
 - Botón de WhatsApp con mensaje prellenado y editable que respeta el consentimiento y queda en la ficha.
+- SPEC-002b Plantillas de seguimiento: las tareas se crean solas al llegar una oportunidad, al entrar en una etapa, al ganar o al perder (con filtro de motivos), con fecha dentro del horario laboral y mensaje sugerido.
+- Seis plantillas precargadas para agencia de viajes (contacto rápido, calificado, propuesta enviada, negociación, ganado y reactivación de perdidos), editables por el administrador.
+- Las tareas automáticas pendientes se cancelan solas al llegar a la etapa de parada, al cerrar o al reabrir, y pasan al nuevo responsable si cambia.
+- Niveles de edición por plantilla (bloqueada, ajustable, libre) y pasos bloqueados, validados en el servidor y en la base.
+- Plantillas personales de los asesores, apagadas por defecto; el administrador las habilita.
+- Horario laboral de la agencia (por defecto lunes a viernes 8 a 18 y sábado 8 a 12, hora de Colombia).
+- Tipo de tarea WhatsApp; las tareas de WhatsApp y correo abren la app o el programa de correo con el mensaje relleno, sin enviar nada solas.
+- Las tareas abiertas se pueden ajustar (fecha, prioridad, mensaje y asignada) según el rol y el nivel.

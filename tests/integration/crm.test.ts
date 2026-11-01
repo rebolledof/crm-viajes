@@ -214,7 +214,9 @@ describe("cierre, saltos y reapertura (AC-207, AC-208, AC-212, AC-216)", () => {
 describe("tareas y Mi día (AC-209, AC-210, AC-213)", () => {
   it("una oportunidad abierta sin tareas aparece en Mi día de su responsable; con tarea, no", async () => {
     const cId = await newContact(asesorA, agencyA, "Ricardo Silva");
-    const oId = await as(t.db, asesorA, (tx) => createOpportunity(tx, asesorA.id, agencyA, { contactId: cId, destination: "Cusco" }));
+    // Desde S02b una oportunidad nueva recibe tareas automáticas; en "Contactado" no aplica ninguna plantilla.
+    const contactado = await stageId(asesorA, agencyA, "Contactado");
+    const oId = await as(t.db, asesorA, (tx) => createOpportunity(tx, asesorA.id, agencyA, { contactId: cId, destination: "Cusco", stageId: contactado }));
     let day = await as(t.db, asesorA, (tx) => myDay(tx, asesorA.id, agencyA, new Date()));
     expect(day.withoutNextAction.map((o) => o.id)).toContain(oId);
     const due = new Date(Date.now() - 60_000);

@@ -9,6 +9,10 @@ import { LOSS_REASON_LABELS, isLossReason } from "@/domain/pipeline";
 import { PRIORITIES, PRIORITY_LABELS, TASK_KINDS, TASK_KIND_LABELS, dueState, isTaskKind, toBogotaInput } from "@/domain/tasks";
 import { AppError, ERROR_MESSAGES, isErrorCode } from "@/server/errors";
 import { cancelTaskAction, completeTaskAction, createTaskAction } from "./crm-actions";
+import { updateTaskAction } from "./followup-actions";
+import { TaskOpenButton } from "./task-open-button";
+import { taskPermissions, type EditLevel } from "@/domain/followups";
+import type { Role } from "@/domain/permissions";
 
 export type SearchParams = Promise<Record<string, string | undefined>>;
 export type Member = { userId: string; email: string; role: string };
@@ -54,6 +58,10 @@ const OK_MESSAGES: Record<string, string> = {
   tarea: "Tarea creada.",
   completada: "Tarea completada.",
   cancelada: "Tarea cancelada.",
+  tarea_editada: "Tarea ajustada.",
+  ajustes: "Ajustes guardados.",
+  paso: "Paso agregado.",
+  borrado: "Paso borrado.",
 };
 
 export function Flash({ sp }: { sp: Record<string, string | undefined> }) {
@@ -322,10 +330,28 @@ export function NewTaskForm({
 const DUE_STYLE = { vencida: "text-red-700", hoy: "text-amber-700", proxima: "text-slate-600" };
 const DUE_LABEL = { vencida: "Vencida", hoy: "Hoy", proxima: "Próxima" };
 
-export type TaskRow = { id: string; title: string; kind: string; dueAt: Date; priority: string; assigneeId: string };
+export type TaskRow = {
+  id: string;
+  title: string;
+  kind: string;
+  dueAt: Date;
+  priority: string;
+  assigneeId: string;
+  templateId?: string | null;
+  message?: string | null;
+  editLevel?: EditLevel | null;
+};
 
-export function TaskItem({ task, now, back, canWrite, members, extra }: { task: TaskRow; now: Date; back: string; canWrite: boolean; members: Member[]; extra?: React.ReactNode }) {
+const secondaryButton = "rounded-md border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50";
+
+/**
+ * Una tarea con sus acciones. Lo que se ofrece depende del rol y del nivel de edición de la tarea
+ * (SPEC-002b RF-226); el servidor y la base vuelven a comprobarlo.
+ */
+export function TaskItem({ task, now, back, role, members, extra }: { task: TaskRow; now: Date; back: string; role: Role; members: Member[]; extra?: React.ReactNode }) {
   const state = dueState(task.dueAt, now);
+  const perms = taskPermissions(role, task.editLevel);
+  const channel = task.kind === "whatsapp" ? "whatsapp" : task.kind === "correo" ? "correo" : null;
   return (
     <li className="flex flex-col gap-2 rounded-md border border-slate-200 bg-white p-3">
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
@@ -334,11 +360,18 @@ export function TaskItem({ task, now, back, canWrite, members, extra }: { task: 
         <span className="text-sm text-slate-600">
           {isTaskKind(task.kind) ? TASK_KIND_LABELS[task.kind] : task.kind} · {fechaHora.format(task.dueAt)} · {memberName(members, task.assigneeId)}
         </span>
+        {task.templateId && (
+          <span className="rounded bg-violet-50 px-1.5 py-0.5 text-xs text-violet-800" title="Creada por una plantilla de seguimiento">
+            Automática{task.editLevel === "bloqueada" ? " · bloqueada" : ""}
+          </span>
+        )}
       </div>
       {extra}
-      {canWrite && (
+      {task.message && <p className="whitespace-pre-line rounded bg-slate-50 px-2 py-1 text-sm text-slate-700">Mensaje sugerido: {task.message}</p>}
+      {perms.complete && channel && <TaskOpenButton taskId={task.id} channel={channel} back={back} />}
+      {perms.complete && (
         <details className="text-sm">
-          <summary className="cursor-pointer text-sky-700">Completar o cancelar</summary>
+          <summary className="cursor-pointer text-sky-700">{perms.cancel ? "Completar o cancelar" : "Completar"}</summary>
           <div className="mt-2 flex flex-col gap-3">
             <ActionForm action={completeTaskAction} className="flex flex-wrap items-end gap-2">
               <input type="hidden" name="taskId" value={task.id} />
@@ -348,15 +381,55 @@ export function TaskItem({ task, now, back, canWrite, members, extra }: { task: 
               </Field>
               <button className={buttonClass}>Completar</button>
             </ActionForm>
-            <ActionForm action={cancelTaskAction} className="flex flex-wrap items-end gap-2">
-              <input type="hidden" name="taskId" value={task.id} />
-              <input type="hidden" name="back" value={back} />
-              <Field label="Motivo de cancelación">
-                <Input name="reason" required />
-              </Field>
-              <button className="rounded-md border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">Cancelar tarea</button>
-            </ActionForm>
+            {perms.cancel && (
+              <ActionForm action={cancelTaskAction} className="flex flex-wrap items-end gap-2">
+                <input type="hidden" name="taskId" value={task.id} />
+                <input type="hidden" name="back" value={back} />
+                <Field label="Motivo de cancelación">
+                  <Input name="reason" required />
+                </Field>
+                <button className={secondaryButton}>Cancelar tarea</button>
+              </ActionForm>
+            )}
           </div>
+        </details>
+      )}
+      {(perms.adjust || perms.reassign) && (
+        <details className="text-sm">
+          <summary className="cursor-pointer text-sky-700">Ajustar</summary>
+          <ActionForm action={updateTaskAction} className="mt-2 grid gap-3 sm:grid-cols-2">
+            <input type="hidden" name="taskId" value={task.id} />
+            <input type="hidden" name="back" value={back} />
+            {perms.adjust && (
+              <>
+                <Field label="Vence (hora de Colombia)">
+                  <Input name="dueAt" type="datetime-local" required defaultValue={toBogotaInput(task.dueAt)} />
+                </Field>
+                <Field label="Prioridad">
+                  <Select name="priority" defaultValue={task.priority}>
+                    {PRIORITIES.map((p) => (
+                      <option key={p} value={p}>{PRIORITY_LABELS[p]}</option>
+                    ))}
+                  </Select>
+                </Field>
+                {(task.message || channel) && (
+                  <div className="sm:col-span-2">
+                    <Field label="Mensaje sugerido ({nombre}, {destino} y {agencia} se rellenan solos)">
+                      <Textarea name="message" defaultValue={task.message ?? ""} rows={3} maxLength={1000} />
+                    </Field>
+                  </div>
+                )}
+              </>
+            )}
+            {perms.reassign && (
+              <Field label="Asignada a">
+                <MemberSelect name="assigneeId" members={members} value={task.assigneeId} />
+              </Field>
+            )}
+            <div className="sm:col-span-2">
+              <button className={buttonClass}>Guardar cambios</button>
+            </div>
+          </ActionForm>
         </details>
       )}
     </li>
@@ -391,6 +464,14 @@ export function describeActivity(kind: string, data: Record<string, unknown>, me
       return `Tarea completada: ${s("titulo")}. Resultado: ${s("resultado")}`;
     case "tarea.cancelada":
       return `Tarea cancelada: ${s("titulo")}. Motivo: ${s("motivo")}`;
+    case "tarea.editada":
+      return `Tarea ajustada: ${s("titulo")}${s("vence") ? `. Nueva fecha: ${fechaHora.format(new Date(s("vence")))}` : ""}${s("asignada") ? `. Asignada a ${memberName(members, s("asignada"))}` : ""}`;
+    case "seguimiento.creado":
+      return `Plantilla "${s("plantilla")}": ${String(data.cantidad ?? "")} tareas automáticas creadas`;
+    case "seguimiento.cancelado":
+      return `${String(data.cantidad ?? "")} tareas automáticas canceladas al pasar a ${s("etapa")}`;
+    case "correo.abierto":
+      return `Correo abierto para ${s("correo")}: “${s("asunto")}”`;
     default:
       return kind;
   }

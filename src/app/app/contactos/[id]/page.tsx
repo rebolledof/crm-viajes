@@ -108,7 +108,7 @@ export default async function ContactoPage({ params, searchParams }: { params: P
                 task={t}
                 now={now}
                 back={back}
-                canWrite={canWrite}
+                role={active.role}
                 members={members}
                 extra={
                   <p className="text-sm text-slate-600">

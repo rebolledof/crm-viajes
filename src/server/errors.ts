@@ -20,6 +20,11 @@ export const ERROR_MESSAGES = {
   whatsapp_blocked: "El contacto retiró el permiso para escribirle por WhatsApp.",
   no_phone: "El contacto no tiene teléfono.",
   reopen_reason_required: "Para reabrir una oportunidad cerrada escribe el motivo.",
+  task_locked: "Esta tarea automática no permite ese cambio. Pídeselo a un administrador.",
+  personal_templates_off: "El administrador no ha habilitado las plantillas personales.",
+  stage_required: "Elige la etapa que dispara la plantilla.",
+  no_email: "El contacto no tiene correo.",
+  email_blocked: "El contacto retiró el permiso para escribirle por correo.",
 } as const;
 
 export type ErrorCode = keyof typeof ERROR_MESSAGES;
@@ -55,6 +60,12 @@ const FIELD_MESSAGES: Record<string, string> = {
   "invalid_input:source": "Escribe cómo dio o retiró el permiso el contacto.",
   "invalid_input:reason": "Escribe el motivo.",
   "invalid_input:name": "Escribe un nombre de 1 a 60 caracteres.",
+  "invalid_input:templateName": "Escribe un nombre de 1 a 80 caracteres.",
+  "invalid_input:delayAmount": "La espera debe ser un número entero entre 0 y 525600.",
+  "invalid_input:atTime": "La hora fija solo aplica a días hábiles o calendario y va como 09:00.",
+  "invalid_input:message": "El mensaje tiene como máximo 1000 caracteres.",
+  "invalid_input:weekdayEnd": "La hora de cierre debe ser posterior a la de apertura.",
+  "invalid_input:saturdayEnd": "El sábado necesita apertura y cierre, y el cierre va después.",
 };
 
 export function errorMessage(code: ErrorCode, field?: string): string {
@@ -71,6 +82,7 @@ export const CODE_FIELDS: Partial<Record<ErrorCode, string>> = {
   reopen_reason_required: "reason",
   result_required: "result",
   stage_name_taken: "name",
+  stage_required: "stageId",
 };
 
 export function isErrorCode(value: unknown): value is ErrorCode {

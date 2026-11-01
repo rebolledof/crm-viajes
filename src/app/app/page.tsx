@@ -14,7 +14,6 @@ export default async function AppHome({ searchParams }: { searchParams: SearchPa
   const sp = await searchParams;
   const now = new Date();
   const [day, members] = await withUser(getDb(), user, (tx) => Promise.all([myDay(tx, user.id, active.agencyId, now), activeMembers(tx, user.id, active.agencyId)]));
-  const canWrite = can(active.role, "crm.write");
   return (
     <div className="flex flex-col gap-6">
       <div>
@@ -36,7 +35,7 @@ export default async function AppHome({ searchParams }: { searchParams: SearchPa
                 task={task}
                 now={now}
                 back="/app"
-                canWrite={canWrite}
+                role={active.role}
                 members={members}
                 extra={
                   <p className="text-sm">
@@ -85,7 +84,7 @@ export default async function AppHome({ searchParams }: { searchParams: SearchPa
                 task={task}
                 now={now}
                 back="/app"
-                canWrite={canWrite}
+                role={active.role}
                 members={members}
                 extra={
                   <p className="text-sm">
