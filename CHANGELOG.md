@@ -32,3 +32,4 @@
 - Horario laboral de la agencia (por defecto lunes a viernes 8 a 18 y sábado 8 a 12, hora de Colombia).
 - Tipo de tarea WhatsApp; las tareas de WhatsApp y correo abren la app o el programa de correo con el mensaje relleno, sin enviar nada solas.
 - Las tareas abiertas se pueden ajustar (fecha, prioridad, mensaje y asignada) según el rol y el nivel.
+- Si una pantalla falla en el servidor, se muestra un aviso en español con el menú visible y la opción de reintentar, en lugar de la página genérica de Next.js.
