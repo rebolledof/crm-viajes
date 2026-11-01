@@ -56,6 +56,7 @@ Bandeja de mensajes y asignación automática (S03), cotizaciones (S04), importa
 - RF-215: Las etapas son de cada agencia; solo el administrador las crea, renombra, ordena o desactiva. Siempre debe quedar al menos una etapa activa de cada tipo (abierta, ganada, perdida).
 - RF-216: Una oportunidad puede moverse a cualquier etapa activa de su agencia, sin pasar por las intermedias; cada movimiento queda en el historial.
 - RF-217: Desactivar una etapa no cambia las oportunidades que ya están en ella; solo deja de ofrecerse para nuevos movimientos.
+- RF-218: Un módulo de Tareas lista todas las tareas de la agencia agrupadas en vencidas, hoy y próximas, con filtros por responsable (mías, de una persona o de todo el equipo), estado y tipo; cada tarea muestra su contacto y su oportunidad y se puede completar o cancelar desde la lista (Felipe, 1 nov 2026).
 
 ## Criterios de aceptación
 
@@ -76,6 +77,7 @@ Bandeja de mensajes y asignación automática (S03), cotizaciones (S04), importa
 - AC-215 (RF-215): Dada una agencia con una sola etapa de tipo ganada, cuando el administrador intenta desactivarla, entonces se rechaza.
 - AC-216 (RF-216): Dada una oportunidad en "nuevo", cuando el asesor la pasa directamente a "propuesta enviada", entonces se acepta y el historial muestra el salto.
 - AC-217 (RF-217): Dadas tres oportunidades en "negociación", cuando el administrador desactiva esa etapa, entonces las tres siguen en ella y la etapa ya no aparece al mover otras.
+- AC-218 (RF-218): Dadas una tarea abierta de Ana y una completada de Luis en la agencia A y una tarea en la agencia B, cuando Ana abre Tareas con "todo el equipo" y estado "abiertas", entonces ve solo la de Ana; con estado "completadas", ve solo la de Luis; nunca ve la de la agencia B.
 
 ## Decisiones tomadas por defecto (cambiables)
 
@@ -106,3 +108,4 @@ Bandeja de mensajes y asignación automática (S03), cotizaciones (S04), importa
 | RF-213 | AC-212 | RF-14 |
 | RF-214 | AC-213 | 5.3 |
 | RF-215, RF-216, RF-217 | AC-214 a AC-217 | 6.2 (embudo configurable), Felipe 19 oct 2026 |
+| RF-218 | AC-218 | Felipe 1 nov 2026 |

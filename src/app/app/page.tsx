@@ -71,7 +71,10 @@ export default async function AppHome({ searchParams }: { searchParams: SearchPa
       </section>
 
       <section className="flex flex-col gap-3">
-        <h2 className="font-medium text-slate-900">Próximas tareas ({day.upcoming.length})</h2>
+        <h2 className="flex flex-wrap items-baseline justify-between gap-2 font-medium text-slate-900">
+          <span>Próximas tareas ({day.upcoming.length})</span>
+          <Link href="/app/tareas" className="text-sm font-normal text-sky-700 hover:underline">Ver todas las tareas</Link>
+        </h2>
         {day.upcoming.length === 0 ? (
           <Notice>No tienes tareas para los próximos días.</Notice>
         ) : (

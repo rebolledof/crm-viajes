@@ -7,7 +7,7 @@ import { acceptInvitation, createAgency, createInvitation, revokeMembership } fr
 import { createContact, getContactDetail, listContacts, openWhatsapp, recordConsent, updateContact } from "../../src/server/contacts";
 import { AppError } from "../../src/server/errors";
 import { createOpportunity, createStage, getOpportunity, listOpportunities, listStages, moveOpportunity, reorderStages, updateOpportunity, updateStage } from "../../src/server/opportunities";
-import { completeTask, createTask, myDay } from "../../src/server/tasks";
+import { completeTask, createTask, listTasks, myDay } from "../../src/server/tasks";
 import { as, createUser, testDb } from "./helpers";
 
 const t = testDb();
@@ -237,6 +237,30 @@ describe("tareas y Mi día (AC-209, AC-210, AC-213)", () => {
     expect(day.due.map((d) => d.task.id)).not.toContain(taskId);
     expect(day.upcoming.map((d) => d.task.id)).toContain(taskId);
     expect(day.withoutNextAction.map((o) => o.id)).not.toContain(oId);
+  });
+
+  it("el módulo de tareas filtra por responsable y estado sin mezclar agencias (AC-218)", async () => {
+    const cId = await newContact(asesorA, agencyA, "Sofía Lara");
+    const now = Date.now();
+    const mine = await as(t.db, asesorA, (tx) => createTask(tx, asesorA.id, agencyA, { contactId: cId, kind: "llamada", title: "Llamar a Sofía", dueAt: new Date(now + 3600_000) }));
+    const theirs = await as(t.db, asesorA, (tx) => createTask(tx, asesorA.id, agencyA, { contactId: cId, kind: "correo", title: "Enviar cotización", assigneeId: adminA.id, dueAt: new Date(now - 3600_000) }));
+    await as(t.db, adminA, (tx) => completeTask(tx, adminA.id, agencyA, theirs, "Enviada"));
+    const cB = await newContact(adminB, agencyB, "Pedro Ruiz");
+    const other = await as(t.db, adminB, (tx) => createTask(tx, adminB.id, agencyB, { contactId: cB, kind: "llamada", title: "Otra agencia", dueAt: new Date(now) }));
+
+    const ids = (rows: { task: { id: string } }[]) => rows.map((r) => r.task.id);
+    const openAll = await as(t.db, asesorA, (tx) => listTasks(tx, asesorA.id, agencyA, { status: "abierta" }));
+    expect(ids(openAll)).toContain(mine);
+    expect(ids(openAll)).not.toContain(theirs);
+    expect(ids(openAll)).not.toContain(other);
+    const doneAll = await as(t.db, asesorA, (tx) => listTasks(tx, asesorA.id, agencyA, { status: "completada" }));
+    expect(ids(doneAll)).toContain(theirs);
+    expect(ids(doneAll)).not.toContain(mine);
+    const doneMine = await as(t.db, asesorA, (tx) => listTasks(tx, asesorA.id, agencyA, { status: "completada", assigneeId: asesorA.id }));
+    expect(ids(doneMine)).not.toContain(theirs);
+    const calls = await as(t.db, asesorA, (tx) => listTasks(tx, asesorA.id, agencyA, { status: "abierta", kind: "correo" }));
+    expect(ids(calls)).not.toContain(mine);
+    expect(openAll.find((r) => r.task.id === mine)).toMatchObject({ contactName: "Sofía Lara" });
   });
 
   it("completar sin resultado se rechaza, también en la base", async () => {

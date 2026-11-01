@@ -1,5 +1,5 @@
 // SPEC-002 · Tareas, próxima acción y "Mi día".
-import { and, asc, eq, gte, isNull, lt, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, isNull, lt, sql } from "drizzle-orm";
 import type { Tx } from "@/db/client";
 import { contacts, opportunities, pipelineStages, tasks } from "@/db/schema";
 import { endOfLocalDay, isPriority, isTaskKind, type Priority, type TaskKind } from "@/domain/tasks";
@@ -100,6 +100,31 @@ export async function myDay(tx: Tx, userId: string, agencyId: string, now: Date)
 }
 
 /** Miembros activos para elegir responsable o asignado. */
+export const TASK_STATUSES = ["abierta", "completada", "cancelada"] as const;
+export type TaskStatus = (typeof TASK_STATUSES)[number];
+
+/** Módulo de Tareas (RF-218): todas las tareas de la agencia con filtros. */
+export async function listTasks(tx: Tx, userId: string, agencyId: string, filter: { assigneeId?: string; status?: TaskStatus; kind?: TaskKind } = {}) {
+  await requirePermission(tx, userId, agencyId, "crm.read");
+  const open = (filter.status ?? "abierta") === "abierta";
+  return tx
+    .select({ task: tasks, contactName: contacts.fullName, destination: opportunities.destination })
+    .from(tasks)
+    .innerJoin(contacts, eq(contacts.id, tasks.contactId))
+    .leftJoin(opportunities, eq(opportunities.id, tasks.opportunityId))
+    .where(
+      and(
+        eq(tasks.agencyId, agencyId),
+        eq(tasks.status, filter.status ?? "abierta"),
+        filter.assigneeId ? eq(tasks.assigneeId, filter.assigneeId) : undefined,
+        filter.kind ? eq(tasks.kind, filter.kind) : undefined,
+      ),
+    )
+    // Abiertas: la más urgente primero. Cerradas: la más reciente primero.
+    .orderBy(open ? asc(tasks.dueAt) : desc(tasks.completedAt), desc(tasks.createdAt))
+    .limit(300);
+}
+
 export async function activeMembers(tx: Tx, userId: string, agencyId: string) {
   await requirePermission(tx, userId, agencyId, "crm.read");
   const rows = await tx.execute<{ user_id: string; email: string; role: string }>(
