@@ -17,7 +17,8 @@ const LOGO_MESSAGES = {
   logo_type: "Ese archivo no es una imagen PNG, WebP o JPG (aunque su nombre lo diga). Elige otro.",
   envio: "No se pudo subir el logo. Revisa que sea PNG, WebP o JPG de hasta 512 KB y vuelve a intentarlo.",
 };
-const SAVE_FAILED = "No se pudo guardar la marca. Revisa tu conexión y vuelve a intentarlo; los colores siguen escritos.";
+const SAVE_FAILED =
+  "No se pudo guardar la marca y los colores siguen escritos. Revisa tu conexión; si llevas rato sin usar el CRM, tu sesión pudo cerrarse: entra de nuevo en otra pestaña y vuelve a pulsar Guardar.";
 
 /** Lo escrito en el formulario, para devolverlo si se rechaza (sin el archivo). */
 function keep(fd: FormData): Record<string, string[]> {
