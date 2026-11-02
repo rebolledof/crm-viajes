@@ -1,7 +1,7 @@
 import { firstParams } from "@/domain/params";
 import Link from "next/link";
 import { ActionForm, Input } from "@/components/form";
-import { Field, Notice, buttonClass, linkButtonClass } from "@/components/ui";
+import { Field, Notice, buttonClass, linkButtonClass, PageHeader } from "@/components/ui";
 import { getDb, withUser } from "@/db/client";
 import { EDIT_LEVEL_SHORT, TRIGGER_LABELS, describeDelay } from "@/domain/followups";
 import { LOSS_REASON_LABELS } from "@/domain/pipeline";
@@ -26,7 +26,7 @@ export default async function SeguimientosPage({ searchParams }: { searchParams:
   const personal = templates.filter((t) => t.ownerId);
 
   const card = (t: (typeof templates)[number]) => (
-    <li key={t.id} className={`flex flex-col gap-2 rounded-md border border-slate-200 p-3 ${t.active ? "bg-white" : "bg-slate-100"}`}>
+    <li key={t.id} className={`flex flex-col gap-2 rounded-md border border-slate-200 p-3 ${t.active ? "bg-surface" : "bg-slate-100"}`}>
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <Link href={`/app/seguimientos/${t.id}`} className="font-medium text-sky-700 hover:underline">{t.name}</Link>
         {!t.active && <span className="text-xs font-semibold uppercase text-slate-500">Inactiva</span>}
@@ -51,18 +51,16 @@ export default async function SeguimientosPage({ searchParams }: { searchParams:
   );
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold text-slate-900">Plantillas de seguimiento</h1>
+    <div className="flex flex-col gap-4">
+      <PageHeader
+        icon="repeat"
+        title="Plantillas de seguimiento"
+        actions={(isAdmin || canPersonal) && <Link href="/app/seguimientos/nueva" className={buttonClass}>{isAdmin ? "Nueva plantilla" : "Nueva plantilla personal"}</Link>}
+      >
           <p className="max-w-3xl text-sm text-slate-600">
             Crean tareas solas cuando llega una oportunidad o cambia de etapa, con fecha dentro del horario laboral y un mensaje sugerido. Las pendientes se cancelan solas cuando la oportunidad avanza. Nada se envía automáticamente.
           </p>
-        </div>
-        {(isAdmin || canPersonal) && (
-          <Link href="/app/seguimientos/nueva" className={buttonClass}>{isAdmin ? "Nueva plantilla" : "Nueva plantilla personal"}</Link>
-        )}
-      </div>
+      </PageHeader>
       <Flash sp={sp} />
 
       <section className="flex flex-col gap-3">
@@ -84,7 +82,7 @@ export default async function SeguimientosPage({ searchParams }: { searchParams:
       <section className="flex flex-col gap-3">
         <h2 className="font-medium text-slate-900">Horario laboral y permisos</h2>
         {isAdmin ? (
-          <ActionForm action={updateSettingsAction} className="grid gap-4 rounded-lg border border-slate-200 bg-white p-4 sm:grid-cols-4">
+          <ActionForm action={updateSettingsAction} className="grid gap-4 rounded-lg border border-slate-200 bg-surface p-4 sm:grid-cols-4">
             <Field label="Lunes a viernes, abre">
               <Input name="weekdayStart" type="time" required defaultValue={settings.weekdayStart} />
             </Field>

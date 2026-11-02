@@ -11,7 +11,7 @@ export default function AppError({ error, reset }: { error: Error & { digest?: s
       <h1 className="text-xl font-semibold">No pudimos cargar esta pantalla</h1>
       <p className="text-sm">
         Hubo un problema en el servidor. Intenta de nuevo; si sigue pasando, avísale al administrador con este código:{" "}
-        <code className="rounded bg-white px-1">{error.digest ?? "sin código"}</code>.
+        <code className="rounded bg-surface px-1">{error.digest ?? "sin código"}</code>.
       </p>
       <div className="flex flex-wrap items-center gap-4">
         <button type="button" onClick={reset} className={buttonClass}>Intentar de nuevo</button>

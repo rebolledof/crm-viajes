@@ -1,6 +1,6 @@
 // Tipos de Drizzle para las tablas de supabase/migrations. El SQL es la fuente de verdad;
 // tests/integration/schema.test.ts comprueba que ambos coinciden.
-import { boolean, date, integer, jsonb, numeric, pgEnum, pgTable, primaryKey, text, time, timestamp, uuid } from "drizzle-orm/pg-core";
+import { boolean, customType, date, integer, jsonb, numeric, pgEnum, pgTable, primaryKey, text, time, timestamp, uuid } from "drizzle-orm/pg-core";
 
 export const agencyRole = pgEnum("agency_role", ["admin", "asesor", "lectura"]);
 
@@ -73,6 +73,7 @@ export const pipelineStages = pgTable("pipeline_stages", {
   position: integer("position").notNull(),
   kind: stageKind("kind").notNull(),
   active: boolean("active").notNull().default(true),
+  goal: text("goal"),
   createdAt: createdAt(),
 });
 
@@ -226,6 +227,26 @@ export const activities = pgTable("activities", {
   createdAt: createdAt(),
 });
 
+const bytea = customType<{ data: Buffer; driverData: Buffer }>({ dataType: () => "bytea" });
+
+export const agencyBranding = pgTable("agency_branding", {
+  agencyId: uuid("agency_id").primaryKey(),
+  primaryColor: text("primary_color").notNull().default("#0F6E6E"),
+  accentColor: text("accent_color").notNull().default("#F28C28"),
+  logo: bytea("logo"),
+  logoType: text("logo_type"),
+  updatedBy: uuid("updated_by").notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const userPreferences = pgTable("user_preferences", {
+  userId: uuid("user_id").primaryKey(),
+  navLayout: text("nav_layout").notNull().default("top"),
+  navCollapsed: boolean("nav_collapsed").notNull().default(false),
+  theme: text("theme").notNull().default("light"),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const schemaTables = {
   agencies,
   memberships,
@@ -242,4 +263,6 @@ export const schemaTables = {
   agency_settings: agencySettings,
   followup_templates: followupTemplates,
   followup_steps: followupSteps,
+  agency_branding: agencyBranding,
+  user_preferences: userPreferences,
 };

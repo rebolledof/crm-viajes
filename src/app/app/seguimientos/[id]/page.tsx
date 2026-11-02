@@ -1,6 +1,6 @@
 import { firstParams } from "@/domain/params";
 import Link from "next/link";
-import { Notice, linkButtonClass } from "@/components/ui";
+import { Notice, linkButtonClass, PageHeader } from "@/components/ui";
 import { getDb, withUser } from "@/db/client";
 import { EDIT_LEVEL_SHORT, TRIGGER_LABELS, describeDelay } from "@/domain/followups";
 import { TASK_KIND_LABELS } from "@/domain/tasks";
@@ -25,18 +25,16 @@ export default async function PlantillaPage({ params, searchParams }: { params: 
   const stageName = (sid: string | null) => stages.find((s) => s.id === sid)?.name ?? "";
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-end justify-between gap-3">
+    <div className="flex flex-col gap-4">
+      <PageHeader icon="repeat" eyebrow={<Link href="/app/seguimientos" className={linkButtonClass}>Plantillas de seguimiento</Link>} title={t.name}>
         <div>
-          <h1 className="text-2xl font-semibold text-slate-900">{t.name}</h1>
           <p className="text-sm text-slate-600">
             {t.trigger === "etapa" ? `Se activa al entrar en ${stageName(t.stageId)}` : TRIGGER_LABELS[t.trigger]}
             {t.stopStageId && ` · se detiene en ${stageName(t.stopStageId)}`} · {EDIT_LEVEL_SHORT[t.editLevel]}
             {t.ownerId && " · personal"} · {t.active ? "activa" : "inactiva"}
           </p>
         </div>
-        <Link href="/app/seguimientos" className={linkButtonClass}>Volver a las plantillas</Link>
-      </div>
+      </PageHeader>
       <Flash sp={sp} />
       {!writable && <Notice>Puedes ver esta plantilla, pero solo un administrador (o su dueño, si están habilitadas las personales) la cambia.</Notice>}
 
@@ -45,7 +43,7 @@ export default async function PlantillaPage({ params, searchParams }: { params: 
         {t.steps.length === 0 && <Notice>Agrega al menos un paso para que la plantilla cree tareas.</Notice>}
         <ol className="flex flex-col gap-2">
           {t.steps.map((s, i) => (
-            <li key={s.id} className="flex flex-col gap-2 rounded-md border border-slate-200 bg-white p-3">
+            <li key={s.id} className="flex flex-col gap-2 rounded-md border border-slate-200 bg-surface p-3">
               <div className="flex flex-wrap items-center gap-3">
                 {writable && (
                   <div className="flex gap-1">
@@ -85,7 +83,7 @@ export default async function PlantillaPage({ params, searchParams }: { params: 
           ))}
         </ol>
         {writable && (
-          <div className="rounded-lg border border-slate-200 bg-white p-4">
+          <div className="rounded-lg border border-slate-200 bg-surface p-4">
             <h3 className="mb-3 text-sm font-medium text-slate-900">Agregar paso</h3>
             <StepForm action={addStepAction} templateId={t.id} submit="Agregar" />
           </div>

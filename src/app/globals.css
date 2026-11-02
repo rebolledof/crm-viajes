@@ -1,5 +1,165 @@
 @import "tailwindcss";
 
+/*
+ * SPEC-002c · Estilo A con marca por agencia y tema claro u oscuro.
+ *
+ * - Los colores de la marca llegan como variables (--brand, --accent, ...) que escribe el layout de
+ *   /app con los valores de la agencia activa (brandCssVars). Aquí solo hay valores por defecto.
+ * - Las clases sky-* que ya usaban las pantallas apuntan a la marca, así que todo enlace o botón
+ *   toma el color de la agencia sin reescribir cada pantalla.
+ * - Tema oscuro: clase .dark (elección "Oscuro") o .theme-system con el equipo en modo oscuro
+ *   (elección "Automático"). Ambos invierten la escala slate y oscurecen los fondos de estado.
+ */
+@custom-variant dark {
+  &:where(.dark, .dark *) {
+    @slot;
+  }
+  @media (prefers-color-scheme: dark) {
+    &:where(.theme-system, .theme-system *) {
+      @slot;
+    }
+  }
+}
+
 @theme {
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --color-whatsapp: #15803d;
+  --color-whatsapp-strong: #166534;
+}
+
+@theme inline {
+  --color-brand: var(--brand);
+  --color-brand-strong: var(--brand-strong);
+  --color-brand-contrast: var(--brand-contrast);
+  --color-brand-text: var(--brand-text);
+  --color-brand-soft: var(--brand-soft);
+  --color-brand-softer: var(--brand-softer);
+  --color-brand-line: var(--brand-line);
+  --color-accent: var(--accent);
+  --color-accent-contrast: var(--accent-contrast);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-text: var(--accent-text);
+  --color-surface: var(--surface);
+  --color-canvas: var(--canvas);
+  --color-line: var(--line);
+
+  /* Enlaces y acentos existentes (sky-*) = color de la agencia. */
+  --color-sky-50: var(--brand-softer);
+  --color-sky-100: var(--brand-soft);
+  --color-sky-200: var(--brand-line);
+  --color-sky-400: var(--brand-line);
+  --color-sky-600: var(--brand);
+  --color-sky-700: var(--brand-text);
+  --color-sky-800: var(--brand-strong);
+  --color-sky-900: var(--brand-text);
+}
+
+:root {
+  --canvas: #eef1f4;
+  --surface: #ffffff;
+  --line: #dddbda;
+  /* Valores por defecto (Andes Travel de los mockups); el layout los reemplaza por los de la agencia. */
+  --brand: #0f6e6e;
+  --brand-strong: #0d5e5e;
+  --brand-contrast: #ffffff;
+  --brand-text: #0f6e6e;
+  --brand-soft: #e7f1f1;
+  --brand-softer: #f3f8f8;
+  --brand-line: #b7d4d4;
+  --accent: #f28c28;
+  --accent-contrast: #111827;
+  --accent-soft: #fde9d4;
+  --accent-text: #8a4b0c;
+}
+
+/* Paleta oscura. Se repite para .theme-system dentro de la media query (CSS no permite unirlas). */
+.dark {
+  color-scheme: dark;
+  --canvas: #0e1217;
+  --surface: #161b22;
+  --line: #2a323d;
+  --color-slate-50: #1b2129;
+  --color-slate-100: #222a33;
+  --color-slate-200: #2a323d;
+  --color-slate-300: #3a4452;
+  --color-slate-400: #6b7685;
+  --color-slate-500: #8b97a6;
+  --color-slate-600: #a3aebb;
+  --color-slate-700: #c3cad4;
+  --color-slate-800: #dde2e8;
+  --color-slate-900: #e8ebef;
+  --color-red-50: #3a1a1d;
+  --color-red-100: #4a1f23;
+  --color-red-200: #5f272c;
+  --color-red-700: #fca5a5;
+  --color-red-800: #fecaca;
+  --color-red-900: #fee2e2;
+  --color-amber-50: #33270f;
+  --color-amber-100: #3d2f12;
+  --color-amber-200: #5a4419;
+  --color-amber-700: #fcd34d;
+  --color-amber-800: #fde68a;
+  --color-amber-900: #fef3c7;
+  --color-emerald-50: #10291c;
+  --color-emerald-100: #133220;
+  --color-emerald-200: #1d4a31;
+  --color-emerald-700: #86efac;
+  --color-emerald-800: #bbf7d0;
+  --color-emerald-900: #dcfce7;
+  --color-violet-50: #241d3a;
+  --color-violet-800: #ddd6fe;
+}
+@media (prefers-color-scheme: dark) {
+  .theme-system {
+    color-scheme: dark;
+    --canvas: #0e1217;
+    --surface: #161b22;
+    --line: #2a323d;
+    --color-slate-50: #1b2129;
+    --color-slate-100: #222a33;
+    --color-slate-200: #2a323d;
+    --color-slate-300: #3a4452;
+    --color-slate-400: #6b7685;
+    --color-slate-500: #8b97a6;
+    --color-slate-600: #a3aebb;
+    --color-slate-700: #c3cad4;
+    --color-slate-800: #dde2e8;
+    --color-slate-900: #e8ebef;
+    --color-red-50: #3a1a1d;
+    --color-red-100: #4a1f23;
+    --color-red-200: #5f272c;
+    --color-red-700: #fca5a5;
+    --color-red-800: #fecaca;
+    --color-red-900: #fee2e2;
+    --color-amber-50: #33270f;
+    --color-amber-100: #3d2f12;
+    --color-amber-200: #5a4419;
+    --color-amber-700: #fcd34d;
+    --color-amber-800: #fde68a;
+    --color-amber-900: #fef3c7;
+    --color-emerald-50: #10291c;
+    --color-emerald-100: #133220;
+    --color-emerald-200: #1d4a31;
+    --color-emerald-700: #86efac;
+    --color-emerald-800: #bbf7d0;
+    --color-emerald-900: #dcfce7;
+    --color-violet-50: #241d3a;
+    --color-violet-800: #ddd6fe;
+  }
+}
+
+/* Flechas del camino de etapas (estilo "path" de Salesforce) en pantallas anchas. */
+@utility chevron {
+  clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 50%, calc(100% - 12px) 100%, 0 100%, 12px 50%);
+}
+@utility chevron-first {
+  clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 50%, calc(100% - 12px) 100%, 0 100%);
+}
+
+/* <details> sin el triángulo del navegador cuando se usa como menú. */
+summary.menu-summary {
+  list-style: none;
+}
+summary.menu-summary::-webkit-details-marker {
+  display: none;
 }

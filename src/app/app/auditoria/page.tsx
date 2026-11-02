@@ -1,3 +1,4 @@
+import { PageHeader } from "@/components/ui";
 import { redirect } from "next/navigation";
 import { getDb, withUser } from "@/db/client";
 import { can } from "@/domain/permissions";
@@ -16,12 +17,13 @@ export default async function AuditoriaPage() {
   const who = new Map(members.map((m) => [m.userId, m.email]));
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="text-2xl font-semibold text-slate-900">Auditoría</h1>
-      <p className="text-sm text-slate-600">Últimas 100 acciones registradas en la agencia, de la más reciente a la más antigua. Hora de Colombia.</p>
+      <PageHeader icon="shield" title="Auditoría">
+        <p className="text-sm text-slate-600">Últimas 100 acciones registradas en la agencia, de la más reciente a la más antigua. Hora de Colombia.</p>
+      </PageHeader>
       {events.length === 0 ? (
         <p className="text-sm text-slate-600">Todavía no hay acciones registradas. Aquí aparecerá cada cambio que haga el equipo.</p>
       ) : (
-      <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+      <div className="overflow-x-auto rounded-lg border border-slate-200 bg-surface">
         <table className="w-full text-left text-sm">
           <thead className="bg-slate-50 text-slate-600">
             <tr><th className="px-3 py-2">Fecha</th><th className="px-3 py-2">Persona</th><th className="px-3 py-2">Qué hizo</th></tr>

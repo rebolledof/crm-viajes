@@ -46,12 +46,22 @@ export async function createStage(tx: Tx, userId: string, agencyId: string, inpu
   return row.id;
 }
 
-export async function updateStage(tx: Tx, userId: string, agencyId: string, stageId: string, input: { name?: string; active?: boolean }): Promise<void> {
+export async function updateStage(tx: Tx, userId: string, agencyId: string, stageId: string, input: { name?: string; active?: boolean; goal?: string | null }): Promise<void> {
   requireIds(stageId);
   await requirePermission(tx, userId, agencyId, "pipeline.manage");
-  const set: { name?: string; active?: boolean } = {};
+  const set: { name?: string; active?: boolean; goal?: string | null } = {};
   if (input.name !== undefined) set.name = stageName(input.name);
   if (input.active !== undefined) set.active = input.active;
+  if (input.goal !== undefined) {
+    // Meta corta que el tablero muestra bajo la etapa (SPEC-002c). Vacía = sin meta.
+    const goal = input.goal?.trim() ?? "";
+    if (goal.length > 120) throw fieldError("invalid_input", "goal");
+    set.goal = goal || null;
+  }
+  const [before] = await tx
+    .select({ name: pipelineStages.name, active: pipelineStages.active, goal: pipelineStages.goal })
+    .from(pipelineStages)
+    .where(and(eq(pipelineStages.id, stageId), eq(pipelineStages.agencyId, agencyId)));
   if (input.active === false) {
     const all = await tx.select({ id: pipelineStages.id, kind: pipelineStages.kind, active: pipelineStages.active }).from(pipelineStages).where(eq(pipelineStages.agencyId, agencyId));
     if (missingKinds(all.map((s) => ({ kind: s.kind, active: s.id === stageId ? false : s.active }))).length) throw new AppError("last_stage_of_kind");
@@ -60,7 +70,12 @@ export async function updateStage(tx: Tx, userId: string, agencyId: string, stag
     tx.update(pipelineStages).set(set).where(and(eq(pipelineStages.id, stageId), eq(pipelineStages.agencyId, agencyId))).returning({ id: pipelineStages.id }),
   );
   if (!rows.length) throw new AppError("not_found");
-  await recordAudit(tx, { agencyId, actorId: userId, action: "stage.updated", objectType: "stage", objectId: stageId, changes: set });
+  // El formulario envía nombre y meta juntos: la auditoría registra solo lo que cambió.
+  const changes: Record<string, unknown> = {};
+  if (set.name !== undefined && set.name !== before?.name) changes.name = set.name;
+  if (set.active !== undefined && set.active !== before?.active) changes.active = set.active;
+  if (set.goal !== undefined && set.goal !== before?.goal) changes.goal = set.goal;
+  if (Object.keys(changes).length) await recordAudit(tx, { agencyId, actorId: userId, action: "stage.updated", objectType: "stage", objectId: stageId, changes });
 }
 
 /** Reordena las etapas según la lista de ids recibida (RF-215). */

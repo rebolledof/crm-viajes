@@ -1,3 +1,5 @@
+import Link from "next/link";
+import { PageHeader, linkButtonClass } from "@/components/ui";
 import { firstParams } from "@/domain/params";
 import { redirect } from "next/navigation";
 import { getDb, withUser } from "@/db/client";
@@ -18,8 +20,8 @@ export default async function EditarContactoPage({ params, searchParams }: { par
   );
   const c = detail.contact;
   return (
-    <div className="flex flex-col gap-6">
-      <h1 className="text-2xl font-semibold text-slate-900">Editar {c.fullName}</h1>
+    <div className="flex flex-col gap-4">
+      <PageHeader icon="users" eyebrow={<Link href={`/app/contactos/${c.id}`} className={linkButtonClass}>{c.fullName}</Link>} title="Editar contacto" />
       <Flash sp={sp} />
       <ContactForm
         action={updateContactAction}

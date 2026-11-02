@@ -68,7 +68,7 @@ export async function renameAgencyAction(_prev: FormState, formData: FormData): 
   const err = await attempt(() => withUser(getDb(), user, (tx) => renameAgency(tx, user.id, active.agencyId, name)));
   if (err) return failedName(formData, err);
   revalidatePath("/app", "layout");
-  redirect("/app?ok=agencia");
+  redirect("/app/configuracion/marca?ok=agencia");
 }
 
 const inviteSchema = z.object({ email: z.email(), role: z.enum(ROLES) });

@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ActionForm, Input, Select, Textarea, type FormAction } from "@/components/form";
-import { Field, Notice, buttonClass } from "@/components/ui";
+import { Chip, Field, Notice, buttonClass, secondaryButtonClass } from "@/components/ui";
+import { Icon, type IconName } from "@/components/icons";
 import { CURRENCIES, formatMoney, isCurrency } from "@/domain/money";
 import { LOSS_REASON_LABELS, isLossReason } from "@/domain/pipeline";
 import { PRIORITIES, PRIORITY_LABELS, TASK_KINDS, TASK_KIND_LABELS, dueState, isTaskKind, toBogotaInput } from "@/domain/tasks";
@@ -114,7 +115,7 @@ export function ContactForm({ action, members, values = {}, submit }: { action: 
   const phones = [...(values.phones ?? []), "", ""].slice(0, Math.max(2, (values.phones?.length ?? 0) + 1));
   const emails = [...(values.emails ?? []), ""].slice(0, Math.max(1, (values.emails?.length ?? 0) + 1));
   return (
-    <ActionForm action={action} className="grid gap-4 rounded-lg border border-slate-200 bg-white p-4 sm:grid-cols-2">
+    <ActionForm action={action} className="grid gap-4 rounded-lg border border-slate-200 bg-surface p-4 sm:grid-cols-2">
       {values.id && <input type="hidden" name="contactId" value={values.id} />}
       <div className="sm:col-span-2">
         <Field label="Nombre completo">
@@ -193,7 +194,7 @@ export function OpportunityForm({
   submit: string;
 }) {
   return (
-    <ActionForm action={action} className="grid gap-4 rounded-lg border border-slate-200 bg-white p-4 sm:grid-cols-2">
+    <ActionForm action={action} className="grid gap-4 rounded-lg border border-slate-200 bg-surface p-4 sm:grid-cols-2">
       {values.id && <input type="hidden" name="opportunityId" value={values.id} />}
       {values.contactId && <input type="hidden" name="contactId" value={values.contactId} />}
       <Field label="Destino">
@@ -329,8 +330,26 @@ export function NewTaskForm({
   );
 }
 
-const DUE_STYLE = { vencida: "text-red-700", hoy: "text-amber-700", proxima: "text-slate-600" };
-const DUE_LABEL = { vencida: "Vencida", hoy: "Hoy", proxima: "Próxima" };
+const DUE_TONE = { vencida: "red", hoy: "amber", proxima: "gray" } as const;
+const KIND_ICON: Record<string, IconName> = { llamada: "phone", whatsapp: "message", correo: "mail", reunion: "users", seguimiento: "repeat", recordatorio: "clock", tarea: "check" };
+
+const hora = new Intl.DateTimeFormat("es-CO", { timeStyle: "short", timeZone: "America/Bogota" });
+
+/** "Vencida · ayer 6:01 p. m.", "Hoy · 4:00 p. m." o la fecha completa. */
+export function dueLabel(dueAt: Date, now: Date): string {
+  const state = dueState(dueAt, now);
+  if (state === "hoy") return `Hoy · ${hora.format(dueAt)}`;
+  return `${state === "vencida" ? "Vencida · " : ""}${fechaHora.format(dueAt)}`;
+}
+
+export function DueChip({ dueAt, now }: { dueAt: Date; now: Date }) {
+  const state = dueState(dueAt, now);
+  return (
+    <Chip tone={DUE_TONE[state]} icon={state === "vencida" ? "alert" : state === "hoy" ? "clock" : "calendar"}>
+      {dueLabel(dueAt, now)}
+    </Chip>
+  );
+}
 
 export type TaskRow = {
   id: string;
@@ -345,11 +364,10 @@ export type TaskRow = {
   editLevel?: EditLevel | null;
 };
 
-const secondaryButton = "rounded-md border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50";
-
 /**
- * Una tarea con sus acciones. Lo que se ofrece depende del rol y del nivel de edición de la tarea
- * (SPEC-002b RF-226); el servidor y la base vuelven a comprobarlo.
+ * Una tarea con sus acciones (SPEC-002c): un solo botón principal según el tipo, la etapa de la
+ * oportunidad y el vencimiento a la vista. Lo que se ofrece depende del rol y del nivel de edición
+ * de la tarea (SPEC-002b RF-226); el servidor y la base vuelven a comprobarlo.
  */
 export function TaskItem({
   task,
@@ -359,6 +377,8 @@ export function TaskItem({
   members,
   extra,
   channels,
+  stageName,
+  primary,
 }: {
   task: TaskRow;
   now: Date;
@@ -368,90 +388,108 @@ export function TaskItem({
   extra?: React.ReactNode;
   /** Teléfono, correo y permisos de los contactos (contactChannels) para deshabilitar el botón del canal. */
   channels?: Map<string, ContactChannels>;
+  /** Etapa de la oportunidad de la tarea, para que el asesor sepa en qué paso del proceso está. */
+  stageName?: string | null;
+  /** Resalta el botón de acción (la primera tarea del plan). */
+  primary?: boolean;
 }) {
-  const state = dueState(task.dueAt, now);
   const perms = taskPermissions(role, task.editLevel);
   const channel = task.kind === "whatsapp" ? "whatsapp" : task.kind === "correo" ? "correo" : null;
   const blocked = channel && task.contactId ? channelBlock(task.kind, channels?.get(task.contactId)) : null;
+  const kind = isTaskKind(task.kind) ? task.kind : "tarea";
   return (
-    <li className="flex flex-col gap-2 rounded-md border border-slate-200 bg-white p-3">
-      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <span className={`text-xs font-semibold uppercase ${DUE_STYLE[state]}`}>{DUE_LABEL[state]}</span>
-        <span className="font-medium text-slate-900">{task.title}</span>
-        <span className="text-sm text-slate-600">
-          {isTaskKind(task.kind) ? TASK_KIND_LABELS[task.kind] : task.kind} · {fechaHora.format(task.dueAt)} · {memberName(members, task.assigneeId)}
+    <li className="flex flex-col gap-2 border-b border-slate-100 py-3 last:border-b-0">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-600" title={TASK_KIND_LABELS[kind]}>
+          <Icon name={KIND_ICON[kind] ?? "check"} className="size-4" />
         </span>
-        {task.templateId && (
-          <span className="rounded bg-violet-50 px-1.5 py-0.5 text-xs text-violet-800" title="Creada por una plantilla de seguimiento">
-            Automática{task.editLevel === "bloqueada" ? " · bloqueada" : ""}
-          </span>
-        )}
+        <div className="min-w-0 flex-1 basis-56">
+          <p className="font-semibold text-slate-900">{task.title}</p>
+          <div className="text-sm text-slate-600">
+            {extra}
+            {task.assigneeId && members.length > 1 && <span className="text-slate-500"> · {memberName(members, task.assigneeId)}</span>}
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-1.5">
+          {stageName && <Chip tone="brand" title="Etapa de la oportunidad">Etapa: {stageName}</Chip>}
+          {task.templateId && (
+            <Chip tone="violet" title="Creada por una plantilla de seguimiento">
+              Automática{task.editLevel === "bloqueada" ? " · bloqueada" : ""}
+            </Chip>
+          )}
+          <DueChip dueAt={task.dueAt} now={now} />
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {perms.complete && channel && <TaskOpenButton taskId={task.id} channel={channel} back={back} blocked={blocked} compact primary={primary} />}
+        </div>
       </div>
-      {extra}
-      {task.message && <p className="whitespace-pre-line rounded bg-slate-50 px-2 py-1 text-sm text-slate-700">Mensaje sugerido: {task.message}</p>}
-      {perms.complete && channel && <TaskOpenButton taskId={task.id} channel={channel} back={back} blocked={blocked} />}
-      {perms.complete && (
-        <details className="text-sm">
-          <summary className="cursor-pointer text-sky-700">{perms.cancel ? "Completar o cancelar" : "Completar"}</summary>
-          <div className="mt-2 flex flex-col gap-3">
-            <ActionForm action={completeTaskAction} className="flex flex-wrap items-end gap-2">
-              <input type="hidden" name="taskId" value={task.id} />
-              <input type="hidden" name="back" value={back} />
-              <Field label="Resultado">
-                <Input name="result" required placeholder="Qué pasó" />
-              </Field>
-              <button className={buttonClass}>Completar</button>
-            </ActionForm>
-            {perms.cancel && (
-              <ActionForm action={cancelTaskAction} className="flex flex-wrap items-end gap-2">
+      {task.message && <p className="ml-11 whitespace-pre-line rounded bg-slate-50 px-2 py-1 text-sm text-slate-700">Mensaje sugerido: {task.message}</p>}
+      {(perms.complete || perms.adjust || perms.reassign) && (
+        <div className="ml-11 flex flex-wrap gap-x-4 gap-y-2 text-sm">
+          {perms.complete && (
+            <details className="group">
+              <summary className="cursor-pointer font-medium text-brand-text marker:text-slate-400">{perms.cancel ? "Marcar hecha o cancelar" : "Marcar hecha"}</summary>
+              <div className="mt-2 flex flex-col gap-3 rounded border border-slate-200 bg-slate-50 p-3">
+                <ActionForm action={completeTaskAction} className="flex flex-wrap items-end gap-2">
+                  <input type="hidden" name="taskId" value={task.id} />
+                  <input type="hidden" name="back" value={back} />
+                  <Field label="¿Qué pasó?">
+                    <Input name="result" required placeholder="Por ejemplo: confirmó fechas del 20 al 24" />
+                  </Field>
+                  <button className={buttonClass}>Marcar hecha</button>
+                </ActionForm>
+                {perms.cancel && (
+                  <ActionForm action={cancelTaskAction} className="flex flex-wrap items-end gap-2">
+                    <input type="hidden" name="taskId" value={task.id} />
+                    <input type="hidden" name="back" value={back} />
+                    <Field label="Motivo de cancelación">
+                      <Input name="reason" required />
+                    </Field>
+                    <button className={secondaryButtonClass}>Cancelar tarea</button>
+                  </ActionForm>
+                )}
+              </div>
+            </details>
+          )}
+          {(perms.adjust || perms.reassign) && (
+            <details>
+              <summary className="cursor-pointer font-medium text-brand-text marker:text-slate-400">Ajustar</summary>
+              <ActionForm action={updateTaskAction} className="mt-2 grid gap-3 rounded border border-slate-200 bg-slate-50 p-3 sm:grid-cols-2">
                 <input type="hidden" name="taskId" value={task.id} />
                 <input type="hidden" name="back" value={back} />
-                <Field label="Motivo de cancelación">
-                  <Input name="reason" required />
-                </Field>
-                <button className={secondaryButton}>Cancelar tarea</button>
-              </ActionForm>
-            )}
-          </div>
-        </details>
-      )}
-      {(perms.adjust || perms.reassign) && (
-        <details className="text-sm">
-          <summary className="cursor-pointer text-sky-700">Ajustar</summary>
-          <ActionForm action={updateTaskAction} className="mt-2 grid gap-3 sm:grid-cols-2">
-            <input type="hidden" name="taskId" value={task.id} />
-            <input type="hidden" name="back" value={back} />
-            {perms.adjust && (
-              <>
-                <Field label="Vence (hora de Colombia)">
-                  <Input name="dueAt" type="datetime-local" required defaultValue={toBogotaInput(task.dueAt)} />
-                </Field>
-                <Field label="Prioridad">
-                  <Select name="priority" defaultValue={task.priority}>
-                    {PRIORITIES.map((p) => (
-                      <option key={p} value={p}>{PRIORITY_LABELS[p]}</option>
-                    ))}
-                  </Select>
-                </Field>
-                {(task.message || channel) && (
-                  <div className="sm:col-span-2">
-                    <Field label="Mensaje sugerido ({nombre}, {destino} y {agencia} se rellenan solos)">
-                      <Textarea name="message" defaultValue={task.message ?? ""} rows={3} maxLength={1000} />
+                {perms.adjust && (
+                  <>
+                    <Field label="Vence (hora de Colombia)">
+                      <Input name="dueAt" type="datetime-local" required defaultValue={toBogotaInput(task.dueAt)} />
                     </Field>
-                  </div>
+                    <Field label="Prioridad">
+                      <Select name="priority" defaultValue={task.priority}>
+                        {PRIORITIES.map((p) => (
+                          <option key={p} value={p}>{PRIORITY_LABELS[p]}</option>
+                        ))}
+                      </Select>
+                    </Field>
+                    {(task.message || channel) && (
+                      <div className="sm:col-span-2">
+                        <Field label="Mensaje sugerido ({nombre}, {destino} y {agencia} se rellenan solos)">
+                          <Textarea name="message" defaultValue={task.message ?? ""} rows={3} maxLength={1000} />
+                        </Field>
+                      </div>
+                    )}
+                  </>
                 )}
-              </>
-            )}
-            {perms.reassign && (
-              <Field label="Asignada a">
-                <MemberSelect name="assigneeId" members={members} value={task.assigneeId} />
-              </Field>
-            )}
-            <div className="sm:col-span-2">
-              <button className={buttonClass}>Guardar cambios</button>
-            </div>
-          </ActionForm>
-        </details>
+                {perms.reassign && (
+                  <Field label="Asignada a">
+                    <MemberSelect name="assigneeId" members={members} value={task.assigneeId} />
+                  </Field>
+                )}
+                <div className="sm:col-span-2">
+                  <button className={buttonClass}>Guardar cambios</button>
+                </div>
+              </ActionForm>
+            </details>
+          )}
+        </div>
       )}
     </li>
   );

@@ -33,6 +33,9 @@ describe("migraciones y esquema", () => {
     const withAgency = await t.admin<{ table_name: string }[]>`
       select table_name from information_schema.columns where table_schema = 'public' and column_name = 'agency_id'`;
     const names = new Set(withAgency.map((r) => r.table_name));
-    for (const r of rows.filter((r) => r.relname !== "agencies")) expect(names, r.relname).toContain(r.relname);
+    // Excepciones: la agencia misma y las preferencias personales (SPEC-002c), que son de la
+    // persona y valen en todas sus agencias. Ambas siguen con RLS (comprobado arriba).
+    const exempt = new Set(["agencies", "user_preferences"]);
+    for (const r of rows.filter((r) => !exempt.has(r.relname))) expect(names, r.relname).toContain(r.relname);
   });
 });

@@ -21,7 +21,7 @@ export type TemplateValues = {
 export function TemplateForm({ action, stages, values = {}, personal, submit }: { action: FormAction; stages: StageOption[]; values?: TemplateValues; personal?: boolean; submit: string }) {
   const open = stages.filter((s) => s.kind === "abierta");
   return (
-    <ActionForm action={action} className="grid gap-4 rounded-lg border border-slate-200 bg-white p-4 sm:grid-cols-2">
+    <ActionForm action={action} className="grid gap-4 rounded-lg border border-slate-200 bg-surface p-4 sm:grid-cols-2">
       {values.id && <input type="hidden" name="templateId" value={values.id} />}
       {personal && <input type="hidden" name="personal" value="true" />}
       <div className="sm:col-span-2">

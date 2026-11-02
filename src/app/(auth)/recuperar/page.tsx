@@ -8,8 +8,8 @@ import { requestPasswordResetAction } from "../actions";
 export default async function RecuperarPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const sp = firstParams(await searchParams);
   return (
-    <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center gap-6 px-4">
-      <h1 className="text-2xl font-semibold text-slate-900">Recuperar contraseña</h1>
+    <main className="flex flex-col gap-6">
+      <h1 className="text-xl font-bold text-slate-900">Recuperar contraseña</h1>
       {sp.error && <Notice tone="error">{AUTH_MESSAGES[sp.error] ?? "No se pudo enviar el correo."}</Notice>}
       {sp.enviado ? (
         <Notice tone="ok">Si hay una cuenta con ese correo, te enviamos un enlace para elegir una contraseña nueva. Revisa también la carpeta de spam.</Notice>

@@ -38,9 +38,9 @@ Logo horizontal y logo para modo oscuro, marca en correos y PDF (llega con el co
 
 ## Requisitos funcionales
 
-- RF-240: Solo el administrador o dueño de una agencia puede leer y cambiar la configuración de marca en la pantalla de configuración y guardarla; también en la base de datos (RLS) y en el almacenamiento del logo.
+- RF-240: Solo el administrador de una agencia puede cambiar la marca, tanto en la pantalla "Marca de la agencia" como directo en la base de datos (RLS). Todos los miembros la leen para pintar la app.
 - RF-241: Toda la app usa el logo, el nombre y los colores de la agencia activa, tomada de la sesión verificada; nunca de un valor enviado por el cliente.
-- RF-242: El servidor valida el formato de los colores (`#RRGGBB`) y el logo (PNG, WebP o SVG saneado, máximo 512 KB). Si el color principal no da un contraste mínimo de 4.5:1 con el texto de los botones, se avisa y se sugiere un tono; lo elegido no se borra.
+- RF-242: El servidor valida el formato de los colores (`#RRGGBB`) y el logo (PNG, WebP o JPG reconocidos por sus bytes, máximo 512 KB; SVG no, porque puede llevar código). Si el color principal no da un contraste mínimo de 4.5:1 con el texto de los botones, se avisa y se sugiere un tono; lo elegido no se borra.
 - RF-243: Las preferencias de menú y tema son de cada usuario, valen en todas sus agencias y se aplican en el servidor (sin parpadeo al cargar).
 - RF-244: Los valores por defecto son menú arriba, menú lateral abierto y tema claro.
 - RF-245: Mi día ordena y agrupa las tareas como en el alcance 5 y muestra el avance del día.
@@ -51,7 +51,7 @@ Logo horizontal y logo para modo oscuro, marca en correos y PDF (llega con el co
 
 ## Criterios de aceptación
 
-- AC-240 (RF-240): Dado un asesor, cuando abre "Configuración › Marca" o intenta cambiar la marca llamando directo a la base de datos o al almacenamiento, entonces se rechaza.
+- AC-240 (RF-240): Dado un asesor, cuando abre "Configuración › Marca" o intenta cambiar la marca llamando directo a la base de datos, entonces se rechaza.
 - AC-241 (RF-241): Dadas dos agencias con colores y logos distintos, cuando un usuario que pertenece a ambas cambia de agencia activa, entonces el logo y los colores cambian a los de la nueva agencia.
 - AC-242 (RF-242): Dado un administrador que sube un archivo de 2 MB o un PDF como logo, entonces se rechaza con un mensaje claro y los colores escritos en el formulario no se pierden.
 - AC-243 (RF-242): Dado un color principal muy claro (por ejemplo `#F5F5F5`), cuando se guarda, entonces aparece el aviso de contraste con un tono sugerido.
@@ -59,16 +59,17 @@ Logo horizontal y logo para modo oscuro, marca en correos y PDF (llega con el co
 - AC-245 (RF-243): Dado el menú a la izquierda, cuando el usuario lo comprime, entonces solo se ven el logo y los íconos, y al pasar el mouse sobre un ícono aparece su nombre.
 - AC-246 (RF-243): Dado el tema "Automático" y un equipo en modo oscuro, cuando el usuario entra, entonces la app se ve en oscuro sin mostrar antes la versión clara.
 - AC-247 (RF-245): Dadas 2 tareas vencidas y 3 de hoy, cuando el asesor abre Mi día, entonces ve primero el grupo "Vencidas" con las 2, luego "Para hoy" con las 3, y el paso 1 del plan marcado como actual.
-- AC-248 (RF-246): Dada una oportunidad en la tercera etapa activa, cuando se abre su ficha, entonces las dos primeras etapas salen como hechas, la tercera como "Estás aquí" y las demás pendientes.
+- AC-248 (RF-246): Dada una oportunidad en la tercera etapa activa, cuando se abre su ficha, entonces las dos primeras etapas salen como hechas, la tercera resaltada como etapa actual (con "paso 3 de N") y las demás pendientes.
 - AC-249 (RF-247): Dada una oportunidad abierta con una sola tarea abierta, cuando el asesor la completa, entonces se ofrece crear la siguiente; si la omite, la oportunidad aparece en "Sin siguiente paso" de Mi día.
 - AC-250 (RF-248): Dado un cambio de color, entonces la auditoría muestra quién lo hizo, cuándo y el valor anterior y el nuevo.
 - AC-251 (RF-249): Dadas las pantallas clave en tema claro y oscuro con las dos marcas de ejemplo, cuando se revisan con una herramienta de contraste, entonces el texto normal cumple AA.
 - AC-252 (alcance 7): Dada una pantalla de 390 px de ancho, entonces no hay desplazamiento horizontal de la página y el menú se abre como cajón.
 
-## Datos (propuesta)
+## Datos
 
-- `agency_branding` (una fila por agencia, con `agency_id`, RLS como `agency_settings`): `primary_color`, `accent_color`, `logo_path`, `updated_by`, `updated_at`.
-- Bucket privado `branding` en Supabase Storage, carpeta por `agency_id`; solo el administrador de esa agencia sube o borra.
+- `agency_branding` (una fila por agencia, con `agency_id`, RLS como `agency_settings`): `primary_color`, `accent_color`, `logo` (bytes, máximo 512 KB también en la base), `logo_type`, `updated_by`, `updated_at`.
+- El logo se guarda en la base y no en Supabase Storage (cambio del 2 nov 2026 al implementar): queda bajo la misma RLS que el resto, se prueba en local y se sirve por `/app/marca/logo` con la sesión. Para un logo de hasta 512 KB no hace falta un bucket.
+- `pipeline_stages.goal`: meta corta opcional de cada etapa (hasta 120 letras).
 - `user_preferences` (una fila por usuario, solo el propio usuario la lee y la cambia): `nav_layout` (`top`|`side`, por defecto `top`), `nav_collapsed` (por defecto falso), `theme` (`light`|`dark`|`system`, por defecto `light`).
 - Migración solo aditiva (tablas nuevas); no toca datos existentes.
 

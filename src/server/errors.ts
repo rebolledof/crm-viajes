@@ -28,6 +28,9 @@ export const ERROR_MESSAGES = {
   no_email: "El contacto no tiene correo.",
   email_blocked: "El contacto retiró el permiso para escribirle por correo.",
   task_contact_mismatch: "Esa oportunidad es de otro contacto. Elige una del mismo contacto o ninguna.",
+  invalid_color: "El color debe ir como #RRGGBB, por ejemplo #0F6E6E.",
+  logo_too_big: "El logo pesa más de 512 KB. Usa una imagen más liviana.",
+  logo_type: "El logo debe ser una imagen PNG, WebP o JPG.",
 } as const;
 
 export type ErrorCode = keyof typeof ERROR_MESSAGES;
@@ -74,6 +77,7 @@ const FIELD_MESSAGES: Record<string, string> = {
   "invalid_input:message": "El mensaje tiene como máximo 1000 caracteres.",
   "invalid_input:weekdayEnd": "La hora de cierre debe ser posterior a la de apertura.",
   "invalid_input:saturdayEnd": "El sábado necesita apertura y cierre, y el cierre va después.",
+  "invalid_input:goal": "La meta de la etapa tiene como máximo 120 caracteres.",
 };
 
 export function errorMessage(code: ErrorCode, field?: string): string {
@@ -92,6 +96,8 @@ export const CODE_FIELDS: Partial<Record<ErrorCode, string>> = {
   stage_name_taken: "name",
   stage_required: "stageId",
   task_contact_mismatch: "opportunityId",
+  logo_too_big: "logo",
+  logo_type: "logo",
 };
 
 export function isErrorCode(value: unknown): value is ErrorCode {
