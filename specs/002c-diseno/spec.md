@@ -1,6 +1,6 @@
 # SPEC-002c Nuevo diseño: estilo A, marca por agencia, preferencias y guía paso a paso
 
-- Estado: Borrador para revisión de Felipe
+- Estado: Aprobada por Felipe el 2 nov 2026 ("Aprobada"). Preguntas 1 y 2 resueltas con la recomendación: la lista por etapa queda fuera de esta etapa y, cuando llegue, solo avisará.
 - Propietario: Felipe
 - Sprint: etapa de diseño después de cerrar S02 (épica DISEÑO, tareas T-063 a T-066)
 - Deriva de: pedidos de Felipe del 2 nov 2026 y la propuesta visual aprobada ("Ese es el diseño que quiero"). Imágenes y detalle en la carpeta del proyecto `diseno/propuesta-v1`, `v2` y `v3`.
