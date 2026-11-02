@@ -16,7 +16,7 @@ import {
   readableOn,
   sniffLogoType,
 } from "@/domain/branding";
-import { DEFAULT_PREFERENCES, isNavLayout, isTheme, toPreferences } from "@/domain/preferences";
+import { DEFAULT_PREFERENCES, backPathFrom, isNavLayout, isTheme, themeClass, toPreferences } from "@/domain/preferences";
 import { TASK_ACTION_LABELS, dayPlan, nextStepStatus, stagePath } from "@/domain/guide";
 import { TASK_KINDS } from "@/domain/tasks";
 
@@ -116,6 +116,30 @@ describe("preferencias personales (RF-243, RF-244)", () => {
     expect(isTheme("rosa")).toBe(false);
     expect(toPreferences({ navLayout: "side", navCollapsed: true, theme: "dark" })).toEqual({ navLayout: "side", navCollapsed: true, theme: "dark" });
     expect(toPreferences({ navLayout: "x", navCollapsed: "si", theme: 3 })).toEqual(DEFAULT_PREFERENCES);
+  });
+});
+
+describe("tema y regreso tras cambiar una preferencia", () => {
+  it("el contenedor lleva la clase del tema desde el servidor (AC-246)", () => {
+    expect(themeClass("light")).toBe("");
+    expect(themeClass("dark")).toBe("dark");
+    expect(themeClass("system")).toBe("theme-system");
+  });
+
+  it("vuelve a la misma pantalla interna sin repetir avisos anteriores", () => {
+    const host = "crm.ejemplo.test";
+    expect(backPathFrom("https://crm.ejemplo.test/app/contactos?q=ana&ok=creado", host)).toBe("/app/contactos?q=ana");
+    expect(backPathFrom("https://crm.ejemplo.test/app/configuracion/marca?ok=marca&contraste=%2346738C", host)).toBe("/app/configuracion/marca");
+    expect(backPathFrom("https://crm.ejemplo.test/app/oportunidades/1?siguiente=1&error=x", host)).toBe("/app/oportunidades/1");
+    expect(backPathFrom("https://crm.ejemplo.test/app", host)).toBe("/app");
+  });
+
+  it("nunca redirige fuera del CRM ni a rutas que no son de la app", () => {
+    const host = "crm.ejemplo.test";
+    for (const bad of [null, "", "nada", "https://malo.test/app", "https://crm.ejemplo.test/login", "https://crm.ejemplo.test/apple", "//malo.test/app"]) {
+      expect(backPathFrom(bad, host)).toBe("/app");
+    }
+    expect(backPathFrom("https://crm.ejemplo.test/app/x", null)).toBe("/app");
   });
 });
 

@@ -55,6 +55,9 @@
 - El nombre de la agencia se cambia ahora en "Marca de la agencia" (antes estaba en Mi día).
 - Login, registro y recuperar contraseña con el nuevo estilo.
 - Contraste AA revisado con axe-core en claro y oscuro con dos marcas.
+- "¿Cuál es el siguiente paso?" se puede dejar para después; la oportunidad queda en «Sin siguiente paso» de Mi día (prueba independiente).
+- Al cambiar el menú o el tema se vuelve a la misma pantalla sin repetir el aviso anterior.
+- Una tarea de llamada sin teléfono en el contacto lo dice y explica cómo corregirlo.
 
 ### Corregido (prueba independiente de S02, 1 nov 2026)
 

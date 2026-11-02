@@ -4,7 +4,7 @@ import { Icon } from "@/components/icons";
 import { getDb, withUser } from "@/db/client";
 import { DEFAULT_ACCENT, DEFAULT_PRIMARY, agencyInitials, brandCssVars, cssBlock } from "@/domain/branding";
 import { ROLE_LABELS, can } from "@/domain/permissions";
-import { NAV_LAYOUT_LABELS, THEME_LABELS, type NavLayout, type Preferences, type Theme } from "@/domain/preferences";
+import { NAV_LAYOUT_LABELS, THEME_LABELS, themeClass, type NavLayout, type Preferences, type Theme } from "@/domain/preferences";
 import { getBranding, getPreferences, type Branding } from "@/server/branding";
 import { getAppContext } from "@/server/session";
 import { dueTodayCount } from "@/server/tasks";
@@ -30,7 +30,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   );
   const vars = brandCssVars(branding);
   const css = [cssBlock(":root", vars.light), cssBlock(".dark", vars.dark), `@media (prefers-color-scheme: dark){${cssBlock(".theme-system", vars.dark)}}`].join("");
-  const themeClass = prefs.theme === "dark" ? "dark" : prefs.theme === "system" ? "theme-system" : "";
+  const theme = themeClass(prefs.theme);
 
   const main: NavItem[] = active
     ? [
@@ -56,7 +56,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   const side = prefs.navLayout === "side";
 
   return (
-    <div className={`${themeClass} min-h-screen bg-canvas text-slate-900`}>
+    <div className={`${theme} min-h-screen bg-canvas text-slate-900`}>
       <style dangerouslySetInnerHTML={{ __html: css }} />
       <a href="#contenido" className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:rounded focus:bg-surface focus:px-3 focus:py-2">
         Saltar al contenido

@@ -96,9 +96,15 @@ export default async function OportunidadPage({ params, searchParams }: { params
               </h2>
               <p className="mt-1 mb-3 text-sm text-slate-600">Terminaste la última tarea de esta oportunidad. Programa lo que sigue para que no se quede sin seguimiento.</p>
               <NewTaskForm contactId={o.contactId} opportunityId={o.id} members={members} userId={user.id} back={back} now={now} />
+              <p className="mt-3 text-sm text-slate-600">
+                ¿Todavía no sabes qué sigue?{" "}
+                <Link href={back} className={linkButtonClass}>Lo defino después</Link>
+                {" "}y la oportunidad quedará en «Sin siguiente paso» de Mi día para que no se olvide.
+              </p>
             </section>
           )}
 
+          {!askNext && (
           <Card title="Qué hacer ahora" icon="check" bodyClassName="px-4">
             {next ? (
               <ul>
@@ -114,6 +120,7 @@ export default async function OportunidadPage({ params, searchParams }: { params
               </div>
             )}
           </Card>
+          )}
 
           {rest.length > 0 && (
             <Card title={`Después (${rest.length})`} icon="list" bodyClassName="px-4">

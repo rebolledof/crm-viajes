@@ -421,6 +421,9 @@ export function TaskItem({
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {perms.complete && channel && <TaskOpenButton taskId={task.id} channel={channel} back={back} blocked={blocked} compact primary={primary} />}
+          {task.kind === "llamada" && task.contactId && channels?.get(task.contactId)?.phone === false && (
+            <span className="text-xs text-amber-800">El contacto no tiene teléfono. Agrégalo en su ficha para poder llamar.</span>
+          )}
         </div>
       </div>
       {task.message && <p className="ml-11 whitespace-pre-line rounded bg-slate-50 px-2 py-1 text-sm text-slate-700">Mensaje sugerido: {task.message}</p>}

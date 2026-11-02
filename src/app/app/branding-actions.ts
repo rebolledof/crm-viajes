@@ -8,6 +8,7 @@ import { redirect } from "next/navigation";
 import type { FormState } from "@/components/form";
 import { getDb, withUser } from "@/db/client";
 import { contrastWarning, normalizeHex } from "@/domain/branding";
+import { backPathFrom } from "@/domain/preferences";
 import { setPreferences, updateBranding } from "@/server/branding";
 import { AppError, CODE_FIELDS, errorMessage } from "@/server/errors";
 import { requireActiveAgency, requireUser } from "@/server/session";
@@ -45,16 +46,10 @@ export async function updateBrandingAction(_prev: FormState, fd: FormData): Prom
   redirect(`/app/configuracion/marca?ok=marca${warn ? `&contraste=${encodeURIComponent(warn.suggestion)}` : ""}`);
 }
 
-/** Ruta interna desde la que se cambió la preferencia, para volver a ella. */
+/** Pantalla interna desde la que se cambió la preferencia, para volver a ella. */
 async function backPath(): Promise<string> {
-  const ref = (await headers()).get("referer");
-  if (!ref) return "/app";
-  try {
-    const url = new URL(ref);
-    return url.pathname.startsWith("/app") ? url.pathname + url.search : "/app";
-  } catch {
-    return "/app";
-  }
+  const h = await headers();
+  return backPathFrom(h.get("referer"), h.get("x-forwarded-host") ?? h.get("host"));
 }
 
 /** Cambia una preferencia personal (RF-243): menú arriba o a la izquierda, comprimido, tema. */

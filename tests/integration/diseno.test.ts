@@ -98,6 +98,20 @@ describe("marca de la agencia (RF-240 a RF-242, RF-248)", () => {
     expect(b.hasLogo).toBe(false);
   });
 
+  it("una persona en dos agencias ve la marca de la agencia activa (AC-241)", async () => {
+    // Andrea es asesora en A y en B; la agencia activa decide qué marca recibe.
+    const both = await createUser(t.admin, "dos");
+    const invB = await as(t.db, B.admin, (tx) => createInvitation(tx, { userId: B.admin.id, agencyId: B.id, email: both.email, role: "asesor", now: new Date() }));
+    await as(t.db, both, (tx) => acceptInvitation(tx, invB.token));
+    const invA = await as(t.db, A.admin, (tx) => createInvitation(tx, { userId: A.admin.id, agencyId: A.id, email: both.email, role: "asesor", now: new Date() }));
+    await as(t.db, both, (tx) => acceptInvitation(tx, invA.token));
+    const [inA, inB] = await Promise.all([as(t.db, both, (tx) => getBranding(tx, both.id, A.id)), as(t.db, both, (tx) => getBranding(tx, both.id, B.id))]);
+    expect(inA.primary).toBe("#C2185B");
+    expect(inB.primary).toBe("#0F4C81");
+    expect(inA.hasLogo).toBe(true);
+    expect(await as(t.db, both, (tx) => getLogo(tx, both.id, B.id))).toBeNull();
+  });
+
   it("rechaza colores inválidos señalando el campo", async () => {
     await expectCode(as(t.db, A.admin, (tx) => updateBranding(tx, A.admin.id, A.id, { primary: "rojo", accent: "#FFB300" })), "invalid_color", "primary");
     await expectCode(as(t.db, A.admin, (tx) => updateBranding(tx, A.admin.id, A.id, { primary: "#C2185B", accent: "#FFB30;}" })), "invalid_color", "accent");

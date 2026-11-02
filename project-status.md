@@ -14,7 +14,7 @@
 
 ## Comandos verificados
 
-2 nov 2026 en la rama del diseño: lint, typecheck, 75 unitarias, 97 de integración y build sin errores. axe-core sin fallas de contraste en las pantallas clave (claro y oscuro, dos marcas) y ninguna pantalla desborda a 390 px.
+2 nov 2026 en la rama del diseño, tras corregir la prueba independiente (Sonnet): lint, typecheck, 78 unitarias, 98 de integración y build sin errores. axe-core sin fallas de contraste en las pantallas clave (claro y oscuro, dos marcas) y ninguna pantalla desborda a 390 px.
 
 2 nov 2026 en la rama de S02b, tras corregir el informe de QA y traer `s02-crm` (d76952e): lint, typecheck, 54 unitarias, 78 de integración y build sin errores; prueba independiente con otro modelo (Sonnet) sin defectos altos ni medios, y sus dos sugerencias aplicadas con prueba. Los avisos de validación en español se comprobaron con Chromium en inglés sobre /registro.
 
@@ -32,7 +32,6 @@
 ## No verificado todavía
 
 - El diseño nuevo en la vista previa de Vercel: necesita aplicar la migración del diseño en `crm-viajes-pruebas`, con permiso de Felipe.
-- Prueba independiente del diseño con otro modelo (T-065).
 
 - Las correcciones del 2 nov (lista de oportunidades, botones deshabilitados, auditoría legible) en la vista previa: tienen pruebas, falta recorrerlas en el navegador.
 - Recorrido E2E con Playwright: necesita Supabase Auth local o de pruebas; queda para S05.
@@ -54,4 +53,4 @@ Ninguno de código. La política de datos personales bloquea cargar datos reales
 
 ## Siguiente tarea
 
-Prueba independiente del diseño (T-065), después Felipe lo revisa en la vista previa (T-066) junto con S02 y S02b (T-021 y T-059). Después, S03 Bandeja unificada.
+Felipe lo revisa en la vista previa (T-066) junto con S02 y S02b (T-021 y T-059). Después, S03 Bandeja unificada.

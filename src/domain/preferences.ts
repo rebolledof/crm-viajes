@@ -29,3 +29,31 @@ export function toPreferences(row: { navLayout?: unknown; navCollapsed?: unknown
     theme: isTheme(row?.theme) ? row.theme : DEFAULT_PREFERENCES.theme,
   };
 }
+
+/**
+ * Clase del contenedor de la app según el tema (RF-243, AC-246). Se pone en el servidor, así que
+ * la primera pintura ya sale con el tema elegido; "Automático" sigue al equipo por CSS.
+ */
+export function themeClass(theme: Theme): string {
+  return theme === "dark" ? "dark" : theme === "system" ? "theme-system" : "";
+}
+
+/**
+ * Ruta a la que se vuelve después de cambiar una preferencia: la misma pantalla interna de la que
+ * vino la persona, sin los avisos de una acción anterior (?ok=, ?error=, ?contraste=). Cualquier
+ * otra cosa vuelve a /app, para no redirigir fuera del CRM.
+ */
+export function backPathFrom(referer: string | null | undefined, host: string | null | undefined): string {
+  if (!referer || !host) return "/app";
+  let url: URL;
+  try {
+    url = new URL(referer);
+  } catch {
+    return "/app";
+  }
+  if (url.host !== host) return "/app";
+  if (url.pathname !== "/app" && !url.pathname.startsWith("/app/")) return "/app";
+  for (const k of ["ok", "error", "contraste", "siguiente"]) url.searchParams.delete(k);
+  const q = url.searchParams.toString();
+  return url.pathname + (q ? `?${q}` : "");
+}
