@@ -8,7 +8,7 @@
 - Documentación SDD base, SPEC-000 ajustada con la entrevista de la agencia y ADR 0001 aceptado.
 - S01 en código (rama `s01-base`): Next.js 16.3, Supabase Auth, esquema de agencias, membresías, invitaciones y auditoría con RLS; pantallas de login, registro, agencia, equipo, invitación y auditoría; CI en GitHub Actions.
 - S02 en código (rama `s02-crm`, sobre `s01-base`): contactos, consentimientos, embudo por agencia, oportunidades, tareas, Mi día y botón de WhatsApp (SPEC-002). Migración `20261102000000_crm_embudo.sql` aplicada solo en PostgreSQL local.
-- S02b en código (rama `claude/project-thread-6eqhro`, sobre `s02-crm`): plantillas de seguimiento con tareas automáticas, horario laboral, niveles de edición y plantillas personales (SPEC-002b). Migraciones `20261103000000_tarea_whatsapp.sql` y `20261103000100_seguimientos.sql` aplicadas en PostgreSQL local y, con permiso de Felipe, en `crm-viajes-pruebas` el 1 nov 2026 (2 agencias con sus 6 plantillas).
+- S02b en código (rama `claude/project-thread-6eqhro`, sobre `s02-crm`): plantillas de seguimiento con tareas automáticas, horario laboral, niveles de edición y plantillas personales (SPEC-002b). Migraciones `20261103000000_tarea_whatsapp.sql` y `20261103000100_seguimientos.sql` aplicadas en PostgreSQL local y, con permiso de Felipe, en `crm-viajes-pruebas` el 1 nov 2026 (2 agencias con sus 6 plantillas). La migración de S02 `20261103000200_s02_miembro_retirado.sql` se aplicó allí el 2 nov 2026 con permiso de Felipe.
 - Pruebas: 14 unitarias y 21 de integración contra PostgreSQL 16 real (aislamiento A/B, roles, invitaciones vencidas, revocadas y de otro correo, membresía revocada, auditoría, coherencia del esquema).
 
 ## Comandos verificados
@@ -33,7 +33,6 @@
 
 ## Pendiente
 
-- Aplicar en `crm-viajes-pruebas` la migración `20261103000200_s02_miembro_retirado.sql` de S02 (solo reemplaza funciones de triggers; necesita permiso de Felipe). Sin ella, la vista previa sigue con la regla anterior: no deja mover ni cerrar lo de una persona retirada.
 - Antes del piloto: conectar un servicio de correo propio (SMTP) en Supabase; el correo incluido solo envía unos 2 por hora y bloqueó el registro y la recuperación de contraseña el 31 oct.
 - Antes del piloto con datos reales: pasar Supabase y Vercel a planes Pro (el plan Hobby de Vercel no permite uso comercial y el gratuito de Supabase no tiene copias).
 - Felipe: iniciar la verificación de Meta Business (ahora es crítica para la bandeja).
