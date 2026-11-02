@@ -63,6 +63,12 @@ const OK_MESSAGES: Record<string, string> = {
   ajustes: "Ajustes guardados.",
   paso: "Paso agregado.",
   borrado: "Paso borrado.",
+  tomada: "Tomaste la conversación. Ahora está en Mías.",
+  asignada: "Responsable de la conversación cambiado.",
+  resuelta: "Conversación resuelta. Si el cliente vuelve a escribir, se reabre sola.",
+  respuesta_creada: "Respuesta guardada creada. Úsala escribiendo / en la caja de respuesta.",
+  respuesta_guardada: "Respuesta guardada actualizada.",
+  respuesta_borrada: "Respuesta guardada borrada.",
 };
 
 export function Flash({ sp }: { sp: Record<string, string | undefined> }) {
@@ -532,6 +538,16 @@ export function describeActivity(kind: string, data: Record<string, unknown>, me
       return `Plantilla "${s("plantilla")}": ${String(data.cantidad ?? "")} tareas automáticas creadas`;
     case "seguimiento.cancelado":
       return `${String(data.cantidad ?? "")} tareas automáticas canceladas al pasar a ${s("etapa")}`;
+    case "bandeja.recibido":
+      return `Mensaje recibido por ${s("canal") === "formulario" ? "el formulario web" : s("canal")}`;
+    case "bandeja.tomada":
+      return "Tomó la conversación";
+    case "bandeja.asignada":
+      return data.a ? `Conversación asignada a ${memberName(members, s("a"))}` : "Conversación devuelta a Sin asignar";
+    case "bandeja.respuesta":
+      return `Respondió por ${s("via") === "correo" ? "correo" : "WhatsApp"} desde la bandeja`;
+    case "bandeja.resuelta":
+      return "Conversación resuelta";
     case "correo.abierto":
       return `Correo abierto para ${s("correo")}: “${s("asunto")}”`;
     default:

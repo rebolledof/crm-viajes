@@ -1,6 +1,6 @@
 # Estado del proyecto
 
-Última actualización: 2 de noviembre de 2026 · Sprint S00 Arranque (19 oct a 1 nov), con S01, S02, S02b y el nuevo diseño adelantados
+Última actualización: 2 de noviembre de 2026 · Sprint S00 Arranque (19 oct a 1 nov), con S01, S02, S02b, el nuevo diseño y la parte 1 de S03 adelantados
 
 ## Hecho
 
@@ -10,9 +10,12 @@
 - S02 en código (rama `s02-crm`, sobre `s01-base`): contactos, consentimientos, embudo por agencia, oportunidades, tareas, Mi día y botón de WhatsApp (SPEC-002). Migración `20261102000000_crm_embudo.sql` aplicada solo en PostgreSQL local.
 - S02b en código (rama `claude/project-thread-6eqhro`, sobre `s02-crm`): plantillas de seguimiento con tareas automáticas, horario laboral, niveles de edición y plantillas personales (SPEC-002b). Migraciones `20261103000000_tarea_whatsapp.sql` y `20261103000100_seguimientos.sql` aplicadas en PostgreSQL local y, con permiso de Felipe, en `crm-viajes-pruebas` el 1 nov 2026 (2 agencias con sus 6 plantillas). La migración de S02 `20261103000200_s02_miembro_retirado.sql` se aplicó allí el 2 nov 2026 con permiso de Felipe.
 - Nuevo diseño SPEC-002c en código (rama `claude/project-thread-ss572g`, sobre la de S02b, PR #4): estilo A, marca por agencia, menú y tema por persona, plan del día, camino de etapas y "¿Cuál es el siguiente paso?". Migración `20261104000000_diseno_marca.sql` aplicada en PostgreSQL local y, con permiso de Felipe, en `crm-viajes-pruebas` el 2 nov 2026.
+- S03 Bandeja, parte 1 en código (rama `claude/project-thread-3wyo62`, sobre la del diseño): SPEC-003 aprobada por Felipe el 2 nov 2026. Formulario web público por agencia (`/f/<código>`, incrustable), bandeja con dueño por conversación, alerta de "sin responder" a los 30 minutos de horario laboral, respuestas guardadas con "/", canales de entrada y paso "Responde los mensajes" en Mi día. ADR 0002 (entrada pública por funciones `app.*`). Migración `20261105000000_bandeja.sql` aplicada solo en PostgreSQL local.
 - Pruebas: 14 unitarias y 21 de integración contra PostgreSQL 16 real (aislamiento A/B, roles, invitaciones vencidas, revocadas y de otro correo, membresía revocada, auditoría, coherencia del esquema).
 
 ## Comandos verificados
+
+2 nov 2026 en la rama de S03 parte 1: lint, typecheck, 93 unitarias, 114 de integración y build sin errores. axe-core sin fallas en bandeja, canales, respuestas y formulario; recorrido a 375 px con capturas en `diseno/implementado/bandeja/`.
 
 2 nov 2026 en la rama del diseño, tras corregir la prueba independiente (Sonnet): lint, typecheck, 78 unitarias, 98 de integración y build sin errores. axe-core sin fallas de contraste en las pantallas clave (claro y oscuro, dos marcas) y ninguna pantalla desborda a 390 px.
 
@@ -30,6 +33,9 @@
 - 19 oct 2026, Felipe en la vista previa de Vercel contra `crm-viajes-pruebas`: registro, confirmación de correo, creación de agencia y aceptación de invitación.
 
 ## No verificado todavía
+
+- La bandeja en la vista previa de Vercel: falta aplicar `20261105000000_bandeja.sql` en `crm-viajes-pruebas` (necesita permiso de Felipe) y que Felipe la recorra (T-032).
+- Respuestas por WhatsApp y correo: en la parte 1 se abren con wa.me o mailto; el chat web (T-027b) y el correo de entrada (T-028, adaptador simulado) siguen pendientes.
 
 - El diseño nuevo en la vista previa de Vercel: la migración ya está en `crm-viajes-pruebas`; falta que Felipe lo recorra (T-066).
 
@@ -53,4 +59,4 @@ Ninguno de código. La política de datos personales bloquea cargar datos reales
 
 ## Siguiente tarea
 
-Felipe lo revisa en la vista previa (T-066) junto con S02 y S02b (T-021 y T-059). Después, S03 Bandeja unificada.
+Prueba independiente de la parte 1 de S03 (T-069) y revisión de Felipe en la vista previa (T-032, con T-066, T-021 y T-059). Después, parte 2: chat web (T-027b).

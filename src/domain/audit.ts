@@ -120,6 +120,31 @@ export function describeAudit(e: AuditEventLike, n: AuditNames = {}): AuditDescr
         ]),
       };
     }
+    // SPEC-003 · Bandeja.
+    case "conversation.assigned":
+      return { text: c.to ? `Asignó una conversación de la bandeja a ${member(c.to)}` : "Devolvió una conversación de la bandeja a Sin asignar", details: [] };
+    case "saved_reply.created":
+      return { text: `Creó la respuesta guardada /${str(c.shortcut) ?? ""}`, details: [] };
+    case "saved_reply.updated":
+      return { text: `Editó la respuesta guardada /${str(c.shortcut) ?? ""}`, details: [] };
+    case "saved_reply.deleted":
+      return { text: `Borró la respuesta guardada /${str(c.shortcut) ?? ""}`, details: [] };
+    case "inbox.settings": {
+      const pair = (v: unknown, fmt: (x: unknown) => string | undefined) => {
+        const x = v as { from?: unknown; to?: unknown } | undefined;
+        return x && JSON.stringify(x.from) !== JSON.stringify(x.to) ? `${fmt(x.from) ?? "sin definir"} → ${fmt(x.to) ?? "sin definir"}` : undefined;
+      };
+      const mins = (x: unknown) => (typeof x === "number" ? `${x} min` : undefined);
+      const onOff = (x: unknown) => (x === true ? "recibe mensajes" : x === false ? "pausado" : undefined);
+      return {
+        text: "Cambió los canales de entrada de la bandeja",
+        details: lines([
+          ["Tiempo máximo sin respuesta", pair(c.maxMinutes, mins)],
+          ["Aviso de privacidad", pair(c.privacyUrl, str)],
+          ["Formulario web", pair(c.formActive, onOff)],
+        ]),
+      };
+    }
     case "stage.reordered":
       return { text: "Cambió el orden de las etapas del embudo", details: [] };
 

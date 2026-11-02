@@ -31,6 +31,9 @@ export const ERROR_MESSAGES = {
   invalid_color: "El color debe ir como #RRGGBB, por ejemplo #0F6E6E.",
   logo_too_big: "El logo pesa más de 512 KB. Usa una imagen más liviana.",
   logo_type: "El logo debe ser una imagen PNG, WebP o JPG.",
+  channel_closed: "Este formulario no está recibiendo mensajes por ahora. Escríbenos por otro medio.",
+  rate_limited: "Recibimos muchos envíos seguidos. Espera unos minutos y vuelve a intentarlo.",
+  shortcut_taken: "Ya existe una respuesta guardada con ese atajo. Usa otro.",
 } as const;
 
 export type ErrorCode = keyof typeof ERROR_MESSAGES;
@@ -78,6 +81,12 @@ const FIELD_MESSAGES: Record<string, string> = {
   "invalid_input:weekdayEnd": "La hora de cierre debe ser posterior a la de apertura.",
   "invalid_input:saturdayEnd": "El sábado necesita apertura y cierre, y el cierre va después.",
   "invalid_input:goal": "La meta de la etapa tiene como máximo 120 caracteres.",
+  "invalid_input:body": "Escribe el mensaje (máximo 4000 caracteres).",
+  "invalid_input:replyBody": "Escribe el texto de la respuesta (máximo 2000 caracteres).",
+  "invalid_input:replyTitle": "Escribe un título de 1 a 80 caracteres.",
+  "invalid_input:shortcut": "El atajo va sin espacios: letras, números, guion o guion bajo (máximo 30), por ejemplo saludo.",
+  "invalid_input:maxMinutes": "El tiempo máximo va en minutos, de 5 a 1440 (24 horas).",
+  "invalid_input:privacyUrl": "El enlace del aviso de privacidad debe empezar por https://",
 };
 
 export function errorMessage(code: ErrorCode, field?: string): string {
@@ -98,6 +107,7 @@ export const CODE_FIELDS: Partial<Record<ErrorCode, string>> = {
   task_contact_mismatch: "opportunityId",
   logo_too_big: "logo",
   logo_type: "logo",
+  shortcut_taken: "shortcut",
 };
 
 export function isErrorCode(value: unknown): value is ErrorCode {

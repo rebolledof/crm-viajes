@@ -4,6 +4,13 @@
 
 ### Añadido
 
+- SPEC-003 Bandeja unificada (parte 1): bandeja con filtros Sin responder, Mías, Sin asignar, Todas y Resueltas, búsqueda por nombre, teléfono o correo, y conversación con "Qué hacer ahora" (Responde → Oportunidad → Siguiente paso).
+- Formulario web público con la marca de la agencia (enlace o código para incrustar): crea o reutiliza el contacto, registra el consentimiento, crea la oportunidad con sus tareas de seguimiento y la conversación. Con campo trampa y límite de envíos.
+- Responsable por conversación: cola "Sin asignar" con botón "Tomar"; el administrador reasigna. Estados abierta, pendiente y resuelta automáticos.
+- Alerta de sin responder con el reloj en horario laboral (30 minutos por defecto, configurable): número rojo en el menú, franja para el administrador en Mi día y en la Bandeja, y primer paso "Responde los mensajes" en el plan del día.
+- Respuestas guardadas de la agencia y personales, con 5 de ejemplo; se insertan escribiendo "/" y reemplazan {nombre}, {asesor} y {agencia}.
+- Administración › Canales de entrada: activar o pausar el formulario, copiar su enlace o código, enlace al aviso de privacidad y tiempo máximo sin respuesta.
+- ADR 0002: entrada pública con el rol anon y funciones del esquema app.
 - Documentación base: constitución, resumen de producto, roadmap, glosario y AGENTS.md.
 - SPEC-000 MVP piloto con los problemas que nombró la agencia piloto; ADR 0001 del stack aceptado.
 - Proyecto Next.js 16.3 con TypeScript estricto, Tailwind y Supabase Auth.

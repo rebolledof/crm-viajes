@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef, type ReactNode } from "react";
 import { Icon, type IconName } from "@/components/icons";
 
-export type NavItem = { href: string; label: string; icon: IconName; badge?: number };
+export type NavItem = { href: string; label: string; icon: IconName; badge?: number; badgeTone?: "alert"; badgeLabel?: string };
 
 function isActive(pathname: string, href: string): boolean {
   if (href === "/app") return pathname === "/app";
@@ -29,7 +29,7 @@ export function TopTabs({ items, more }: { items: NavItem[]; more: NavItem[] }) 
             className={`-mb-[3px] flex items-center gap-2 border-b-[3px] px-3.5 text-sm ${on ? "border-accent bg-brand-softer font-semibold text-slate-900" : "border-transparent text-slate-700 hover:bg-slate-50"}`}
           >
             {i.label}
-            {i.badge ? <Badge n={i.badge} /> : null}
+            {i.badge ? <Badge n={i.badge} tone={i.badgeTone} label={i.badgeLabel} /> : null}
           </Link>
         );
       })}
@@ -77,7 +77,7 @@ export function SideLinks({ items, collapsed }: { items: NavItem[]; collapsed: b
             >
               <Icon name={i.icon} className={`size-[18px] ${on ? "text-brand-text" : "text-slate-500"}`} />
               {!collapsed && <span className="flex-1">{i.label}</span>}
-              {i.badge ? <Badge n={i.badge} floating={collapsed} /> : null}
+              {i.badge ? <Badge n={i.badge} floating={collapsed} tone={i.badgeTone} label={i.badgeLabel} /> : null}
             </Link>
             {collapsed && (
               <span role="tooltip" className="pointer-events-none absolute top-1/2 left-full z-30 ml-2 hidden -translate-y-1/2 whitespace-nowrap rounded bg-slate-900 px-2.5 py-1 text-xs font-medium text-white shadow-lg group-focus-within:block group-hover:block dark:bg-slate-700 dark:text-slate-50">
@@ -101,7 +101,7 @@ export function DrawerLinks({ items }: { items: NavItem[] }) {
           <Link href={i.href} aria-current={isActive(pathname, i.href) ? "page" : undefined} className="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 aria-[current=page]:bg-brand-softer aria-[current=page]:font-semibold aria-[current=page]:text-brand-text">
             <Icon name={i.icon} className="size-[18px] text-slate-500" />
             <span className="flex-1">{i.label}</span>
-            {i.badge ? <Badge n={i.badge} /> : null}
+            {i.badge ? <Badge n={i.badge} tone={i.badgeTone} label={i.badgeLabel} /> : null}
           </Link>
         </li>
       ))}
@@ -109,11 +109,11 @@ export function DrawerLinks({ items }: { items: NavItem[] }) {
   );
 }
 
-function Badge({ n, floating }: { n: number; floating?: boolean }) {
+function Badge({ n, floating, tone, label = "pendientes" }: { n: number; floating?: boolean; tone?: "alert"; label?: string }) {
   return (
     <span
-      aria-label={`${n} pendientes`}
-      className={`rounded-full bg-accent px-1.5 text-[11px] leading-[18px] font-bold text-accent-contrast ${floating ? "absolute top-1 right-3" : ""}`}
+      aria-label={`${n} ${label}`}
+      className={`rounded-full px-1.5 text-[11px] leading-[18px] font-bold ${tone === "alert" ? "bg-red-600 text-white" : "bg-accent text-accent-contrast"} ${floating ? "absolute top-1 right-3" : ""}`}
     >
       {n > 99 ? "99+" : n}
     </span>

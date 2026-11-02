@@ -1,6 +1,6 @@
 # SPEC-003 Bandeja unificada: formulario, chat web y correo
 
-- Estado: Propuesta, esperando aprobación de Felipe
+- Estado: Aprobada por Felipe el 2 nov 2026 ("procede"). Las 3 preguntas quedaron con la recomendación (correo simulado por ahora, enlace configurable al aviso de privacidad, 30 minutos en horario laboral); Felipe puede cambiarlas. Parte 1 implementada (ver plan.md).
 - Propietario: Felipe
 - Sprint: S03 (fase A MVP piloto), sobre S02, S02b y el diseño de SPEC-002c
 - Deriva de: SPEC-000 (alcance 6, 7 y 8; RF-15 a RF-18; AC-09 a AC-11) y la entrevista con la agencia del 18 oct 2026: contactos por varias fuentes, poco control de las respuestas, no saber si se responde a todos y tiempo perdido respondiendo lo que ya está en la web.
@@ -24,7 +24,7 @@ Hoy las consultas llegan por la web, por correo y por WhatsApp, cada una a un lu
 3. **Estados**: **Abierta** (el último mensaje es del cliente), **Pendiente** (le respondimos y esperamos al cliente) y **Resuelta** (cerrada a mano). Un mensaje nuevo del cliente reabre una conversación pendiente o resuelta.
 4. **Responsable**: si el contacto ya tiene una oportunidad abierta, la conversación va a su responsable; si no, queda en la cola **Sin asignar** y cualquier asesor la toma con **"Tomar"**. El administrador puede reasignar. Cada cambio queda en el historial.
 5. **Contacto y oportunidad**: cada mensaje entrante se vincula a un contacto existente con el mismo teléfono o correo, o crea uno nuevo (reglas de duplicados de S02). El formulario crea además una oportunidad con origen "Formulario web" (lo que dispara las plantillas de seguimiento de S02b). En chat y correo, que también traen mensajes que no son ventas (proveedores, clientes con viaje en curso), la tarjeta "Qué hacer ahora" ofrece **"Crear oportunidad"** o **"Vincular a una oportunidad"** con un clic.
-6. **Formulario web**: página pública de la agencia con su marca (`/f/<agencia>`), con nombre, teléfono, correo, destino, fechas aproximadas, número de viajeros, mensaje y aceptación del aviso de privacidad. Se enlaza desde la web de la agencia o se incrusta con un código que se copia desde Configuración. Al enviarlo, el visitante ve una confirmación.
+6. **Formulario web**: página pública de la agencia con su marca (`/f/<código del formulario>`, un código aleatorio de 32 caracteres; no se usa el nombre de la agencia para que no se pueda adivinar), con nombre, teléfono, correo, destino, fechas aproximadas, número de viajeros, mensaje y aceptación del aviso de privacidad. Se enlaza desde la web de la agencia o se incrusta con un código que se copia desde Configuración. Al enviarlo, el visitante ve una confirmación.
 7. **Chat web**: burbuja que la agencia pega en su web con una línea de código. El visitante deja nombre y teléfono o correo y acepta el aviso de privacidad antes del primer mensaje; ve las respuestas del asesor en la misma ventana y puede volver más tarde en el mismo navegador. Fuera del horario laboral, la burbuja avisa que la respuesta llegará en el siguiente horario.
 8. **Correo entrante**: la agencia reenvía automáticamente su buzón de ventas (por ejemplo `ventas@agencia.com`) a una dirección única que le da el CRM. Cada correo entra una sola vez (se reconoce por su identificador de mensaje) y las respuestas del mismo hilo se agrupan en la misma conversación. Se muestra el texto; los adjuntos se listan por nombre con el aviso "revísalos en tu correo".
 9. **Responder**: por el mismo canal por el que escribió el cliente. Chat: aparece en la burbuja. Correo: sale un correo desde la dirección de la agencia en el mismo hilo. Formulario: se responde por correo si dejó uno; si solo dejó teléfono, el botón de WhatsApp de S02 con el texto escrito (se registra como enviado al abrirlo, igual que en S02). Cada respuesta registra quién la envió y cuándo.
@@ -101,6 +101,12 @@ Cada parte va en su PR, con prueba independiente con otro modelo antes del merge
 - La burbuja del chat consulta respuestas nuevas cada pocos segundos mientras está abierta, en lugar de una conexión en tiempo real (más simple y dentro del plan gratuito).
 - El formulario crea oportunidad; el chat y el correo no, hasta que el asesor lo decida.
 - Mensajes guardados como texto simple, sin formato.
+- Mientras nadie toma una conversación del formulario, las tareas automáticas de su oportunidad quedan con el administrador activo más antiguo (la base necesita un responsable para cada tarea); al tomarla, pasan a quien la tomó. Decisión del 2 nov 2026 al implementar (ADR 0002).
+- En la parte 1 el formulario se responde por WhatsApp o por correo desde la app del asesor (el CRM registra la respuesta y abre la app con el texto). La salida directa por correo llega con la parte 3.
+- Al responder una conversación sin responsable, quien responde la toma.
+- Límite de envíos públicos: 5 cada 10 minutos por dirección y formulario, y 200 cada 10 minutos por agencia. La dirección no se guarda: solo su huella.
+- Cambiar el tiempo máximo aplica a los mensajes que lleguen desde ese momento.
+- La pregunta "¿Era una consulta de viaje?" al resolver y el botón "Vincular a una oportunidad" llegan con el chat y el correo (partes 2 y 3): en la parte 1 toda conversación del formulario ya tiene oportunidad.
 
 ## Preguntas para Felipe
 

@@ -7,6 +7,7 @@ import { ROLE_LABELS } from "@/domain/permissions";
 import { dayPlan, type PlanStep } from "@/domain/guide";
 import { dueState } from "@/domain/tasks";
 import { requireActiveAgency } from "@/server/session";
+import { inboxCounts } from "@/server/inbox";
 import { activeMembers, contactChannels, myDay } from "@/server/tasks";
 import { Flash, TaskItem, fechaHora, type SearchParams } from "./crm-ui";
 
@@ -20,11 +21,14 @@ export default async function AppHome({ searchParams }: { searchParams: SearchPa
   const { user, active } = await requireActiveAgency();
   const sp = firstParams(await searchParams);
   const now = new Date();
-  const [day, members] = await withUser(getDb(), user, (tx) => Promise.all([myDay(tx, user.id, active.agencyId, now), activeMembers(tx, user.id, active.agencyId)]));
+  const [day, members, inbox] = await withUser(getDb(), user, (tx) =>
+    Promise.all([myDay(tx, user.id, active.agencyId, now), activeMembers(tx, user.id, active.agencyId), inboxCounts(tx, user.id, active.agencyId, now)]),
+  );
   const channels = await withUser(getDb(), user, (tx) => contactChannels(tx, user.id, active.agencyId, [...day.due, ...day.upcoming].map((d) => d.task.contactId)));
   const overdue = day.due.filter((d) => dueState(d.task.dueAt, now) === "vencida");
   const today = day.due.filter((d) => dueState(d.task.dueAt, now) !== "vencida");
-  const plan = dayPlan({ overdue: overdue.length, today: today.length, withoutNext: day.withoutNextAction.length });
+  // Lectura no responde mensajes: su plan no lleva ese paso.
+  const plan = dayPlan({ overdue: overdue.length, today: today.length, withoutNext: day.withoutNextAction.length, unanswered: active.role === "lectura" ? undefined : inbox.unansweredMine });
   const total = day.doneToday + day.due.length;
   // El botón relleno va en la primera tarea con canal (WhatsApp o correo): es lo que toca hacer ya.
   const firstId = day.due.find((d) => d.task.kind === "whatsapp" || d.task.kind === "correo")?.task.id;
@@ -61,6 +65,15 @@ export default async function AppHome({ searchParams }: { searchParams: SearchPa
         <p className="text-sm text-slate-600">{active.agencyName} · {ROLE_LABELS[active.role]}</p>
       </PageHeader>
       <Flash sp={sp} />
+      {active.role === "admin" && inbox.unansweredTeam > 0 && (
+        <div role="alert" className="flex flex-wrap items-center gap-3 rounded border border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-900">
+          <Icon name="alert" className="size-5" />
+          <span className="min-w-0 flex-1">
+            <b>{inbox.unansweredTeam === 1 ? "1 conversación del equipo sin responder" : `${inbox.unansweredTeam} conversaciones del equipo sin responder`}</b>: pasaron el tiempo máximo en horario laboral.
+          </span>
+          <Link href="/app/bandeja?f=sin_responder" className="rounded border border-red-300 bg-surface px-3 py-1.5 font-medium text-red-800 hover:bg-red-100">Ver en la bandeja</Link>
+        </div>
+      )}
 
       <Card title="Tu plan de hoy" icon="flag" actions={total > 0 ? <Progress done={day.doneToday} total={total} /> : null}>
         <p className="mb-3 text-sm text-slate-600">Sigue los pasos en orden. Cuando termines uno, pasa al siguiente.</p>
@@ -139,7 +152,7 @@ export default async function AppHome({ searchParams }: { searchParams: SearchPa
   );
 }
 
-const STEP_HREF: Record<PlanStep["key"], string | null> = { vencidas: "#vencidas", hoy: "#hoy", sin_paso: "#sin-paso", listo: null };
+const STEP_HREF: Record<PlanStep["key"], string | null> = { mensajes: "/app/bandeja?f=sin_responder", vencidas: "#vencidas", hoy: "#hoy", sin_paso: "#sin-paso", listo: null };
 
 /** Los cuatro pasos del día con flechas entre ellos; el actual resalta con el color de la agencia. */
 function PlanStrip({ steps }: { steps: PlanStep[] }) {
