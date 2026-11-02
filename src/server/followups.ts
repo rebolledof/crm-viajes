@@ -61,7 +61,9 @@ export async function listTemplates(tx: Tx, userId: string, agencyId: string) {
     .from(followupTemplates)
     .leftJoin(pipelineStages, eq(pipelineStages.id, followupTemplates.stageId))
     .where(eq(followupTemplates.agencyId, agencyId))
-    .orderBy(asc(followupTemplates.ownerId), asc(followupTemplates.createdAt));
+    // En el orden del embudo: momento que la activa, posición de la etapa y, para desempatar las
+    // precargadas (mismo created_at), el nombre.
+    .orderBy(asc(followupTemplates.ownerId), asc(followupTemplates.trigger), asc(pipelineStages.position), asc(followupTemplates.createdAt), asc(followupTemplates.name));
   const steps = await tx.select().from(followupSteps).where(eq(followupSteps.agencyId, agencyId)).orderBy(asc(followupSteps.position), asc(followupSteps.createdAt));
   return templates.map(({ t, stageName }) => ({ ...t, stageName, steps: steps.filter((s) => s.templateId === t.id) }));
 }

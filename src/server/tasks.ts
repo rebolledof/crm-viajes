@@ -1,8 +1,8 @@
 // SPEC-002 · Tareas, próxima acción y "Mi día".
-import { and, asc, desc, eq, gte, isNull, lt, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNull, lt, sql } from "drizzle-orm";
 import type { Tx } from "@/db/client";
-import { agencies, contactEmails, contacts, opportunities, pipelineStages, tasks } from "@/db/schema";
-import { fillMessage, mailtoLink, taskPermissions } from "@/domain/followups";
+import { agencies, contactConsents, contactEmails, contactPhones, contacts, opportunities, pipelineStages, tasks } from "@/db/schema";
+import { fillMessage, mailtoLink, taskPermissions, type ContactChannels } from "@/domain/followups";
 import { DEFAULT_WHATSAPP_TEMPLATE } from "@/domain/whatsapp";
 import { endOfLocalDay, isPriority, isTaskKind, type Priority, type TaskKind } from "@/domain/tasks";
 import { recordAudit, requirePermission } from "./agencies";
@@ -155,6 +155,34 @@ export async function openTaskLink(tx: Tx, userId: string, agencyId: string, tas
   const subject = fillMessage("Tu viaje a {destino} con {agencia}", values);
   await logActivity(tx, { agencyId, contactId: task.contactId, opportunityId: task.opportunityId, actorId: userId, kind: "correo.abierto", data: { correo: email.email, asunto: subject, mensaje: body } });
   return { link: mailtoLink(email.email, subject, body), channel: "correo" };
+}
+
+/**
+ * Para cada contacto: si tiene teléfono y correo, y si retiró el permiso de WhatsApp o de correo
+ * (último registro por canal y propósito "servicio"). Lo usan los botones de las tareas.
+ */
+export async function contactChannels(tx: Tx, userId: string, agencyId: string, contactIds: string[]): Promise<Map<string, ContactChannels>> {
+  await requirePermission(tx, userId, agencyId, "crm.read");
+  const ids = [...new Set(contactIds)];
+  const out = new Map<string, ContactChannels>();
+  if (ids.length === 0) return out;
+  const [phones, emails, consents] = await Promise.all([
+    tx.selectDistinct({ id: contactPhones.contactId }).from(contactPhones).where(and(eq(contactPhones.agencyId, agencyId), inArray(contactPhones.contactId, ids))),
+    tx.selectDistinct({ id: contactEmails.contactId }).from(contactEmails).where(and(eq(contactEmails.agencyId, agencyId), inArray(contactEmails.contactId, ids))),
+    tx
+      .selectDistinctOn([contactConsents.contactId, contactConsents.channel], { id: contactConsents.contactId, channel: contactConsents.channel, status: contactConsents.status })
+      .from(contactConsents)
+      .where(and(eq(contactConsents.agencyId, agencyId), eq(contactConsents.purpose, "servicio"), inArray(contactConsents.contactId, ids)))
+      .orderBy(contactConsents.contactId, contactConsents.channel, desc(contactConsents.createdAt), desc(contactConsents.id)),
+  ]);
+  const has = (rows: { id: string }[]) => new Set(rows.map((r) => r.id));
+  const withPhone = has(phones);
+  const withEmail = has(emails);
+  const withdrawn = new Set(consents.filter((c) => c.status === "retirado").map((c) => `${c.id}:${c.channel}`));
+  for (const id of ids) {
+    out.set(id, { phone: withPhone.has(id), email: withEmail.has(id), whatsappAllowed: !withdrawn.has(`${id}:whatsapp`), emailAllowed: !withdrawn.has(`${id}:correo`) });
+  }
+  return out;
 }
 
 /** Mis tareas vencidas y de hoy, y mis oportunidades abiertas sin próxima acción (RF-210). */

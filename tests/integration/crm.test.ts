@@ -354,3 +354,23 @@ describe("etapas propias de cada agencia (AC-214 a AC-217)", () => {
     expect((await as(t.db, adminA, (tx) => listStages(tx, adminA.id, agencyA, { includeInactive: true })))[0].name).toBe("Esperando pago");
   });
 });
+
+describe("lista de oportunidades con búsqueda (F-01 del informe de pruebas, RF de 5.2)", () => {
+  it("busca por nombre del contacto, destino, correo o teléfono sin distinguir mayúsculas y solo dentro de la agencia", async () => {
+    const cId = await newContact(asesorA, agencyA, "Mariana Quintero", "315 444 5566", "mariana.q@example.com");
+    const oId = await as(t.db, asesorA, (tx) => createOpportunity(tx, asesorA.id, agencyA, { contactId: cId, destination: "Punta Cana" }));
+    const otherC = await newContact(asesorA, agencyA, "Jorge Ibáñez");
+    const otherO = await as(t.db, asesorA, (tx) => createOpportunity(tx, asesorA.id, agencyA, { contactId: otherC, destination: "Madrid" }));
+    const search = (q: string, u = asesorA, ag = agencyA) => as(t.db, u, (tx) => listOpportunities(tx, u.id, ag, { q })).then((r) => r.map((o) => o.id));
+
+    for (const q of ["quintero", "MARIANA", "punta", "mariana.q@", "3154445566", "+57 315 444 5566"]) {
+      const ids = await search(q);
+      expect(ids, q).toContain(oId);
+      expect(ids, q).not.toContain(otherO);
+    }
+    expect(await search("   ")).toEqual(expect.arrayContaining([oId, otherO]));
+    // Los comodines de LIKE se buscan como texto, no como patrón.
+    expect(await search("%")).toEqual([]);
+    expect(await search("Quintero", adminB, agencyB)).toEqual([]);
+  });
+});

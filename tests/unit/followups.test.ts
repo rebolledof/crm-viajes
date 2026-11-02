@@ -1,6 +1,6 @@
 // SPEC-002b · reglas puras de las plantillas de seguimiento
 import { describe, expect, it } from "vitest";
-import { describeDelay, fillMessage, mailtoLink, parseTime, taskPermissions } from "../../src/domain/followups";
+import { channelBlock, describeDelay, fillMessage, mailtoLink, parseTime, taskPermissions } from "../../src/domain/followups";
 
 describe("plantillas de seguimiento (SPEC-002b)", () => {
   it("describe la espera de cada paso", () => {
@@ -33,5 +33,20 @@ describe("plantillas de seguimiento (SPEC-002b)", () => {
     expect(parseTime("9:00")).toBeNull();
     expect(parseTime("09:00")).toBe("09:00");
     expect(parseTime("24:00")).toBeNull();
+  });
+
+  it("explica por qué no se puede abrir WhatsApp o correo desde una tarea (informe de QA)", () => {
+    const ok = { phone: true, whatsappAllowed: true, email: true, emailAllowed: true };
+    expect(channelBlock("whatsapp", ok)).toBeNull();
+    expect(channelBlock("correo", ok)).toBeNull();
+    expect(channelBlock("llamada", { ...ok, phone: false })).toBeNull();
+    expect(channelBlock("whatsapp", { ...ok, whatsappAllowed: false })).toMatch(/retiró el permiso para recibir WhatsApp/);
+    expect(channelBlock("whatsapp", { ...ok, phone: false })).toMatch(/no tiene teléfono/);
+    expect(channelBlock("correo", { ...ok, emailAllowed: false })).toMatch(/retiró el permiso para recibir correos/);
+    expect(channelBlock("correo", { ...ok, email: false })).toMatch(/no tiene correo/);
+    // El retiro de WhatsApp no bloquea el correo, ni al revés.
+    expect(channelBlock("correo", { ...ok, whatsappAllowed: false })).toBeNull();
+    expect(channelBlock("whatsapp", { ...ok, emailAllowed: false })).toBeNull();
+    expect(channelBlock("whatsapp", undefined)).toBeNull();
   });
 });

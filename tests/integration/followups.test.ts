@@ -8,7 +8,7 @@ import { createContact } from "../../src/server/contacts";
 import { AppError, pgError } from "../../src/server/errors";
 import { addStep, createTemplate, listTemplates, updateSettings, updateTemplate } from "../../src/server/followups";
 import { createOpportunity, listStages, moveOpportunity, updateOpportunity } from "../../src/server/opportunities";
-import { cancelTask, completeTask, createTask, openTaskLink, updateTask } from "../../src/server/tasks";
+import { cancelTask, completeTask, contactChannels, createTask, openTaskLink, updateTask } from "../../src/server/tasks";
 import { recordConsent } from "../../src/server/contacts";
 import { revokeMembership } from "../../src/server/agencies";
 import { as, createUser, testDb } from "./helpers";
@@ -360,5 +360,25 @@ describe("hallazgos de la prueba independiente", () => {
     await expectCode(as(t.db, a.asesor, (tx) => openTaskLink(tx, a.asesor.id, a.id, mail.id)), "email_blocked");
     await as(t.db, a.asesor, (tx) => completeTask(tx, a.asesor.id, a.id, wa.id, "Enviado"));
     await expectCode(as(t.db, a.asesor, (tx) => openTaskLink(tx, a.asesor.id, a.id, wa.id)), "not_found");
+  });
+
+  it("los botones de las tareas saben si el contacto retiró el permiso o no tiene teléfono o correo (informe de QA)", async () => {
+    const a = await newAgency("Canales");
+    const b = await newAgency("Canales B");
+    const full = await as(t.db, a.asesor, (tx) => createContact(tx, a.asesor.id, a.id, { fullName: "Con todo", phones: [{ raw: "310 555 0202" }], emails: ["todo@ejemplo.test"] }));
+    const bare = await as(t.db, a.asesor, (tx) => createContact(tx, a.asesor.id, a.id, { fullName: "Sin datos", phones: [], emails: [] }));
+    const channels = (u = a.asesor, ag = a.id) => as(t.db, u, (tx) => contactChannels(tx, u.id, ag, [full, bare, full]));
+    let m = await channels();
+    expect(m.get(full)).toEqual({ phone: true, email: true, whatsappAllowed: true, emailAllowed: true });
+    expect(m.get(bare)).toEqual({ phone: false, email: false, whatsappAllowed: true, emailAllowed: true });
+    await as(t.db, a.asesor, (tx) => recordConsent(tx, a.asesor.id, a.id, full, { channel: "whatsapp", purpose: "servicio", status: "retirado", source: "Lo pidió por chat" }));
+    m = await channels();
+    expect(m.get(full)).toMatchObject({ whatsappAllowed: false, emailAllowed: true });
+    // El último registro manda: si lo vuelve a dar, el botón se habilita otra vez.
+    await as(t.db, a.asesor, (tx) => recordConsent(tx, a.asesor.id, a.id, full, { channel: "whatsapp", purpose: "servicio", status: "otorgado", source: "Lo volvió a autorizar" }));
+    expect((await channels()).get(full)).toMatchObject({ whatsappAllowed: true });
+    // Otra agencia no averigua nada de los contactos de A.
+    const other = await channels(b.admin, b.id);
+    expect(other.get(full)).toEqual({ phone: false, email: false, whatsappAllowed: true, emailAllowed: true });
   });
 });

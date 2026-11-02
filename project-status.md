@@ -1,6 +1,6 @@
 # Estado del proyecto
 
-Última actualización: 1 de noviembre de 2026 · Sprint S00 Arranque (19 oct a 1 nov), con S01, S02 y S02b adelantados
+Última actualización: 2 de noviembre de 2026 · Sprint S00 Arranque (19 oct a 1 nov), con S01, S02 y S02b adelantados
 
 ## Hecho
 
@@ -13,6 +13,8 @@
 
 ## Comandos verificados
 
+2 nov 2026 en la rama de S02b, tras corregir el informe de QA: lint, typecheck, 49 unitarias, 72 de integración y build sin errores. Los avisos de validación en español se comprobaron con Chromium en inglés sobre /registro.
+
 1 nov 2026 en la rama de S02b: lint, typecheck, 40 unitarias, 68 de integración y build sin errores. Prueba independiente con otro modelo (Sonnet) hecha; hallazgos corregidos con prueba.
 
 19 oct 2026 en `s02-crm`: lint, typecheck, 33 unitarias, 45 de integración y build sin errores.
@@ -21,12 +23,12 @@
 
 ## Verificado manualmente
 
+- 1 y 2 nov 2026, QA con IA en la vista previa del PR #3: S02 y S02b cumplen salvo F-01 (faltaba la lista con búsqueda de oportunidades) y tres mejoras de usabilidad; las cuatro se corrigieron el 2 nov (T-060). No se probaron en el navegador AC-201, AC-202 ni el ingreso de un usuario inactivo (están cubiertos por pruebas de integración). QA dejó activadas las plantillas propias de asesores en su agencia de prueba.
 - 19 oct 2026, Felipe en la vista previa de Vercel contra `crm-viajes-pruebas`: registro, confirmación de correo, creación de agencia y aceptación de invitación.
 
 ## No verificado todavía
 
-- Pantallas de S02b (Seguimientos, Ajustar y Abrir WhatsApp/correo desde una tarea) en un navegador: compilan, no se han recorrido.
-- Pantallas de S02 en un navegador: compilan, pero nadie las ha recorrido; hace falta aplicar la migración en `crm-viajes-pruebas` (con permiso de Felipe) y probar en la vista previa.
+- Las correcciones del 2 nov (lista de oportunidades, botones deshabilitados, auditoría legible) en la vista previa: tienen pruebas, falta recorrerlas en el navegador.
 - Recorrido E2E con Playwright: necesita Supabase Auth local o de pruebas; queda para S05.
 
 ## Pendiente

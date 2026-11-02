@@ -87,3 +87,23 @@ export function parseTime(value: string): string | null {
   const m = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(value.trim());
   return m ? `${m[1]}:${m[2]}` : null;
 }
+
+/** Qué tiene el contacto para que un botón de WhatsApp o correo funcione (informe de QA, 2 nov 2026). */
+export type ContactChannels = { phone: boolean; whatsappAllowed: boolean; email: boolean; emailAllowed: boolean };
+
+/**
+ * Motivo por el que no se puede abrir el canal de la tarea, en palabras de la agencia, o null si se
+ * puede. El servidor vuelve a comprobarlo al abrir (openTaskLink).
+ */
+export function channelBlock(kind: string, c: ContactChannels | undefined): string | null {
+  if (!c) return null;
+  if (kind === "whatsapp") {
+    if (!c.whatsappAllowed) return "El cliente retiró el permiso para recibir WhatsApp. Usa otro canal y registra el resultado, o actualiza el permiso en su ficha si lo volvió a dar.";
+    if (!c.phone) return "El contacto no tiene teléfono. Agrégalo en su ficha para escribirle por WhatsApp.";
+  }
+  if (kind === "correo") {
+    if (!c.emailAllowed) return "El cliente retiró el permiso para recibir correos. Usa otro canal y registra el resultado, o actualiza el permiso en su ficha si lo volvió a dar.";
+    if (!c.email) return "El contacto no tiene correo. Agrégalo en su ficha para escribirle.";
+  }
+  return null;
+}

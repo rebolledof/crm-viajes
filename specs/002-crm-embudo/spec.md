@@ -78,6 +78,13 @@ Bandeja de mensajes y asignación automática (S03), cotizaciones (S04), importa
 - AC-216 (RF-216): Dada una oportunidad en "nuevo", cuando el asesor la pasa directamente a "propuesta enviada", entonces se acepta y el historial muestra el salto.
 - AC-217 (RF-217): Dadas tres oportunidades en "negociación", cuando el administrador desactiva esa etapa, entonces las tres siguen en ella y la etapa ya no aparece al mover otras.
 - AC-218 (RF-218): Dadas una tarea abierta de Ana y una completada de Luis en la agencia A y una tarea en la agencia B, cuando Ana abre Tareas con "todo el equipo" y estado "abiertas", entonces ve solo la de Ana; con estado "completadas", ve solo la de Luis; nunca ve la de la agencia B.
+- AC-219 (alcance 5.2, hallazgo F-01 de QA del 2 nov 2026): Dadas las oportunidades de Mariana Quintero a Punta Cana y de Jorge Ibáñez a Madrid en la agencia A, cuando un asesor abre Oportunidades en vista "Lista" y busca "punta", "quintero", su correo o su teléfono en cualquier formato, entonces ve solo la de Mariana; los signos % y _ se buscan como texto; la agencia B no la encuentra; una búsqueda sin resultados explica qué probar.
+
+### Correcciones de usabilidad del informe de QA (2 nov 2026)
+
+- AC-219a: Dado un contacto que retiró el permiso de WhatsApp (o de correo) para atención del viaje, o que no tiene teléfono (o correo), cuando una de sus tareas de WhatsApp (o correo) aparece en Mi día, Tareas, la ficha o la oportunidad, entonces el botón "Abrir…" está deshabilitado y al lado se explica el motivo y qué hacer; si vuelve a dar el permiso, el botón se habilita. El servidor lo sigue comprobando al abrir.
+- AC-219b: Dado un navegador en inglés, cuando se envía un formulario con un campo obligatorio vacío, un correo mal escrito o un texto más corto que el mínimo, entonces el aviso del navegador está en español y nombra el campo (por ejemplo "Completa «Resultado»: es obligatorio.").
+- AC-219c: Dado que el administrador activó la etapa "Nuevo", cuando abre Auditoría, entonces lee "Activó la etapa «Nuevo»"; ninguna acción conocida se muestra como clave técnica, id o JSON, y los detalles (motivo, resultado, fechas, responsable) salen con etiquetas en español.
 
 ## Decisiones tomadas por defecto (cambiables)
 
@@ -85,6 +92,8 @@ Bandeja de mensajes y asignación automática (S03), cotizaciones (S04), importa
 - Teléfono por defecto de Colombia (+57) cuando no se escribe el indicativo.
 - El mensaje prellenado de WhatsApp es "Hola {nombre}, te escribo de {agencia} por tu viaje a {destino}." y el asesor lo puede editar antes de abrir.
 - Al crear un contacto, el consentimiento queda "sin registrar" (no se presume otorgado); el botón de WhatsApp sí se ofrece porque es una respuesta a una consulta del propio cliente.
+
+- La búsqueda de oportunidades mira nombre del contacto, destino, correo y teléfono; respeta el filtro de responsable (por defecto "Mías") y la vista elegida (tablero o lista).
 
 ## Preguntas para Felipe
 

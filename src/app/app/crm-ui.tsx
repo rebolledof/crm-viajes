@@ -11,7 +11,7 @@ import { AppError, ERROR_MESSAGES, isErrorCode } from "@/server/errors";
 import { cancelTaskAction, completeTaskAction, createTaskAction } from "./crm-actions";
 import { updateTaskAction } from "./followup-actions";
 import { TaskOpenButton } from "./task-open-button";
-import { taskPermissions, type EditLevel } from "@/domain/followups";
+import { channelBlock, taskPermissions, type ContactChannels, type EditLevel } from "@/domain/followups";
 import type { Role } from "@/domain/permissions";
 
 export type SearchParams = Promise<Record<string, string | undefined>>;
@@ -332,6 +332,7 @@ const DUE_LABEL = { vencida: "Vencida", hoy: "Hoy", proxima: "Próxima" };
 
 export type TaskRow = {
   id: string;
+  contactId?: string;
   title: string;
   kind: string;
   dueAt: Date;
@@ -348,10 +349,28 @@ const secondaryButton = "rounded-md border border-slate-300 px-4 py-2 text-sm te
  * Una tarea con sus acciones. Lo que se ofrece depende del rol y del nivel de edición de la tarea
  * (SPEC-002b RF-226); el servidor y la base vuelven a comprobarlo.
  */
-export function TaskItem({ task, now, back, role, members, extra }: { task: TaskRow; now: Date; back: string; role: Role; members: Member[]; extra?: React.ReactNode }) {
+export function TaskItem({
+  task,
+  now,
+  back,
+  role,
+  members,
+  extra,
+  channels,
+}: {
+  task: TaskRow;
+  now: Date;
+  back: string;
+  role: Role;
+  members: Member[];
+  extra?: React.ReactNode;
+  /** Teléfono, correo y permisos de los contactos (contactChannels) para deshabilitar el botón del canal. */
+  channels?: Map<string, ContactChannels>;
+}) {
   const state = dueState(task.dueAt, now);
   const perms = taskPermissions(role, task.editLevel);
   const channel = task.kind === "whatsapp" ? "whatsapp" : task.kind === "correo" ? "correo" : null;
+  const blocked = channel && task.contactId ? channelBlock(task.kind, channels?.get(task.contactId)) : null;
   return (
     <li className="flex flex-col gap-2 rounded-md border border-slate-200 bg-white p-3">
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
@@ -368,7 +387,7 @@ export function TaskItem({ task, now, back, role, members, extra }: { task: Task
       </div>
       {extra}
       {task.message && <p className="whitespace-pre-line rounded bg-slate-50 px-2 py-1 text-sm text-slate-700">Mensaje sugerido: {task.message}</p>}
-      {perms.complete && channel && <TaskOpenButton taskId={task.id} channel={channel} back={back} />}
+      {perms.complete && channel && <TaskOpenButton taskId={task.id} channel={channel} back={back} blocked={blocked} />}
       {perms.complete && (
         <details className="text-sm">
           <summary className="cursor-pointer text-sky-700">{perms.cancel ? "Completar o cancelar" : "Completar"}</summary>

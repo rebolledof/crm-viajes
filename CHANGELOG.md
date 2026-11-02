@@ -33,3 +33,8 @@
 - Tipo de tarea WhatsApp; las tareas de WhatsApp y correo abren la app o el programa de correo con el mensaje relleno, sin enviar nada solas.
 - Las tareas abiertas se pueden ajustar (fecha, prioridad, mensaje y asignada) según el rol y el nivel.
 - Si una pantalla falla en el servidor, se muestra un aviso en español con el menú visible y la opción de reintentar, en lugar de la página genérica de Next.js.
+- Oportunidades tiene vista "Lista" además del tablero, con búsqueda por cliente, destino, teléfono o correo (hallazgo F-01 de QA, AC-219).
+- Las tareas de WhatsApp y correo muestran el botón deshabilitado y el motivo cuando el cliente retiró el permiso o le falta el teléfono o el correo (AC-219a).
+- Los avisos de validación del navegador salen en español y nombran el campo, en todos los formularios (AC-219b).
+- Auditoría en lenguaje de la agencia: "Activó la etapa «Nuevo»", "Completó la tarea «Llamar»", con detalles legibles en vez de claves y JSON (AC-219c).
+- Las plantillas de Seguimientos se listan en el orden del embudo; antes el orden de las seis precargadas podía cambiar entre cargas.
