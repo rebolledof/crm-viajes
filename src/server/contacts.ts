@@ -7,7 +7,7 @@ import { normalizeEmail } from "@/domain/invitations";
 import { normalizePhone } from "@/domain/phone";
 import { DEFAULT_WHATSAPP_TEMPLATE, fillWhatsappTemplate, whatsappAllowed, whatsappLink } from "@/domain/whatsapp";
 import { recordAudit, requirePermission } from "./agencies";
-import { AppError, fieldError, pgError, rethrowBusiness } from "./errors";
+import { AppError, fieldError, pgError, requireIds, rethrowBusiness } from "./errors";
 
 export type Channel = "whatsapp" | "correo" | "telefono";
 export type Purpose = "servicio" | "promociones";
@@ -102,6 +102,7 @@ async function writeIdentifiers(tx: Tx, agencyId: string, contactId: string, dat
 
 export async function createContact(tx: Tx, userId: string, agencyId: string, input: ContactInput): Promise<string> {
   await requirePermission(tx, userId, agencyId, "crm.write");
+  requireIds(input.ownerId);
   const data = prepareContact(input);
   const dup = await findDuplicate(tx, agencyId, data.phones.map((p) => p.e164), data.emails);
   if (dup) throw new AppError("duplicate_contact", dup);
@@ -122,6 +123,7 @@ export async function createContact(tx: Tx, userId: string, agencyId: string, in
 
 export async function updateContact(tx: Tx, userId: string, agencyId: string, contactId: string, input: ContactInput): Promise<void> {
   await requirePermission(tx, userId, agencyId, "crm.write");
+  requireIds(contactId, input.ownerId);
   const data = prepareContact(input);
   const dup = await findDuplicate(tx, agencyId, data.phones.map((p) => p.e164), data.emails, contactId);
   if (dup) throw new AppError("duplicate_contact", dup);
@@ -146,11 +148,14 @@ export async function listContacts(tx: Tx, userId: string, agencyId: string, q =
   await requirePermission(tx, userId, agencyId, "crm.read");
   const term = q.trim();
   const phone = term ? normalizePhone(term) : null;
+  // Parte del número ("4567"): se busca por los dígitos dentro del teléfono guardado.
+  const digits = /^[\d\s()+.-]+$/.test(term) ? term.replace(/\D/g, "") : "";
   const search = term
     ? or(
         ilike(contacts.fullName, `%${term.replace(/[%_\\]/g, "\\$&")}%`),
         sql`exists (select 1 from ${contactEmails} e where e.contact_id = ${contacts.id} and e.email like ${`%${term.toLowerCase().replace(/[%_\\]/g, "\\$&")}%`})`,
         phone ? sql`exists (select 1 from ${contactPhones} p where p.contact_id = ${contacts.id} and p.e164 = ${phone})` : undefined,
+        digits.length >= 4 ? sql`exists (select 1 from ${contactPhones} p where p.contact_id = ${contacts.id} and p.e164 like ${`%${digits}%`})` : undefined,
       )
     : undefined;
   return tx
@@ -188,6 +193,7 @@ export async function currentConsents(tx: Tx, contactId: string) {
 
 export async function getContactDetail(tx: Tx, userId: string, agencyId: string, contactId: string) {
   await requirePermission(tx, userId, agencyId, "crm.read");
+  requireIds(contactId);
   const [contact] = await tx.select().from(contacts).where(and(eq(contacts.id, contactId), eq(contacts.agencyId, agencyId)));
   if (!contact) throw new AppError("not_found");
   const [phones, emails, consents, opps, openTasks, history] = await Promise.all([
@@ -214,6 +220,7 @@ export async function recordConsent(
   input: { channel: Channel; purpose: Purpose; status: "otorgado" | "retirado"; source: string },
 ): Promise<void> {
   await requirePermission(tx, userId, agencyId, "crm.write");
+  requireIds(contactId);
   const source = input.source.trim();
   if (!source) throw fieldError("invalid_input", "source");
   const [c] = await tx.select({ id: contacts.id }).from(contacts).where(and(eq(contacts.id, contactId), eq(contacts.agencyId, agencyId)));
@@ -225,6 +232,7 @@ export async function recordConsent(
 
 /** Mensaje prellenado para el botón de WhatsApp de la ficha. */
 export async function whatsappDraft(tx: Tx, agencyId: string, contactId: string, opportunityId?: string | null) {
+  requireIds(contactId, opportunityId);
   const [c] = await tx.select({ fullName: contacts.fullName }).from(contacts).where(and(eq(contacts.id, contactId), eq(contacts.agencyId, agencyId)));
   if (!c) throw new AppError("not_found");
   const [a] = await tx.select({ name: agencies.name }).from(agencies).where(eq(agencies.id, agencyId));
@@ -246,6 +254,7 @@ export async function openWhatsapp(
 ): Promise<string> {
   await requirePermission(tx, userId, agencyId, "crm.write");
   const message = input.message.trim();
+  requireIds(contactId, input.opportunityId);
   if (!message || message.length > 2000) throw new AppError("invalid_input");
   const [phone] = await tx
     .select({ e164: contactPhones.e164 })
@@ -258,6 +267,10 @@ export async function openWhatsapp(
     throw new AppError(c ? "no_phone" : "not_found");
   }
   if (!whatsappAllowed(await currentConsents(tx, contactId))) throw new AppError("whatsapp_blocked");
+  if (input.opportunityId) {
+    const [o] = await tx.select({ id: opportunities.id }).from(opportunities).where(and(eq(opportunities.id, input.opportunityId), eq(opportunities.contactId, contactId), eq(opportunities.agencyId, agencyId)));
+    if (!o) throw new AppError("not_found");
+  }
   await logActivity(tx, { agencyId, contactId, opportunityId: input.opportunityId ?? null, actorId: userId, kind: "whatsapp.abierto", data: { telefono: phone.e164, mensaje: message } });
   await recordAudit(tx, { agencyId, actorId: userId, action: "whatsapp.opened", objectType: "contact", objectId: contactId, changes: { phone: phone.e164 } });
   return whatsappLink(phone.e164, message);

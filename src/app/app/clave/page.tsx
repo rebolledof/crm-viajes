@@ -1,3 +1,4 @@
+import { firstParams } from "@/domain/params";
 import { ActionForm, Input } from "@/components/form";
 import { AUTH_MESSAGES } from "@/domain/auth-errors";
 import { Field, Notice, buttonClass } from "@/components/ui";
@@ -7,7 +8,7 @@ import { updatePasswordAction } from "../../(auth)/actions";
 /** Elegir contraseña nueva; se llega con sesión desde el enlace de recuperación. */
 export default async function ClavePage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const user = await requireUser();
-  const sp = await searchParams;
+  const sp = firstParams(await searchParams);
   return (
     <div className="mx-auto flex max-w-sm flex-col gap-6">
       <h1 className="text-2xl font-semibold text-slate-900">Nueva contraseña</h1>

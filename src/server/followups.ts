@@ -8,7 +8,7 @@ import { isDelayUnit, isEditLevel, isFollowupTrigger, parseTime, type DelayUnit,
 import { isLossReason, type LossReason } from "@/domain/pipeline";
 import { isPriority, isTaskKind, type Priority, type TaskKind } from "@/domain/tasks";
 import { recordAudit, requirePermission } from "./agencies";
-import { AppError, fieldError, rethrowBusiness } from "./errors";
+import { AppError, fieldError, requireIds, rethrowBusiness } from "./errors";
 
 export const DEFAULT_SETTINGS = {
   timeZone: "America/Bogota",
@@ -70,6 +70,7 @@ export async function listTemplates(tx: Tx, userId: string, agencyId: string) {
 
 export async function getTemplate(tx: Tx, userId: string, agencyId: string, templateId: string) {
   await requirePermission(tx, userId, agencyId, "crm.read");
+  requireIds(templateId);
   const [t] = await tx.select().from(followupTemplates).where(and(eq(followupTemplates.id, templateId), eq(followupTemplates.agencyId, agencyId)));
   if (!t) throw new AppError("not_found");
   const steps = await tx.select().from(followupSteps).where(eq(followupSteps.templateId, templateId)).orderBy(asc(followupSteps.position), asc(followupSteps.createdAt));
@@ -102,6 +103,7 @@ export type TemplateInput = {
 };
 
 async function prepareTemplate(tx: Tx, agencyId: string, input: TemplateInput) {
+  requireIds(input.stageId, input.stopStageId);
   const name = input.name.trim();
   if (!name || name.length > 80) throw fieldError("invalid_input", "templateName");
   if (!isFollowupTrigger(input.trigger)) throw fieldError("invalid_input", "trigger");
@@ -132,6 +134,7 @@ export async function createTemplate(tx: Tx, userId: string, agencyId: string, i
 }
 
 export async function updateTemplate(tx: Tx, userId: string, agencyId: string, templateId: string, input: TemplateInput & { active?: boolean }): Promise<void> {
+  requireIds(templateId);
   await loadWritableTemplate(tx, userId, agencyId, templateId);
   const fields = await prepareTemplate(tx, agencyId, input);
   const set = { ...fields, ...(input.active === undefined ? {} : { active: input.active }) };
@@ -144,6 +147,7 @@ export async function updateTemplate(tx: Tx, userId: string, agencyId: string, t
 }
 
 export async function setTemplateActive(tx: Tx, userId: string, agencyId: string, templateId: string, active: boolean): Promise<void> {
+  requireIds(templateId);
   await loadWritableTemplate(tx, userId, agencyId, templateId);
   await tx.update(followupTemplates).set({ active }).where(and(eq(followupTemplates.id, templateId), eq(followupTemplates.agencyId, agencyId)));
   await recordAudit(tx, { agencyId, actorId: userId, action: "followup.template_updated", objectType: "followup_template", objectId: templateId, changes: { active } });
@@ -179,6 +183,7 @@ function prepareStep(input: StepInput) {
 }
 
 export async function addStep(tx: Tx, userId: string, agencyId: string, templateId: string, input: StepInput): Promise<string> {
+  requireIds(templateId);
   await loadWritableTemplate(tx, userId, agencyId, templateId);
   const fields = prepareStep(input);
   const [{ next }] = await tx
@@ -198,6 +203,7 @@ async function loadStep(tx: Tx, userId: string, agencyId: string, stepId: string
 }
 
 export async function updateStep(tx: Tx, userId: string, agencyId: string, stepId: string, input: StepInput): Promise<void> {
+  requireIds(stepId);
   const step = await loadStep(tx, userId, agencyId, stepId);
   const fields = prepareStep(input);
   await tx.update(followupSteps).set(fields).where(eq(followupSteps.id, stepId));
@@ -206,6 +212,7 @@ export async function updateStep(tx: Tx, userId: string, agencyId: string, stepI
 
 /** Borra un paso; las tareas que ya creó no cambian (step_id queda vacío). */
 export async function deleteStep(tx: Tx, userId: string, agencyId: string, stepId: string): Promise<string> {
+  requireIds(stepId);
   const step = await loadStep(tx, userId, agencyId, stepId);
   await tx.delete(followupSteps).where(eq(followupSteps.id, stepId));
   await recordAudit(tx, { agencyId, actorId: userId, action: "followup.step_deleted", objectType: "followup_template", objectId: step.templateId, changes: { stepId, title: step.title } });
@@ -214,6 +221,7 @@ export async function deleteStep(tx: Tx, userId: string, agencyId: string, stepI
 
 /** Sube o baja un paso un puesto. */
 export async function moveStep(tx: Tx, userId: string, agencyId: string, stepId: string, direction: "up" | "down"): Promise<string> {
+  requireIds(stepId);
   const step = await loadStep(tx, userId, agencyId, stepId);
   const steps = await tx.select({ id: followupSteps.id }).from(followupSteps).where(eq(followupSteps.templateId, step.templateId)).orderBy(asc(followupSteps.position), asc(followupSteps.createdAt));
   const order = steps.map((s) => s.id);

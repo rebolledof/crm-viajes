@@ -15,8 +15,9 @@ export function Notice({ tone = "info", children }: { tone?: "info" | "error" | 
 
 export function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <label className="flex flex-col gap-1 text-sm">
-      <span className="font-medium text-slate-700">{label}</span>
+    // Si el campo de adentro es obligatorio, la etiqueta muestra un asterisco rojo (regla de usabilidad).
+    <label className="group flex flex-col gap-1 text-sm">
+      <span className="font-medium text-slate-700 group-has-[:required]:after:ml-0.5 group-has-[:required]:after:text-red-700 group-has-[:required]:after:content-['*']">{label}</span>
       {children}
     </label>
   );

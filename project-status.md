@@ -13,7 +13,7 @@
 
 ## Comandos verificados
 
-2 nov 2026 en la rama de S02b, tras corregir el informe de QA: lint, typecheck, 50 unitarias, 72 de integración y build sin errores; prueba independiente con otro modelo (Sonnet) sin defectos altos ni medios, y sus dos sugerencias aplicadas con prueba. Los avisos de validación en español se comprobaron con Chromium en inglés sobre /registro.
+2 nov 2026 en la rama de S02b, tras corregir el informe de QA y traer `s02-crm` (d76952e): lint, typecheck, 54 unitarias, 78 de integración y build sin errores; prueba independiente con otro modelo (Sonnet) sin defectos altos ni medios, y sus dos sugerencias aplicadas con prueba. Los avisos de validación en español se comprobaron con Chromium en inglés sobre /registro.
 
 1 nov 2026 en la rama de S02b: lint, typecheck, 40 unitarias, 68 de integración y build sin errores. Prueba independiente con otro modelo (Sonnet) hecha; hallazgos corregidos con prueba.
 
@@ -33,6 +33,9 @@
 
 ## Pendiente
 
+- Aplicar en `crm-viajes-pruebas` la migración `20261103000000_s02_miembro_retirado.sql` de S02 (solo reemplaza funciones de triggers; necesita permiso de Felipe). Sin ella, la vista previa sigue con la regla anterior: no deja mover ni cerrar lo de una persona retirada.
+
+- Aplicar en Supabase de pruebas la migración 20261103000000 (solo reemplaza funciones de triggers), con permiso de Felipe.
 - Antes del piloto: conectar un servicio de correo propio (SMTP) en Supabase; el correo incluido solo envía unos 2 por hora y bloqueó el registro y la recuperación de contraseña el 31 oct.
 - Antes del piloto con datos reales: pasar Supabase y Vercel a planes Pro (el plan Hobby de Vercel no permite uso comercial y el gratuito de Supabase no tiene copias).
 - Felipe: iniciar la verificación de Meta Business (ahora es crítica para la bandeja).

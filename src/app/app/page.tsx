@@ -1,3 +1,4 @@
+import { firstParams } from "@/domain/params";
 import Link from "next/link";
 import { ActionForm, Input } from "@/components/form";
 import { Field, Notice, buttonClass } from "@/components/ui";
@@ -11,7 +12,7 @@ import { Flash, TaskItem, fechaHora, type SearchParams } from "./crm-ui";
 /** Mi día: tareas vencidas y de hoy, y oportunidades sin próxima acción (RF-210). */
 export default async function AppHome({ searchParams }: { searchParams: SearchParams }) {
   const { user, active } = await requireActiveAgency();
-  const sp = await searchParams;
+  const sp = firstParams(await searchParams);
   const now = new Date();
   const [day, members] = await withUser(getDb(), user, (tx) => Promise.all([myDay(tx, user.id, active.agencyId, now), activeMembers(tx, user.id, active.agencyId)]));
   const channels = await withUser(getDb(), user, (tx) => contactChannels(tx, user.id, active.agencyId, [...day.due, ...day.upcoming].map((d) => d.task.contactId)));

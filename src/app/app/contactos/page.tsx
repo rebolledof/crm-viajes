@@ -1,3 +1,4 @@
+import { firstParams } from "@/domain/params";
 import Link from "next/link";
 import { Notice, buttonClass, inputClass, linkButtonClass } from "@/components/ui";
 import { getDb, withUser } from "@/db/client";
@@ -10,7 +11,7 @@ import { Flash, memberName, type SearchParams } from "../crm-ui";
 
 export default async function ContactosPage({ searchParams }: { searchParams: SearchParams }) {
   const { user, active } = await requireActiveAgency();
-  const sp = await searchParams;
+  const sp = firstParams(await searchParams);
   const q = sp.q?.slice(0, 100) ?? "";
   const [rows, members] = await withUser(getDb(), user, (tx) =>
     Promise.all([listContacts(tx, user.id, active.agencyId, q), activeMembers(tx, user.id, active.agencyId)]),

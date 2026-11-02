@@ -3,11 +3,12 @@ import { and, asc, desc, eq, gte, inArray, isNull, lt, sql } from "drizzle-orm";
 import type { Tx } from "@/db/client";
 import { agencies, contactConsents, contactEmails, contactPhones, contacts, opportunities, pipelineStages, tasks } from "@/db/schema";
 import { fillMessage, mailtoLink, taskPermissions, type ContactChannels } from "@/domain/followups";
+import { isUuid } from "@/domain/params";
 import { DEFAULT_WHATSAPP_TEMPLATE } from "@/domain/whatsapp";
 import { endOfLocalDay, isPriority, isTaskKind, type Priority, type TaskKind } from "@/domain/tasks";
 import { recordAudit, requirePermission } from "./agencies";
 import { currentConsents, logActivity, openWhatsapp } from "./contacts";
-import { AppError, fieldError, rethrowBusiness } from "./errors";
+import { AppError, fieldError, requireIds, rethrowBusiness } from "./errors";
 
 export type TaskInput = {
   contactId: string;
@@ -21,12 +22,18 @@ export type TaskInput = {
 
 export async function createTask(tx: Tx, userId: string, agencyId: string, input: TaskInput): Promise<string> {
   await requirePermission(tx, userId, agencyId, "crm.write");
+  requireIds(input.contactId, input.opportunityId, input.assigneeId);
   const title = input.title.trim();
   if (!title || title.length > 200) throw fieldError("invalid_input", "title");
   if (!isTaskKind(input.kind) || Number.isNaN(input.dueAt.getTime())) throw fieldError("invalid_input", "dueAt");
   if (input.priority && !isPriority(input.priority)) throw new AppError("invalid_input");
   const [contact] = await tx.select({ id: contacts.id }).from(contacts).where(and(eq(contacts.id, input.contactId), eq(contacts.agencyId, agencyId)));
   if (!contact) throw new AppError("not_found");
+  if (input.opportunityId) {
+    const [opp] = await tx.select({ contactId: opportunities.contactId }).from(opportunities).where(and(eq(opportunities.id, input.opportunityId), eq(opportunities.agencyId, agencyId)));
+    if (!opp) throw new AppError("not_found");
+    if (opp.contactId !== input.contactId) throw new AppError("task_contact_mismatch", undefined, "opportunityId");
+  }
   const assigneeId = input.assigneeId ?? userId;
   try {
     const [row] = await tx
@@ -44,19 +51,22 @@ export async function createTask(tx: Tx, userId: string, agencyId: string, input
 /** Completar exige resultado (RF-211). */
 export async function completeTask(tx: Tx, userId: string, agencyId: string, taskId: string, result: string): Promise<void> {
   await requirePermission(tx, userId, agencyId, "crm.write");
+  requireIds(taskId);
   const text = result.trim();
   if (!text) throw new AppError("result_required");
   const [row] = await tx
     .update(tasks)
     .set({ status: "completada", result: text, completedAt: new Date() })
     .where(and(eq(tasks.id, taskId), eq(tasks.agencyId, agencyId), eq(tasks.status, "abierta")))
-    .returning({ contactId: tasks.contactId, opportunityId: tasks.opportunityId, title: tasks.title });
+    .returning({ contactId: tasks.contactId, opportunityId: tasks.opportunityId, title: tasks.title })
+    .catch(rethrowBusiness);
   if (!row) throw new AppError("not_found");
   await logActivity(tx, { agencyId, contactId: row.contactId, opportunityId: row.opportunityId, actorId: userId, kind: "tarea.completada", data: { titulo: row.title, resultado: text } });
   await recordAudit(tx, { agencyId, actorId: userId, action: "task.completed", objectType: "task", objectId: taskId, changes: { result: text } });
 }
 
 async function loadOpenTask(tx: Tx, agencyId: string, taskId: string) {
+  requireIds(taskId);
   const [task] = await tx.select().from(tasks).where(and(eq(tasks.id, taskId), eq(tasks.agencyId, agencyId), eq(tasks.status, "abierta")));
   if (!task) throw new AppError("not_found");
   return task;
@@ -65,6 +75,7 @@ async function loadOpenTask(tx: Tx, agencyId: string, taskId: string) {
 /** Cancelar una tarea automática depende de su nivel de edición (RF-226). */
 export async function cancelTask(tx: Tx, userId: string, agencyId: string, taskId: string, reason: string): Promise<void> {
   const role = await requirePermission(tx, userId, agencyId, "crm.write");
+  requireIds(taskId);
   const text = reason.trim();
   if (!text) throw fieldError("invalid_input", "reason");
   const task = await loadOpenTask(tx, agencyId, taskId);
@@ -87,6 +98,7 @@ export type TaskUpdate = { dueAt?: Date; priority?: Priority; message?: string |
 export async function updateTask(tx: Tx, userId: string, agencyId: string, taskId: string, input: TaskUpdate): Promise<void> {
   const role = await requirePermission(tx, userId, agencyId, "crm.write");
   const task = await loadOpenTask(tx, agencyId, taskId);
+  requireIds(input.assigneeId);
   const perms = taskPermissions(role, task.editLevel);
   const set: { dueAt?: Date; priority?: Priority; message?: string | null; assigneeId?: string } = {};
   if (input.dueAt !== undefined && input.dueAt.getTime() !== task.dueAt.getTime()) {
@@ -127,6 +139,7 @@ export async function updateTask(tx: Tx, userId: string, agencyId: string, taskI
  */
 export async function openTaskLink(tx: Tx, userId: string, agencyId: string, taskId: string): Promise<{ link: string; channel: "whatsapp" | "correo" }> {
   await requirePermission(tx, userId, agencyId, "crm.write");
+  requireIds(taskId);
   const [row] = await tx
     .select({ task: tasks, contactName: contacts.fullName, agencyName: agencies.name, destination: opportunities.destination })
     .from(tasks)
@@ -163,7 +176,7 @@ export async function openTaskLink(tx: Tx, userId: string, agencyId: string, tas
  */
 export async function contactChannels(tx: Tx, userId: string, agencyId: string, contactIds: string[]): Promise<Map<string, ContactChannels>> {
   await requirePermission(tx, userId, agencyId, "crm.read");
-  const ids = [...new Set(contactIds)];
+  const ids = [...new Set(contactIds)].filter(isUuid);
   const out = new Map<string, ContactChannels>();
   if (ids.length === 0) return out;
   const [phones, emails, consents] = await Promise.all([

@@ -1,3 +1,4 @@
+import { firstParams } from "@/domain/params";
 import Link from "next/link";
 import { ActionForm, Input } from "@/components/form";
 import { Field, Notice, buttonClass, linkButtonClass } from "@/components/ui";
@@ -15,7 +16,7 @@ import { updateSettingsAction } from "../followup-actions";
 /** Plantillas de seguimiento y ajustes (SPEC-002b). */
 export default async function SeguimientosPage({ searchParams }: { searchParams: SearchParams }) {
   const { user, active } = await requireActiveAgency();
-  const sp = await searchParams;
+  const sp = firstParams(await searchParams);
   const [templates, settings, members] = await withUser(getDb(), user, (tx) =>
     Promise.all([listTemplates(tx, user.id, active.agencyId), getSettings(tx, user.id, active.agencyId), activeMembers(tx, user.id, active.agencyId)]),
   );

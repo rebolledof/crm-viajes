@@ -1,3 +1,4 @@
+import { firstParams } from "@/domain/params";
 import Link from "next/link";
 import { Notice, linkButtonClass } from "@/components/ui";
 import { getDb, withUser } from "@/db/client";
@@ -15,7 +16,7 @@ const small = "rounded-md border border-slate-300 px-2 py-1 text-xs text-slate-7
 export default async function PlantillaPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: SearchParams }) {
   const { user, active } = await requireActiveAgency();
   const { id } = await params;
-  const sp = await searchParams;
+  const sp = firstParams(await searchParams);
   const [t, stages, settings] = await loadOr404(id, () =>
     withUser(getDb(), user, (tx) => Promise.all([getTemplate(tx, user.id, active.agencyId, id), listStages(tx, user.id, active.agencyId, { includeInactive: true }), getSettings(tx, user.id, active.agencyId)])),
   );

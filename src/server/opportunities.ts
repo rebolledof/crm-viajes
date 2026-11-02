@@ -8,7 +8,7 @@ import { closeRequirement, missingKinds, type LossReason, type StageKind } from 
 import type { Priority } from "@/domain/tasks";
 import { recordAudit, requirePermission } from "./agencies";
 import { logActivity } from "./contacts";
-import { AppError, fieldError, pgError, rethrowBusiness } from "./errors";
+import { AppError, fieldError, pgError, requireIds, rethrowBusiness } from "./errors";
 
 export async function listStages(tx: Tx, userId: string, agencyId: string, opts: { includeInactive?: boolean } = {}) {
   await requirePermission(tx, userId, agencyId, "crm.read");
@@ -47,6 +47,7 @@ export async function createStage(tx: Tx, userId: string, agencyId: string, inpu
 }
 
 export async function updateStage(tx: Tx, userId: string, agencyId: string, stageId: string, input: { name?: string; active?: boolean }): Promise<void> {
+  requireIds(stageId);
   await requirePermission(tx, userId, agencyId, "pipeline.manage");
   const set: { name?: string; active?: boolean } = {};
   if (input.name !== undefined) set.name = stageName(input.name);
@@ -64,6 +65,7 @@ export async function updateStage(tx: Tx, userId: string, agencyId: string, stag
 
 /** Reordena las etapas según la lista de ids recibida (RF-215). */
 export async function reorderStages(tx: Tx, userId: string, agencyId: string, orderedIds: string[]): Promise<void> {
+  requireIds(...orderedIds);
   await requirePermission(tx, userId, agencyId, "pipeline.manage");
   const existing = await tx.select({ id: pipelineStages.id }).from(pipelineStages).where(eq(pipelineStages.agencyId, agencyId));
   const ids = new Set(existing.map((s) => s.id));
@@ -132,6 +134,7 @@ function prepareFields(input: Omit<OpportunityInput, "contactId" | "stageId">) {
 
 export async function createOpportunity(tx: Tx, userId: string, agencyId: string, input: OpportunityInput): Promise<string> {
   await requirePermission(tx, userId, agencyId, "crm.write");
+  requireIds(input.contactId, input.stageId, input.ownerId);
   const fields = prepareFields({ ...input, ownerId: input.ownerId === undefined ? userId : input.ownerId });
   const [contact] = await tx.select({ id: contacts.id }).from(contacts).where(and(eq(contacts.id, input.contactId), eq(contacts.agencyId, agencyId)));
   if (!contact) throw new AppError("not_found");
@@ -162,6 +165,7 @@ export async function createOpportunity(tx: Tx, userId: string, agencyId: string
 
 export async function updateOpportunity(tx: Tx, userId: string, agencyId: string, opportunityId: string, input: Omit<OpportunityInput, "contactId" | "stageId">): Promise<void> {
   await requirePermission(tx, userId, agencyId, "crm.write");
+  requireIds(opportunityId, input.ownerId);
   const fields = prepareFields(input);
   const [before] = await tx.select().from(opportunities).where(and(eq(opportunities.id, opportunityId), eq(opportunities.agencyId, agencyId)));
   if (!before) throw new AppError("not_found");
@@ -181,6 +185,7 @@ export type MoveInput = { stageId: string; lostReason?: LossReason | null; lostN
 /** Mueve a cualquier etapa activa, saltando las intermedias (RF-216), con las reglas de cierre. */
 export async function moveOpportunity(tx: Tx, userId: string, agencyId: string, opportunityId: string, input: MoveInput): Promise<void> {
   await requirePermission(tx, userId, agencyId, "crm.write");
+  requireIds(opportunityId, input.stageId);
   const [current] = await tx
     .select({ opp: opportunities, kind: pipelineStages.kind, name: pipelineStages.name })
     .from(opportunities)
@@ -276,6 +281,7 @@ export async function listOpportunities(tx: Tx, userId: string, agencyId: string
 
 export async function getOpportunity(tx: Tx, userId: string, agencyId: string, opportunityId: string) {
   await requirePermission(tx, userId, agencyId, "crm.read");
+  requireIds(opportunityId);
   const [row] = await tx
     .select({ opp: opportunities, contactName: contacts.fullName, stageName: pipelineStages.name, stageKind: pipelineStages.kind })
     .from(opportunities)

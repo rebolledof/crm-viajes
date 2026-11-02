@@ -1,3 +1,4 @@
+import { firstParams } from "@/domain/params";
 import Link from "next/link";
 import { Notice, inputClass, buttonClass, linkButtonClass } from "@/components/ui";
 import { getDb, withUser } from "@/db/client";
@@ -9,7 +10,7 @@ import { Flash, budget, fechaHora, formatDay, memberName, type Member, type Sear
 
 export default async function OportunidadesPage({ searchParams }: { searchParams: SearchParams }) {
   const { user, active } = await requireActiveAgency();
-  const sp = await searchParams;
+  const sp = firstParams(await searchParams);
   const owner = sp.responsable ?? "mias";
   const view = sp.vista === "lista" ? "lista" : "tablero";
   const q = sp.q?.trim().slice(0, 100) ?? "";

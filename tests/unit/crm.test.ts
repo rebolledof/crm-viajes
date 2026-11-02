@@ -110,6 +110,11 @@ describe("fechas de tareas en hora de Colombia", async () => {
     expect(toBogotaInput(d!)).toBe("2026-11-02T09:30");
     expect(parseBogotaDateTime("mañana")).toBeNull();
   });
+  it("una fecha que no existe se rechaza en vez de correrse al mes siguiente", () => {
+    expect(parseBogotaDateTime("2026-02-30T10:00")).toBeNull();
+    expect(parseBogotaDateTime("2026-11-02T25:00")).toBeNull();
+    expect(parseBogotaDateTime("2028-02-29T10:00")?.toISOString()).toBe("2028-02-29T15:00:00.000Z");
+  });
 });
 
 describe("signUpProblem", () => {
@@ -144,5 +149,30 @@ describe("errores ligados a un campo", () => {
     expect(errorMessage("invalid_input", "email.1")).toBe("Ese correo no tiene un formato válido.");
     expect(errorMessage("invalid_input", "campo_sin_mensaje")).toBe(ERROR_MESSAGES.invalid_input);
     expect(errorMessage("invalid_phone", "phone.0")).toBe(ERROR_MESSAGES.invalid_phone);
+  });
+});
+
+describe("auditoría en lenguaje de la agencia", async () => {
+  const { describeAudit } = await import("@/domain/audit");
+  it("muestra el cambio de etapa y el motivo en lenguaje de la agencia (AC-212)", () => {
+    const e = { objectType: "opportunity", objectId: "x", reason: "Cliente lo pidió" };
+    expect(describeAudit({ ...e, action: "opportunity.stage_changed", changes: { de: "Nuevo", a: "Perdido", motivo: "precio", nota: null } })).toEqual({
+      text: "Movió una oportunidad de «Nuevo» a «Perdido»",
+      details: ["Motivo de pérdida: Precio", "Razón: Cliente lo pidió"],
+    });
+    expect(describeAudit({ ...e, action: "contact.updated", changes: { fullName: "Ana", ownerId: null }, reason: null }).text).toBe("Editó el contacto «Ana»");
+    expect(describeAudit({ ...e, action: "task.completed", changes: {}, reason: null }).text).toBe("Completó una tarea");
+  });
+});
+
+describe("parámetros de la URL", async () => {
+  const { firstParams, isUuid } = await import("@/domain/params");
+  it("un parámetro repetido toma el primer valor en vez de romper la pantalla", () => {
+    expect(firstParams({ q: ["ana", "luis"], estado: "abierta", tipo: undefined })).toEqual({ q: "ana", estado: "abierta", tipo: undefined });
+  });
+  it("reconoce identificadores válidos", () => {
+    expect(isUuid("5f83d83d-6bcf-4ec0-9f04-c0f09180b6de")).toBe(true);
+    expect(isUuid("no-es-uuid")).toBe(false);
+    expect(isUuid(["5f83d83d-6bcf-4ec0-9f04-c0f09180b6de"])).toBe(false);
   });
 });

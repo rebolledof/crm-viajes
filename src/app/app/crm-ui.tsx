@@ -14,7 +14,7 @@ import { TaskOpenButton } from "./task-open-button";
 import { channelBlock, taskPermissions, type ContactChannels, type EditLevel } from "@/domain/followups";
 import type { Role } from "@/domain/permissions";
 
-export type SearchParams = Promise<Record<string, string | undefined>>;
+export type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 export type Member = { userId: string; email: string; role: string };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -88,6 +88,8 @@ export function MemberSelect({ name, members, value, emptyLabel }: { name: strin
   return (
     <Select name={name} defaultValue={value ?? ""}>
       {emptyLabel && <option value="">{emptyLabel}</option>}
+      {/* Responsable que ya no está en la agencia: se conserva si no se cambia, en vez de borrarse al guardar. */}
+      {value && !members.some((m) => m.userId === value) && <option value={value}>Persona que ya no está en la agencia</option>}
       {members.map((m) => (
         <option key={m.userId} value={m.userId}>{m.email}</option>
       ))}
@@ -210,7 +212,7 @@ export function OpportunityForm({
         <Input name="dateFlexibility" defaultValue={values.dateFlexibility ?? ""} placeholder="Por ejemplo ± 3 días" />
       </Field>
       <Field label="Viajeros">
-        <Input name="travelers" type="number" min={1} max={500} defaultValue={values.travelers ?? ""} />
+        <Input name="travelers" type="number" min={1} max={999} defaultValue={values.travelers ?? ""} />
       </Field>
       <Field label="Presupuesto">
         <Input name="budgetAmount" inputMode="decimal" defaultValue={values.budgetAmount ?? ""} placeholder="5.000.000" />

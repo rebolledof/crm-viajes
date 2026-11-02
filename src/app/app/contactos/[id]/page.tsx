@@ -1,3 +1,4 @@
+import { firstParams } from "@/domain/params";
 import Link from "next/link";
 import { ActionForm, Input, Select } from "@/components/form";
 import { Field, Notice, buttonClass, linkButtonClass } from "@/components/ui";
@@ -19,7 +20,7 @@ const PURPOSE_LABELS = { servicio: "Atención del viaje", promociones: "Promocio
 export default async function ContactoPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: SearchParams }) {
   const { user, active } = await requireActiveAgency();
   const { id } = await params;
-  const sp = await searchParams;
+  const sp = firstParams(await searchParams);
   const [detail, members, draft, channels] = await loadOr404(id, () =>
     withUser(getDb(), user, (tx) =>
       Promise.all([

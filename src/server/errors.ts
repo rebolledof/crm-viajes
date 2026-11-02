@@ -1,3 +1,5 @@
+import { isUuid } from "@/domain/params";
+
 /** Errores de negocio estables (briefing 15.3). El mensaje es para la persona usuaria. */
 export const ERROR_MESSAGES = {
   permission_denied: "No tienes permiso para hacer esto.",
@@ -25,6 +27,7 @@ export const ERROR_MESSAGES = {
   stage_required: "Elige la etapa que dispara la plantilla.",
   no_email: "El contacto no tiene correo.",
   email_blocked: "El contacto retiró el permiso para escribirle por correo.",
+  task_contact_mismatch: "Esa oportunidad es de otro contacto. Elige una del mismo contacto o ninguna.",
 } as const;
 
 export type ErrorCode = keyof typeof ERROR_MESSAGES;
@@ -40,6 +43,11 @@ export class AppError extends Error {
     super(code);
     this.name = "AppError";
   }
+}
+
+/** Un identificador malformado (formulario alterado, URL editada) es "no encontrado", no un error interno. */
+export function requireIds(...ids: (string | null | undefined)[]): void {
+  for (const id of ids) if (id != null && !isUuid(id)) throw new AppError("not_found");
 }
 
 /** Error de validación ligado a un campo, para resaltarlo en el formulario. */
@@ -83,6 +91,7 @@ export const CODE_FIELDS: Partial<Record<ErrorCode, string>> = {
   result_required: "result",
   stage_name_taken: "name",
   stage_required: "stageId",
+  task_contact_mismatch: "opportunityId",
 };
 
 export function isErrorCode(value: unknown): value is ErrorCode {

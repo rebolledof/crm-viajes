@@ -6,7 +6,7 @@ import { activities, agencySettings, followupSteps, followupTemplates, tasks } f
 import { acceptInvitation, createAgency, createInvitation } from "../../src/server/agencies";
 import { createContact } from "../../src/server/contacts";
 import { AppError, pgError } from "../../src/server/errors";
-import { addStep, createTemplate, listTemplates, updateSettings, updateTemplate } from "../../src/server/followups";
+import { addStep, createTemplate, deleteStep, getTemplate, listTemplates, moveStep, setTemplateActive, updateSettings, updateStep, updateTemplate } from "../../src/server/followups";
 import { createOpportunity, listStages, moveOpportunity, updateOpportunity } from "../../src/server/opportunities";
 import { cancelTask, completeTask, contactChannels, createTask, openTaskLink, updateTask } from "../../src/server/tasks";
 import { recordConsent } from "../../src/server/contacts";
@@ -287,17 +287,20 @@ describe("quién administra plantillas (AC-220, AC-229)", () => {
 });
 
 describe("hallazgos de la prueba independiente", () => {
-  it("con el responsable retirado, S02 ya exige reasignar antes de mover (RF-214); al reasignar, las tareas van al nuevo", async () => {
+  it("con el responsable retirado se puede mover (regla de S02 del 1 nov); las tareas nuevas van a quien la mueve, nunca a la persona retirada", async () => {
     const a = await newAgency("Revocado");
     const { oppId } = await newOpp(a, a.asesor2, "Cliente huérfano", { stageId: await stage(a, "Contactado") });
     await as(t.db, a.admin, (tx) => revokeMembership(tx, a.admin.id, a.id, a.asesor2.id));
     const propuesta = await stage(a, "Propuesta enviada");
-    await expectCode(as(t.db, a.asesor, (tx) => moveOpportunity(tx, a.asesor.id, a.id, oppId, { stageId: propuesta })), "not_active_member");
-    expect(await oppTasks(oppId)).toHaveLength(0);
-    await as(t.db, a.asesor, (tx) => updateOpportunity(tx, a.asesor.id, a.id, oppId, { ownerId: a.asesor.id, destination: "Cancún" }));
     await as(t.db, a.asesor, (tx) => moveOpportunity(tx, a.asesor.id, a.id, oppId, { stageId: propuesta }));
-    const list = await oppTasks(oppId);
+    let list = await oppTasks(oppId);
     expect(list).toHaveLength(3);
+    // Nunca se asigna una tarea a la persona retirada.
+    expect(list.every((x) => x.assigneeId === a.asesor.id)).toBe(true);
+    // Al dar la oportunidad a otro responsable, las tareas siguen con quien las está trabajando
+    // (solo se pasan las que tenía el responsable anterior).
+    await as(t.db, a.admin, (tx) => updateOpportunity(tx, a.admin.id, a.id, oppId, { ownerId: a.admin.id, destination: "Cancún" }));
+    list = await oppTasks(oppId);
     expect(list.every((x) => x.assigneeId === a.asesor.id)).toBe(true);
   });
 
@@ -380,5 +383,21 @@ describe("hallazgos de la prueba independiente", () => {
     // Otra agencia no averigua nada de los contactos de A.
     const other = await channels(b.admin, b.id);
     expect(other.get(full)).toEqual({ phone: false, email: false, whatsappAllowed: true, emailAllowed: true });
+  });
+
+  it("un identificador malformado en plantillas, pasos o tareas responde 'no encontrado' (como en S02)", async () => {
+    const a = await newAgency("Ids raros");
+    const tpl = await template(a, "Negociación: cierre");
+    const step = { kind: "llamada" as const, title: "x", delayAmount: 1, delayUnit: "dias" as const };
+    const bad = "no-es-uuid";
+    await expectCode(as(t.db, a.admin, (tx) => getTemplate(tx, a.admin.id, a.id, bad)), "not_found");
+    await expectCode(as(t.db, a.admin, (tx) => setTemplateActive(tx, a.admin.id, a.id, bad, false)), "not_found");
+    await expectCode(as(t.db, a.admin, (tx) => addStep(tx, a.admin.id, a.id, bad, step)), "not_found");
+    await expectCode(as(t.db, a.admin, (tx) => updateStep(tx, a.admin.id, a.id, bad, step)), "not_found");
+    await expectCode(as(t.db, a.admin, (tx) => deleteStep(tx, a.admin.id, a.id, bad)), "not_found");
+    await expectCode(as(t.db, a.admin, (tx) => moveStep(tx, a.admin.id, a.id, bad, "up")), "not_found");
+    await expectCode(as(t.db, a.admin, (tx) => updateTemplate(tx, a.admin.id, a.id, tpl.id, { name: "x", trigger: "etapa", stageId: bad, editLevel: "libre" })), "not_found");
+    await expectCode(as(t.db, a.asesor, (tx) => updateTask(tx, a.asesor.id, a.id, bad, { priority: "alta" })), "not_found");
+    await expectCode(as(t.db, a.asesor, (tx) => openTaskLink(tx, a.asesor.id, a.id, bad)), "not_found");
   });
 });

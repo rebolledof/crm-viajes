@@ -1,3 +1,4 @@
+import { firstParams } from "@/domain/params";
 import { redirect } from "next/navigation";
 import { ActionForm, Input, Select } from "@/components/form";
 import { Field, Notice, buttonClass } from "@/components/ui";
@@ -15,7 +16,7 @@ const small = "rounded-md border border-slate-300 px-2 py-1 text-xs text-slate-7
 export default async function EmbudoPage({ searchParams }: { searchParams: SearchParams }) {
   const { user, active } = await requireActiveAgency();
   if (!can(active.role, "pipeline.manage")) redirect("/app?error=permission_denied");
-  const sp = await searchParams;
+  const sp = firstParams(await searchParams);
   const stages = await withUser(getDb(), user, (tx) => listStages(tx, user.id, active.agencyId, { includeInactive: true }));
   const order = stages.map((s) => s.id).join(",");
   return (
