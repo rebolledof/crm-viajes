@@ -45,7 +45,7 @@
 
 ### Corregido (prueba independiente de S02, 1 nov 2026)
 
-- Las tareas, oportunidades y contactos de una persona retirada de la agencia ya se pueden completar, cancelar, mover y editar; antes daban error. Asignarle algo nuevo sigue prohibido (migración 20261103000000).
+- Las tareas, oportunidades y contactos de una persona retirada de la agencia ya se pueden completar, cancelar, mover y editar; antes daban error. Asignarle algo nuevo sigue prohibido (migración 20261103000200).
 - Un parámetro repetido en la URL (?q=a&q=b) ya no rompe las listas.
 - Un identificador alterado en un formulario o en la URL responde "no encontrado" en vez de un error interno.
 - Una tarea con una oportunidad de otro contacto muestra un mensaje claro; WhatsApp ya no registra el mensaje en una oportunidad de otro contacto.
