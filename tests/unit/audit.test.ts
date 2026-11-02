@@ -1,4 +1,5 @@
 // Auditoría en lenguaje de la agencia (informe de QA, 2 nov 2026).
+import { readFileSync, readdirSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { describeAudit, type AuditEventLike } from "../../src/domain/audit";
 
@@ -63,5 +64,20 @@ describe("describeAudit", () => {
     expect(unknown.text).toBe("Acción registrada (algo.nuevo)");
     expect(unknown.details).toEqual(["visible: sí"]);
     expect(JSON.stringify(unknown)).not.toContain("{\\\"");
+  });
+
+  it("cada acción que escribe el código o la base tiene su frase (evita volver al texto técnico)", () => {
+    const files = [
+      ...readdirSync("src/server").map((f) => `src/server/${f}`),
+      ...readdirSync("supabase/migrations").map((f) => `supabase/migrations/${f}`),
+    ];
+    const found = new Set<string>();
+    for (const f of files) {
+      const src = readFileSync(f, "utf8");
+      for (const m of src.matchAll(/action: "([a-z_]+\.[a-z_]+)"/g)) found.add(m[1]);
+      for (const m of src.matchAll(/'([a-z_]+\.[a-z_]+)', '(?:agency|invitation|membership|opportunity|stage|contact|task|followup_template)'/g)) found.add(m[1]);
+    }
+    expect(found.size).toBeGreaterThan(20);
+    for (const a of found) expect(describeAudit(ev(a), names).text, a).not.toMatch(/^Acción registrada/);
   });
 });

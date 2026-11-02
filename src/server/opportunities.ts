@@ -229,6 +229,8 @@ export async function listOpportunities(tx: Tx, userId: string, agencyId: string
   const term = filter.q?.trim() ?? "";
   const like = `%${term.replace(/[%_\\]/g, "\\$&")}%`;
   const phone = term ? normalizePhone(term) : null;
+  // Un trozo de número (4 dígitos o más, sin letras) busca dentro de los teléfonos guardados.
+  const digits = /^[\d\s()+.-]+$/.test(term) ? term.replace(/\D/g, "") : "";
   // Búsqueda de la lista (SPEC-002, 5.2): nombre del contacto, destino, correo o teléfono.
   const search = term
     ? or(
@@ -236,6 +238,7 @@ export async function listOpportunities(tx: Tx, userId: string, agencyId: string
         ilike(opportunities.destination, like),
         sql`exists (select 1 from ${contactEmails} e where e.contact_id = ${contacts.id} and e.email like ${like.toLowerCase()})`,
         phone ? sql`exists (select 1 from ${contactPhones} p where p.contact_id = ${contacts.id} and p.e164 = ${phone})` : undefined,
+        digits.length >= 4 ? sql`exists (select 1 from ${contactPhones} p where p.contact_id = ${contacts.id} and p.e164 like ${`%${digits}%`})` : undefined,
       )
     : undefined;
   return tx

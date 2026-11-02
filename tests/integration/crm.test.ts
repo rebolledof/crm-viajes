@@ -368,6 +368,9 @@ describe("lista de oportunidades con búsqueda (F-01 del informe de pruebas, RF 
       expect(ids, q).toContain(oId);
       expect(ids, q).not.toContain(otherO);
     }
+    // Un trozo del número (4 dígitos o más) también encuentra la oportunidad.
+    for (const q of ["4445566", "315 444", "5566"]) expect(await search(q), q).toContain(oId);
+    expect(await search("315"), "menos de 4 dígitos no busca por teléfono").not.toContain(oId);
     expect(await search("   ")).toEqual(expect.arrayContaining([oId, otherO]));
     // Los comodines de LIKE se buscan como texto, no como patrón.
     expect(await search("%")).toEqual([]);

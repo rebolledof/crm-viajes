@@ -78,7 +78,7 @@ Bandeja de mensajes y asignación automática (S03), cotizaciones (S04), importa
 - AC-216 (RF-216): Dada una oportunidad en "nuevo", cuando el asesor la pasa directamente a "propuesta enviada", entonces se acepta y el historial muestra el salto.
 - AC-217 (RF-217): Dadas tres oportunidades en "negociación", cuando el administrador desactiva esa etapa, entonces las tres siguen en ella y la etapa ya no aparece al mover otras.
 - AC-218 (RF-218): Dadas una tarea abierta de Ana y una completada de Luis en la agencia A y una tarea en la agencia B, cuando Ana abre Tareas con "todo el equipo" y estado "abiertas", entonces ve solo la de Ana; con estado "completadas", ve solo la de Luis; nunca ve la de la agencia B.
-- AC-219 (alcance 5.2, hallazgo F-01 de QA del 2 nov 2026): Dadas las oportunidades de Mariana Quintero a Punta Cana y de Jorge Ibáñez a Madrid en la agencia A, cuando un asesor abre Oportunidades en vista "Lista" y busca "punta", "quintero", su correo o su teléfono en cualquier formato, entonces ve solo la de Mariana; los signos % y _ se buscan como texto; la agencia B no la encuentra; una búsqueda sin resultados explica qué probar.
+- AC-219 (alcance 5.2, hallazgo F-01 de QA del 2 nov 2026): Dadas las oportunidades de Mariana Quintero a Punta Cana y de Jorge Ibáñez a Madrid en la agencia A, cuando un asesor abre Oportunidades en vista "Lista" y busca "punta", "quintero", su correo, su teléfono en cualquier formato o un trozo de 4 dígitos o más del teléfono, entonces ve solo la de Mariana; los signos % y _ se buscan como texto; la agencia B no la encuentra; una búsqueda sin resultados explica qué probar.
 
 ### Correcciones de usabilidad del informe de QA (2 nov 2026)
 

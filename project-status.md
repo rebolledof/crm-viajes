@@ -13,7 +13,7 @@
 
 ## Comandos verificados
 
-2 nov 2026 en la rama de S02b, tras corregir el informe de QA: lint, typecheck, 49 unitarias, 72 de integración y build sin errores. Los avisos de validación en español se comprobaron con Chromium en inglés sobre /registro.
+2 nov 2026 en la rama de S02b, tras corregir el informe de QA: lint, typecheck, 50 unitarias, 72 de integración y build sin errores; prueba independiente con otro modelo (Sonnet) sin defectos altos ni medios, y sus dos sugerencias aplicadas con prueba. Los avisos de validación en español se comprobaron con Chromium en inglés sobre /registro.
 
 1 nov 2026 en la rama de S02b: lint, typecheck, 40 unitarias, 68 de integración y build sin errores. Prueba independiente con otro modelo (Sonnet) hecha; hallazgos corregidos con prueba.
 
