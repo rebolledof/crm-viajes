@@ -9,7 +9,7 @@
 - S01 en código (rama `s01-base`): Next.js 16.3, Supabase Auth, esquema de agencias, membresías, invitaciones y auditoría con RLS; pantallas de login, registro, agencia, equipo, invitación y auditoría; CI en GitHub Actions.
 - S02 en código (rama `s02-crm`, sobre `s01-base`): contactos, consentimientos, embudo por agencia, oportunidades, tareas, Mi día y botón de WhatsApp (SPEC-002). Migración `20261102000000_crm_embudo.sql` aplicada solo en PostgreSQL local.
 - S02b en código (rama `claude/project-thread-6eqhro`, sobre `s02-crm`): plantillas de seguimiento con tareas automáticas, horario laboral, niveles de edición y plantillas personales (SPEC-002b). Migraciones `20261103000000_tarea_whatsapp.sql` y `20261103000100_seguimientos.sql` aplicadas en PostgreSQL local y, con permiso de Felipe, en `crm-viajes-pruebas` el 1 nov 2026 (2 agencias con sus 6 plantillas). La migración de S02 `20261103000200_s02_miembro_retirado.sql` se aplicó allí el 2 nov 2026 con permiso de Felipe.
-- Nuevo diseño SPEC-002c en código (rama `claude/project-thread-ss572g`, sobre la de S02b, PR #4): estilo A, marca por agencia, menú y tema por persona, plan del día, camino de etapas y "¿Cuál es el siguiente paso?". Migración `20261104000000_diseno_marca.sql` aplicada solo en PostgreSQL local.
+- Nuevo diseño SPEC-002c en código (rama `claude/project-thread-ss572g`, sobre la de S02b, PR #4): estilo A, marca por agencia, menú y tema por persona, plan del día, camino de etapas y "¿Cuál es el siguiente paso?". Migración `20261104000000_diseno_marca.sql` aplicada en PostgreSQL local y, con permiso de Felipe, en `crm-viajes-pruebas` el 2 nov 2026.
 - Pruebas: 14 unitarias y 21 de integración contra PostgreSQL 16 real (aislamiento A/B, roles, invitaciones vencidas, revocadas y de otro correo, membresía revocada, auditoría, coherencia del esquema).
 
 ## Comandos verificados
@@ -31,7 +31,7 @@
 
 ## No verificado todavía
 
-- El diseño nuevo en la vista previa de Vercel: necesita aplicar la migración del diseño en `crm-viajes-pruebas`, con permiso de Felipe.
+- El diseño nuevo en la vista previa de Vercel: la migración ya está en `crm-viajes-pruebas`; falta que Felipe lo recorra (T-066).
 
 - Las correcciones del 2 nov (lista de oportunidades, botones deshabilitados, auditoría legible) en la vista previa: tienen pruebas, falta recorrerlas en el navegador.
 - Recorrido E2E con Playwright: necesita Supabase Auth local o de pruebas; queda para S05.
