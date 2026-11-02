@@ -79,7 +79,8 @@ export function fillMessage(template: string, values: { nombre: string; agencia:
 
 /** Enlace mailto con asunto y cuerpo; lo abre el programa de correo del asesor. */
 export function mailtoLink(email: string, subject: string, body: string): string {
-  return `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  // El destinatario va codificado: un "?" o "&" en el correo no puede agregar copias ni cambiar el texto.
+  return `mailto:${encodeURIComponent(email).replaceAll("%40", "@")}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 }
 
 /** Valida "HH:MM" de un <input type="time">. */

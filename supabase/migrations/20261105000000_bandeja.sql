@@ -193,6 +193,13 @@ as $$
 begin
   if new.assignee_id is distinct from old.assignee_id then
     perform app.assert_active_member(new.agency_id, new.assignee_id);
+    -- Quien solo lee no puede responder: no se le asigna (prueba independiente, H-8).
+    if new.assignee_id is not null and exists (
+      select 1 from public.memberships m
+      where m.agency_id = new.agency_id and m.user_id = new.assignee_id and m.revoked_at is null and m.role = 'lectura'
+    ) then
+      raise exception 'assignee_read_only' using errcode = 'P0001';
+    end if;
     if current_user = 'authenticated'
        and not app.has_role(new.agency_id, array['admin']::public.agency_role[])
        and not (old.assignee_id is null and new.assignee_id = auth.uid()) then
@@ -359,7 +366,7 @@ begin
   end if;
   if length(v_name) not between 1 and 160 or (v_phone is null and v_email is null)
      or (v_phone is not null and v_phone !~ '^\+[1-9][0-9]{6,14}$')
-     or (v_email is not null and v_email !~ '^[^@\s]+@[^@\s]+\.[^@\s]+$')
+     or (v_email is not null and v_email !~* '^[a-z0-9._+-]+@[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}$')
      or length(coalesce(p_message, '')) > 4000 or length(coalesce(p_destination, '')) > 160
      or length(coalesce(p_dates, '')) > 200 or (p_travelers is not null and p_travelers not between 1 and 999) then
     raise exception 'invalid_input' using errcode = 'P0001';
@@ -398,7 +405,11 @@ begin
   from unnest(array_remove(array[
     case when v_phone is not null then 'whatsapp' end,
     case when v_phone is not null then 'telefono' end,
-    case when v_email is not null then 'correo' end], null)) as ch;
+    case when v_email is not null then 'correo' end], null)) as ch
+  -- Un permiso que el contacto retiró no lo vuelve a otorgar un formulario anónimo (prueba independiente, H-2).
+  where coalesce((select c.status from public.contact_consents c
+                  where c.contact_id = v_contact and c.channel = ch::public.contact_channel and c.purpose = 'servicio'
+                  order by c.created_at desc limit 1), 'otorgado') <> 'retirado';
 
   -- Si el contacto ya tiene una oportunidad abierta con responsable, lo atiende esa persona.
   select o.owner_id into v_owner

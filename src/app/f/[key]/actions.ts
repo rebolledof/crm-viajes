@@ -1,7 +1,7 @@
 "use server";
 
 // Envío del formulario web público (SPEC-003). Sin sesión: corre con el rol anon y la agencia sale
-// del código del formulario. El campo trampa ("sitio") lo llenan robots, no personas.
+// del código del formulario. El campo trampa ("hp_contacto") lo llenan robots, no personas.
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import type { FormState } from "@/components/form";
@@ -26,7 +26,11 @@ export async function submitWebFormAction(_prev: FormState, fd: FormData): Promi
   if (!isFormKey(key)) return keep(fd, ERROR_MESSAGES.channel_closed);
   const done = `/f/${key}?enviado=1${str(fd, "embed") === "1" ? "&embed=1" : ""}`;
   // Campo trampa: se responde como si todo saliera bien, pero no se guarda nada.
-  if (str(fd, "sitio").trim()) redirect(done);
+  if (str(fd, "hp_contacto").trim()) {
+    // Se descarta sin decirle nada al robot; queda en el registro del servidor por si fuera una persona.
+    console.warn("formulario web: envío descartado por el campo trampa", { key: str(fd, "key").slice(0, 8) });
+    redirect(done);
+  }
   const parsed = parseWebForm({
     name: str(fd, "name"),
     phone: str(fd, "phone"),

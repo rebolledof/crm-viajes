@@ -61,8 +61,8 @@ export default async function WebFormPage({ params, searchParams }: Props) {
               {/* Campo trampa para robots: invisible para personas y lectores de pantalla. */}
               <div aria-hidden className="absolute -left-[9999px] h-0 w-0 overflow-hidden">
                 <label>
-                  Sitio web
-                  <input name="sitio" tabIndex={-1} autoComplete="off" />
+                  No llenar este campo
+                  <input name="hp_contacto" tabIndex={-1} autoComplete="off" data-lpignore="true" data-1p-ignore="true" data-form-type="other" />
                 </label>
               </div>
               <p className="text-sm text-slate-600 sm:col-span-2">Déjanos un teléfono o un correo para responderte. Los campos con * son obligatorios.</p>

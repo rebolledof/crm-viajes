@@ -18,4 +18,6 @@ El formulario web lo envía un visitante sin sesión. AGENTS.md exige que la age
 
 - Sin clave de servicio en la aplicación y sin tablas legibles por `anon`; probado en `tests/integration/bandeja.test.ts`.
 - El chat (parte 2) y el webhook de correo (parte 3) usarán el mismo patrón: función de entrada en `app`, agencia desde el canal, `anon` sin acceso a tablas. El webhook además valida la firma del proveedor.
+- La huella sale de `x-real-ip` o del primer valor de `x-forwarded-for`. En Vercel esas cabeceras las pone la plataforma; en otro despliegue hay que confirmarlo, porque si el cliente pudiera fijarlas el límite por dirección no serviría y solo quedaría el de 200 por agencia, que también frena a los visitantes reales. Sin dirección, todos comparten la huella "desconocida" (prueba independiente, H-3).
+- Un formulario no vuelve a otorgar un permiso que el contacto retiró. Sí agrega a un contacto existente el teléfono o correo que llegue con su mismo teléfono o correo; está pendiente que Felipe decida si se marcan como "sin verificar" (H-2).
 - Si el administrador más antiguo se retira, toma su lugar el siguiente; si la agencia no tiene administradores activos, el formulario rechaza los envíos.

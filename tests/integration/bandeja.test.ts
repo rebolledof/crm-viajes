@@ -330,3 +330,29 @@ describe("contacto existente por teléfono", () => {
     expect(phones).toHaveLength(1);
   });
 });
+
+describe("prueba independiente (T-069)", () => {
+  it("H-1: el formulario rechaza un correo con ? o & que alteraría el enlace mailto", async () => {
+    const a = await newAgency("Bandeja H1");
+    await expectCode(submit(a, form({ phone: null, email: "a@b.co?bcc=otro%40x.com&subject=hola" })), "invalid_input");
+  });
+
+  it("H-2: un formulario nuevo no vuelve a otorgar un permiso que el contacto retiró", async () => {
+    const a = await newAgency("Bandeja H2");
+    const phone = "+573009998877";
+    const convId = await submit(a, form({ phone }));
+    const [conv] = await t.db.select().from(conversations).where(eq(conversations.id, convId));
+    await as(t.db, a.ana, (tx) => recordConsent(tx, a.ana.id, a.id, conv.contactId, { channel: "whatsapp", purpose: "servicio", status: "retirado", source: "Pidió no más WhatsApp" }));
+    const conv2 = await submit(a, form({ phone }));
+    const rows = await t.db.select().from(contactConsents).where(and(eq(contactConsents.contactId, conv.contactId), eq(contactConsents.channel, "whatsapp"))).orderBy(contactConsents.createdAt);
+    expect(rows.map((r) => r.status)).toEqual(["otorgado", "retirado"]);
+    await expectCode(as(t.db, a.ana, (tx) => replyConversation(tx, a.ana.id, a.id, conv2, { body: "Hola", via: "whatsapp" })), "whatsapp_blocked");
+  });
+
+  it("H-8: no se asigna una conversación a alguien de solo lectura", async () => {
+    const a = await newAgency("Bandeja H8");
+    const convId = await submit(a, form());
+    await expectCode(as(t.db, a.admin, (tx) => assignConversation(tx, a.admin.id, a.id, convId, a.lectura.id)), "assignee_read_only");
+  });
+});
+

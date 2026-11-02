@@ -304,12 +304,17 @@ function Conversation({
               </form>
             )}
             {acts.resolve && (
-              <form action={resolveConversationAction}>
-                {hidden}
-                <button className="inline-flex items-center gap-1.5 rounded border border-slate-300 bg-surface px-3 py-1.5 text-sm font-medium text-brand-text hover:bg-slate-50" title="Márcala resuelta cuando no haga falta responder más. Si el cliente vuelve a escribir, se reabre sola.">
+              // Pide confirmación: la conversación sale de las listas de trabajo (prueba independiente, H-6).
+              <details className="relative">
+                <summary className="inline-flex cursor-pointer list-none items-center gap-1.5 rounded border border-slate-300 bg-surface px-3 py-1.5 text-sm font-medium text-brand-text hover:bg-slate-50 [&::-webkit-details-marker]:hidden">
                   <Icon name="check" className="size-4" /> Resolver
-                </button>
-              </form>
+                </summary>
+                <form action={resolveConversationAction} className="absolute right-0 z-10 mt-1 w-64 rounded border border-line bg-surface p-3 text-sm shadow-lg">
+                  {hidden}
+                  <p className="text-slate-700">Sale de Mías y de Sin asignar. Si el cliente vuelve a escribir, se reabre sola.</p>
+                  <button className="mt-2 rounded bg-brand px-3 py-1.5 font-medium text-brand-contrast hover:bg-brand-strong">Sí, resolver</button>
+                </form>
+              </details>
             )}
           </div>
         </header>
@@ -351,7 +356,11 @@ function Conversation({
             replies={replies}
             values={{ nombre: detail.contactName, asesor: myName, agencia: agencyName }}
             channels={channels}
-            hint="El formulario se responde por WhatsApp o correo: se abre tu app con el texto y aquí queda registrado."
+            hint={
+              c.status === "resuelta"
+                ? "Esta conversación está resuelta. Si respondes, vuelve a Pendiente, esperando al cliente."
+                : "El formulario se responde por WhatsApp o correo: se abre tu app con el texto y aquí queda registrado."
+            }
           />
         ) : (
           <p className="border-t border-slate-100 px-4 py-3 text-sm text-slate-600">Tu rol es de solo lectura: puedes ver la conversación, pero no responder.</p>

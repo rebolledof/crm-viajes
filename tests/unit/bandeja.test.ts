@@ -1,5 +1,6 @@
 // SPEC-003 · Reglas puras de la bandeja: estados, siguiente paso, respuestas guardadas y formulario.
 import { describe, expect, it } from "vitest";
+import { mailtoLink } from "@/domain/followups";
 import { dayPlan } from "@/domain/guide";
 import {
   conversationActions,
@@ -126,6 +127,17 @@ describe("formulario web (RF-261, RF-271, AC-273)", () => {
     expect(err({ travelers: "2.5" })).toBe("travelers");
     expect(err({ message: "x".repeat(4001) })).toBe("message");
     expect(err({ phone: "", email: "Ana@Example.com" })).toBeNull();
+  });
+
+  it("H-1: rechaza correos con caracteres que cambian un enlace mailto", () => {
+    expect(parseWebForm({ ...base, phone: "", email: "a@b.co?bcc=x@y.com" }).ok).toBe(false);
+    expect(parseWebForm({ ...base, phone: "", email: "a&b@c.co" }).ok).toBe(false);
+    expect(parseWebForm({ ...base, phone: "", email: "ana.maria+viajes@correo.com.co" }).ok).toBe(true);
+  });
+
+  it("H-1: el enlace mailto codifica el destinatario", () => {
+    const link = mailtoLink("a@b.co?bcc=x@y.com", "Re: Hola", "Texto");
+    expect(link.startsWith("mailto:a@b.co%3Fbcc%3Dx@y.com?subject=")).toBe(true);
   });
 
   it("el mensaje del aviso dice que lo escrito se conserva", () => {

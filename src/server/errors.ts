@@ -5,6 +5,7 @@ export const ERROR_MESSAGES = {
   permission_denied: "No tienes permiso para hacer esto.",
   not_found: "No encontramos lo que buscas.",
   invalid_input: "Revisa los datos del formulario.",
+  assignee_read_only: "Esa persona tiene rol de solo lectura y no puede responder. Asigna la conversación a un asesor o administrador.",
   invitation_invalid: "La invitación no es válida: venció, ya se usó, fue revocada o es para otro correo.",
   slug_taken: "Ya existe una agencia con ese nombre. Prueba con otro.",
   not_authenticated: "Tu sesión terminó. Vuelve a iniciar sesión.",

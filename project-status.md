@@ -15,7 +15,7 @@
 
 ## Comandos verificados
 
-2 nov 2026 en la rama de S03 parte 1: lint, typecheck, 93 unitarias, 114 de integración y build sin errores. axe-core sin fallas en bandeja, canales, respuestas y formulario; recorrido a 375 px con capturas en `diseno/implementado/bandeja/`.
+2 nov 2026 en la rama de S03 parte 1, tras corregir la prueba independiente (Sonnet): lint, typecheck, 95 unitarias, 117 de integración y build sin errores. axe-core sin fallas en bandeja, canales, respuestas y formulario; recorrido a 375 px con capturas en `diseno/implementado/bandeja/`.
 
 2 nov 2026 en la rama del diseño, tras corregir la prueba independiente (Sonnet): lint, typecheck, 78 unitarias, 98 de integración y build sin errores. axe-core sin fallas de contraste en las pantallas clave (claro y oscuro, dos marcas) y ninguna pantalla desborda a 390 px.
 
@@ -59,4 +59,4 @@ Ninguno de código. La política de datos personales bloquea cargar datos reales
 
 ## Siguiente tarea
 
-Prueba independiente de la parte 1 de S03 (T-069) y revisión de Felipe en la vista previa (T-032, con T-066, T-021 y T-059). Después, parte 2: chat web (T-027b).
+Revisión de Felipe en la vista previa (T-032, con T-066, T-021 y T-059). Después, parte 2: chat web (T-027b).

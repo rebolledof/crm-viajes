@@ -11,6 +11,7 @@ import { getInboxSettings } from "@/server/inbox";
 import { requireActiveAgency } from "@/server/session";
 import { Flash, type SearchParams } from "../../crm-ui";
 import { updateInboxSettingsAction } from "../../inbox-actions";
+import { ActiveCheckbox } from "./active-checkbox";
 import { CopyField } from "./copy-field";
 
 /** Configuración › Canales de entrada (SPEC-003, alcance 13). Solo administradores. */
@@ -37,10 +38,7 @@ export default async function CanalesPage({ searchParams }: { searchParams: Sear
             <p className="text-sm text-slate-700">
               Cada envío crea el contacto (o usa el que ya existe con ese teléfono o correo), una oportunidad en la primera etapa del embudo con sus tareas de seguimiento, y una conversación en la bandeja.
             </p>
-            <label className="flex items-center gap-2 text-sm font-medium text-slate-800">
-              <input type="checkbox" name="formActive" defaultChecked={s.form?.active ?? false} className="size-4 accent-[var(--brand)]" />
-              Recibir mensajes por el formulario
-            </label>
+            <ActiveCheckbox saved={s.form?.active ?? false} />
             {formUrl && (
               <>
                 <CopyField id="enlace-formulario" label="Enlace del formulario (para botones, redes o la firma del correo)" value={formUrl} />

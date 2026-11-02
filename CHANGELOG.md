@@ -66,6 +66,7 @@
 - Al cambiar el menú o el tema se vuelve a la misma pantalla sin repetir el aviso anterior.
 - Una tarea de llamada sin teléfono en el contacto lo dice y explica cómo corregirlo.
 - Un logo de más de 512 KB o un archivo que no es imagen aunque se llame .png ya no muestra "No pudimos cargar esta pantalla": se revisa antes de enviarlo, se avisa sobre el campo del logo y los colores escritos se conservan (hallazgo F-02 de QA, AC-242).
+- Prueba independiente de SPEC-003 parte 1 (Sonnet): el enlace mailto codifica el destinatario y el formulario solo acepta correos sin "?" ni "&"; un formulario no vuelve a otorgar un permiso retirado; no se asigna una conversación a alguien de solo lectura; "Resolver" pide confirmación; la casilla del formulario en Canales conserva lo marcado si el guardado falla; el campo trampa ya no lo llena el autocompletado; una conversación resuelta avisa que responder la deja en Pendiente.
 
 ### Corregido (prueba independiente de S02, 1 nov 2026)
 

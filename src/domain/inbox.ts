@@ -134,7 +134,7 @@ export function parseWebForm(input: WebFormInput): { ok: true; data: WebFormData
   let email: string | null = null;
   if (input.email.trim()) {
     email = normalizeEmail(input.email);
-    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email) || email.length > 254) return { ok: false, error: { field: "email", message: "Revisa el correo, por ejemplo nombre@correo.com." } };
+    if (!/^[a-z0-9._+-]+@[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}$/i.test(email) || email.length > 254) return { ok: false, error: { field: "email", message: "Revisa el correo, por ejemplo nombre@correo.com." } };
   }
   if (!phone && !email) return { ok: false, error: { field: "phone", message: "Déjanos un teléfono o un correo para responderte." } };
   const destination = input.destination.trim() || null;
