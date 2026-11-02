@@ -6,6 +6,7 @@ import {
   DEFAULT_PRIMARY,
   LIGHT_SURFACE,
   agencyInitials,
+  checkLogoFile,
   brandCssVars,
   contrast,
   contrastWarning,
@@ -93,6 +94,13 @@ describe("logo (RF-242)", () => {
 
   it("rechaza SVG, PDF, HTML y archivos vacíos aunque digan ser imágenes", () => {
     for (const bad of [enc("<svg xmlns='http://www.w3.org/2000/svg'/>"), enc("%PDF-1.7"), enc("<html>"), new Uint8Array()]) expect(sniffLogoType(bad)).toBeNull();
+  });
+
+  it("revisa el archivo antes de enviarlo: tamaño y tipo real (AC-242)", () => {
+    expect(checkLogoFile({ size: 2048, head: png })).toBeNull();
+    expect(checkLogoFile({ size: 45 * 1024 * 1024, head: png })).toBe("logo_too_big");
+    expect(checkLogoFile({ size: 2048, head: enc("%PDF-1.4") })).toBe("logo_type");
+    expect(checkLogoFile({ size: 2048, head: enc("<svg") })).toBe("logo_type");
   });
 
   it("arma las iniciales de la agencia para cuando no hay logo", () => {

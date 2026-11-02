@@ -43,7 +43,9 @@ export async function updateBrandingAction(_prev: FormState, fd: FormData): Prom
   }
   revalidatePath("/app", "layout");
   const warn = contrastWarning(normalizeHex(primary) ?? "");
-  redirect(`/app/configuracion/marca?ok=marca${warn ? `&contraste=${encodeURIComponent(warn.suggestion)}` : ""}`);
+  // El formulario la llama desde el cliente para poder atrapar fallas de envío (AC-242); por eso
+  // devuelve la ruta en vez de redirigir.
+  return { redirectTo: `/app/configuracion/marca?ok=marca${warn ? `&contraste=${encodeURIComponent(warn.suggestion)}` : ""}`, at: Date.now() };
 }
 
 /** Pantalla interna desde la que se cambió la preferencia, para volver a ella. */

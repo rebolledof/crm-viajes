@@ -58,6 +58,7 @@
 - "¿Cuál es el siguiente paso?" se puede dejar para después; la oportunidad queda en «Sin siguiente paso» de Mi día (prueba independiente).
 - Al cambiar el menú o el tema se vuelve a la misma pantalla sin repetir el aviso anterior.
 - Una tarea de llamada sin teléfono en el contacto lo dice y explica cómo corregirlo.
+- Un logo de más de 512 KB o un archivo que no es imagen aunque se llame .png ya no muestra "No pudimos cargar esta pantalla": se revisa antes de enviarlo, se avisa sobre el campo del logo y los colores escritos se conservan (hallazgo F-02 de QA, AC-242).
 
 ### Corregido (prueba independiente de S02, 1 nov 2026)
 

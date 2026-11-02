@@ -129,6 +129,16 @@ export function sniffLogoType(bytes: Uint8Array): LogoType | null {
   return null;
 }
 
+/**
+ * Revisión del logo antes de enviarlo (AC-242): tamaño y tipo real por los primeros bytes. El
+ * servidor repite la misma revisión; esta evita mandar un archivo que de todos modos se rechazaría
+ * (y que, si es muy grande, la plataforma cortaría antes de llegar a la acción).
+ */
+export function checkLogoFile(file: { size: number; head: Uint8Array }): "logo_too_big" | "logo_type" | null {
+  if (file.size > LOGO_MAX_BYTES) return "logo_too_big";
+  return sniffLogoType(file.head) ? null : "logo_type";
+}
+
 /** Iniciales de la agencia para cuando todavía no hay logo. */
 export function agencyInitials(name: string): string {
   const words = name.trim().split(/\s+/).filter((w) => /[\p{L}\p{N}]/u.test(w));

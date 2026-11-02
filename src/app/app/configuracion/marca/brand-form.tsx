@@ -2,18 +2,56 @@
 
 // Formulario de la marca con vista previa en vivo (RF-241 y RF-242). La vista previa solo pinta;
 // el servidor vuelve a validar colores y logo y la base solo deja guardar a un administrador.
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { ActionForm, useField } from "@/components/form";
+import { ActionForm, useField, type FormState } from "@/components/form";
 import { Icon } from "@/components/icons";
 import { buttonClass, inputClass, secondaryButtonClass } from "@/components/ui";
-import { DEFAULT_ACCENT, DEFAULT_PRIMARY, LOGO_MAX_BYTES, brandCssVars, contrastWarning, cssBlock, normalizeHex } from "@/domain/branding";
+import { DEFAULT_ACCENT, DEFAULT_PRIMARY, LOGO_MAX_BYTES, brandCssVars, checkLogoFile, contrastWarning, cssBlock, normalizeHex } from "@/domain/branding";
 import { updateBrandingAction } from "../../branding-actions";
 
 type Props = { primary: string; accent: string; logoUrl: string | null; initials: string; agencyName: string };
 
+const LOGO_MESSAGES = {
+  logo_too_big: "El logo pesa más de 512 KB. Redúcelo o expórtalo como WebP y vuelve a elegirlo.",
+  logo_type: "Ese archivo no es una imagen PNG, WebP o JPG (aunque su nombre lo diga). Elige otro.",
+  envio: "No se pudo subir el logo. Revisa que sea PNG, WebP o JPG de hasta 512 KB y vuelve a intentarlo.",
+};
+const SAVE_FAILED = "No se pudo guardar la marca. Revisa tu conexión y vuelve a intentarlo; los colores siguen escritos.";
+
+/** Lo escrito en el formulario, para devolverlo si se rechaza (sin el archivo). */
+function keep(fd: FormData): Record<string, string[]> {
+  const values: Record<string, string[]> = {};
+  for (const [k, v] of fd.entries()) if (!k.startsWith("$") && typeof v === "string") (values[k] ??= []).push(v);
+  return values;
+}
+
 export function BrandForm(props: Props) {
+  const router = useRouter();
+  // Revisa el logo antes de enviarlo y convierte cualquier falla del envío (archivo demasiado grande
+  // para la plataforma, conexión) en un aviso sobre el campo, sin perder los colores (AC-242).
+  async function save(prev: FormState, fd: FormData): Promise<FormState> {
+    const fail = (code: keyof typeof LOGO_MESSAGES): FormState => ({ error: LOGO_MESSAGES[code], field: "logo", values: keep(fd), at: Date.now() });
+    const file = fd.get("logo");
+    if (file instanceof File && file.size > 0 && fd.get("removeLogo") !== "1") {
+      const problem = checkLogoFile({ size: file.size, head: new Uint8Array(await file.slice(0, 16).arrayBuffer()) });
+      if (problem) return fail(problem);
+    }
+    const sendsLogo = file instanceof File && file.size > 0;
+    let state: FormState;
+    try {
+      state = await updateBrandingAction(prev, fd);
+    } catch {
+      return sendsLogo ? fail("envio") : { error: SAVE_FAILED, values: keep(fd), at: Date.now() };
+    }
+    if (state.redirectTo) {
+      router.replace(state.redirectTo);
+      router.refresh();
+    }
+    return state;
+  }
   return (
-    <ActionForm action={updateBrandingAction} className="flex flex-col gap-4">
+    <ActionForm action={save} className="flex flex-col gap-4">
       <BrandFields {...props} />
     </ActionForm>
   );
