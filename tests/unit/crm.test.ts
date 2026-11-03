@@ -152,12 +152,16 @@ describe("errores ligados a un campo", () => {
   });
 });
 
-describe("auditDetail", async () => {
-  const { auditDetail, AUDIT_ACTIONS } = await import("@/domain/audit");
+describe("auditoría en lenguaje de la agencia", async () => {
+  const { describeAudit } = await import("@/domain/audit");
   it("muestra el cambio de etapa y el motivo en lenguaje de la agencia (AC-212)", () => {
-    expect(auditDetail("opportunity.stage_changed", { de: "Nuevo", a: "Perdido", motivo: "precio", nota: null }, "Cliente lo pidió")).toBe("De Nuevo a Perdido · Motivo: Precio · Razón: Cliente lo pidió");
-    expect(auditDetail("contact.updated", { fullName: "Ana", ownerId: "x" })).toBe("Nombre: Ana");
-    expect(AUDIT_ACTIONS["task.completed"]).toBe("Completó una tarea");
+    const e = { objectType: "opportunity", objectId: "x", reason: "Cliente lo pidió" };
+    expect(describeAudit({ ...e, action: "opportunity.stage_changed", changes: { de: "Nuevo", a: "Perdido", motivo: "precio", nota: null } })).toEqual({
+      text: "Movió una oportunidad de «Nuevo» a «Perdido»",
+      details: ["Motivo de pérdida: Precio", "Razón: Cliente lo pidió"],
+    });
+    expect(describeAudit({ ...e, action: "contact.updated", changes: { fullName: "Ana", ownerId: null }, reason: null }).text).toBe("Editó el contacto «Ana»");
+    expect(describeAudit({ ...e, action: "task.completed", changes: {}, reason: null }).text).toBe("Completó una tarea");
   });
 });
 

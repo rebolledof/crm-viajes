@@ -20,6 +20,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
               <Link href="/app/contactos" className="hover:text-sky-700">Contactos</Link>
               <Link href="/app/oportunidades" className="hover:text-sky-700">Oportunidades</Link>
               <Link href="/app/tareas" className="hover:text-sky-700">Tareas</Link>
+              <Link href="/app/seguimientos" className="hover:text-sky-700">Seguimientos</Link>
               {can(active.role, "pipeline.manage") && <Link href="/app/embudo" className="hover:text-sky-700">Embudo</Link>}
               {can(active.role, "team.manage") && <Link href="/app/equipo" className="hover:text-sky-700">Equipo</Link>}
               {can(active.role, "audit.read") && <Link href="/app/auditoria" className="hover:text-sky-700">Auditoría</Link>}

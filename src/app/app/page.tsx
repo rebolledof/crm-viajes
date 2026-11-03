@@ -5,7 +5,7 @@ import { Field, Notice, buttonClass } from "@/components/ui";
 import { getDb, withUser } from "@/db/client";
 import { ROLE_LABELS, can } from "@/domain/permissions";
 import { requireActiveAgency } from "@/server/session";
-import { activeMembers, myDay } from "@/server/tasks";
+import { activeMembers, contactChannels, myDay } from "@/server/tasks";
 import { renameAgencyAction } from "./actions";
 import { Flash, TaskItem, fechaHora, type SearchParams } from "./crm-ui";
 
@@ -15,7 +15,7 @@ export default async function AppHome({ searchParams }: { searchParams: SearchPa
   const sp = firstParams(await searchParams);
   const now = new Date();
   const [day, members] = await withUser(getDb(), user, (tx) => Promise.all([myDay(tx, user.id, active.agencyId, now), activeMembers(tx, user.id, active.agencyId)]));
-  const canWrite = can(active.role, "crm.write");
+  const channels = await withUser(getDb(), user, (tx) => contactChannels(tx, user.id, active.agencyId, [...day.due, ...day.upcoming].map((d) => d.task.contactId)));
   return (
     <div className="flex flex-col gap-6">
       <div>
@@ -37,8 +37,9 @@ export default async function AppHome({ searchParams }: { searchParams: SearchPa
                 task={task}
                 now={now}
                 back="/app"
-                canWrite={canWrite}
+                role={active.role}
                 members={members}
+                channels={channels}
                 extra={
                   <p className="text-sm">
                     <Link href={task.opportunityId ? `/app/oportunidades/${task.opportunityId}` : `/app/contactos/${task.contactId}`} className="text-sky-700 hover:underline">
@@ -86,8 +87,9 @@ export default async function AppHome({ searchParams }: { searchParams: SearchPa
                 task={task}
                 now={now}
                 back="/app"
-                canWrite={canWrite}
+                role={active.role}
                 members={members}
+                channels={channels}
                 extra={
                   <p className="text-sm">
                     <Link href={task.opportunityId ? `/app/oportunidades/${task.opportunityId}` : `/app/contactos/${task.contactId}`} className="text-sky-700 hover:underline">

@@ -1,7 +1,8 @@
 // SPEC-002 · Embudo por agencia y oportunidades.
-import { and, asc, desc, eq, sql } from "drizzle-orm";
+import { and, asc, desc, eq, ilike, or, sql } from "drizzle-orm";
 import type { Tx } from "@/db/client";
-import { contacts, opportunities, pipelineStages, tasks } from "@/db/schema";
+import { contactEmails, contactPhones, contacts, opportunities, pipelineStages, tasks } from "@/db/schema";
+import { normalizePhone } from "@/domain/phone";
 import { isCurrency, parseAmount, type Currency } from "@/domain/money";
 import { closeRequirement, missingKinds, type LossReason, type StageKind } from "@/domain/pipeline";
 import type { Priority } from "@/domain/tasks";
@@ -228,8 +229,23 @@ const nextActionSql = sql<string | null>`(select t.due_at from ${tasks} t where 
 const nextActionTitleSql = sql<string | null>`(select t.title from ${tasks} t where t.opportunity_id = ${OPP_ID} and t.status = 'abierta' order by t.due_at limit 1)`;
 
 /** Oportunidades para el tablero y la lista, con su próxima acción (RF-210). */
-export async function listOpportunities(tx: Tx, userId: string, agencyId: string, filter: { ownerId?: string; contactId?: string } = {}) {
+export async function listOpportunities(tx: Tx, userId: string, agencyId: string, filter: { ownerId?: string; contactId?: string; q?: string } = {}) {
   await requirePermission(tx, userId, agencyId, "crm.read");
+  const term = filter.q?.trim() ?? "";
+  const like = `%${term.replace(/[%_\\]/g, "\\$&")}%`;
+  const phone = term ? normalizePhone(term) : null;
+  // Un trozo de número (4 dígitos o más, sin letras) busca dentro de los teléfonos guardados.
+  const digits = /^[\d\s()+.-]+$/.test(term) ? term.replace(/\D/g, "") : "";
+  // Búsqueda de la lista (SPEC-002, 5.2): nombre del contacto, destino, correo o teléfono.
+  const search = term
+    ? or(
+        ilike(contacts.fullName, like),
+        ilike(opportunities.destination, like),
+        sql`exists (select 1 from ${contactEmails} e where e.contact_id = ${contacts.id} and e.email like ${like.toLowerCase()})`,
+        phone ? sql`exists (select 1 from ${contactPhones} p where p.contact_id = ${contacts.id} and p.e164 = ${phone})` : undefined,
+        digits.length >= 4 ? sql`exists (select 1 from ${contactPhones} p where p.contact_id = ${contacts.id} and p.e164 like ${`%${digits}%`})` : undefined,
+      )
+    : undefined;
   return tx
     .select({
       id: opportunities.id,
@@ -256,6 +272,7 @@ export async function listOpportunities(tx: Tx, userId: string, agencyId: string
         eq(opportunities.agencyId, agencyId),
         filter.ownerId ? eq(opportunities.ownerId, filter.ownerId) : undefined,
         filter.contactId ? eq(opportunities.contactId, filter.contactId) : undefined,
+        search,
       ),
     )
     .orderBy(desc(opportunities.updatedAt))

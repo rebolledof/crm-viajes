@@ -6,6 +6,7 @@
 - [x] T-020 Tareas, próxima acción y Mi día (AC-209, AC-210, AC-213)
 - [x] T-034 Botón de WhatsApp con mensaje prellenado y registro en la ficha (AC-211)
 - [x] T-020b Módulo de Tareas con filtros (AC-218)
+- [x] T-060 Correcciones del informe de QA del 2 nov 2026 (en la rama de S02b): lista con búsqueda de oportunidades (AC-219), botones de WhatsApp y correo deshabilitados sin permiso (AC-219a), validación del navegador en español (AC-219b) y auditoría legible (AC-219c)
 - [ ] T-021 Demo a la agencia y anotar cambios
 
 T-017 a T-034 están en código con pruebas (19 oct 2026); falta la prueba de Felipe en la vista previa.

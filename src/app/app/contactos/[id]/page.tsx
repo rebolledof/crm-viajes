@@ -9,7 +9,7 @@ import { formatPhone } from "@/domain/phone";
 import { whatsappAllowed } from "@/domain/whatsapp";
 import { getContactDetail, whatsappDraft } from "@/server/contacts";
 import { requireActiveAgency } from "@/server/session";
-import { activeMembers } from "@/server/tasks";
+import { activeMembers, contactChannels } from "@/server/tasks";
 import { recordConsentAction } from "../../crm-actions";
 import { Flash, NewTaskForm, TaskItem, describeActivity, fechaHora, loadOr404, memberName, type SearchParams } from "../../crm-ui";
 import { WhatsappButton } from "../whatsapp-button";
@@ -21,9 +21,14 @@ export default async function ContactoPage({ params, searchParams }: { params: P
   const { user, active } = await requireActiveAgency();
   const { id } = await params;
   const sp = firstParams(await searchParams);
-  const [detail, members, draft] = await loadOr404(id, () =>
+  const [detail, members, draft, channels] = await loadOr404(id, () =>
     withUser(getDb(), user, (tx) =>
-      Promise.all([getContactDetail(tx, user.id, active.agencyId, id), activeMembers(tx, user.id, active.agencyId), whatsappDraft(tx, active.agencyId, id)]),
+      Promise.all([
+        getContactDetail(tx, user.id, active.agencyId, id),
+        activeMembers(tx, user.id, active.agencyId),
+        whatsappDraft(tx, active.agencyId, id),
+        contactChannels(tx, user.id, active.agencyId, [id]),
+      ]),
     ),
   );
   const c = detail.contact;
@@ -109,8 +114,9 @@ export default async function ContactoPage({ params, searchParams }: { params: P
                 task={t}
                 now={now}
                 back={back}
-                canWrite={canWrite}
+                role={active.role}
                 members={members}
+                channels={channels}
                 extra={
                   <p className="text-sm text-slate-600">
                     {t.opportunityId ? (

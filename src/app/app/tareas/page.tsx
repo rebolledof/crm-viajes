@@ -2,10 +2,9 @@ import { firstParams } from "@/domain/params";
 import Link from "next/link";
 import { Notice, buttonClass, inputClass, linkButtonClass } from "@/components/ui";
 import { getDb, withUser } from "@/db/client";
-import { can } from "@/domain/permissions";
 import { TASK_KINDS, TASK_KIND_LABELS, dueState, isTaskKind } from "@/domain/tasks";
 import { requireActiveAgency } from "@/server/session";
-import { TASK_STATUSES, activeMembers, listTasks, type TaskStatus } from "@/server/tasks";
+import { TASK_STATUSES, activeMembers, contactChannels, listTasks, type TaskStatus } from "@/server/tasks";
 import { Flash, TaskItem, fechaHora, memberName, type SearchParams } from "../crm-ui";
 
 const STATUS_LABELS: Record<TaskStatus, string> = { abierta: "Abiertas", completada: "Completadas", cancelada: "Canceladas" };
@@ -25,7 +24,7 @@ export default async function TareasPage({ searchParams }: { searchParams: Searc
   const kind = isTaskKind(sp.tipo) ? sp.tipo : undefined;
   const assigneeId = owner === "todas" ? undefined : (members.find((m) => m.userId === owner)?.userId ?? user.id);
   const rows = await withUser(getDb(), user, (tx) => listTasks(tx, user.id, active.agencyId, { assigneeId, status, kind }));
-  const canWrite = can(active.role, "crm.write");
+  const channels = await withUser(getDb(), user, (tx) => contactChannels(tx, user.id, active.agencyId, rows.filter((r) => r.task.status === "abierta").map((r) => r.task.contactId)));
   const now = new Date();
   const query = new URLSearchParams({ responsable: owner, estado: status, ...(kind ? { tipo: kind } : {}) });
   const back = `/app/tareas?${query}`;
@@ -91,7 +90,7 @@ export default async function TareasPage({ searchParams }: { searchParams: Searc
                 <h2 className={`font-medium ${g.tone}`}>{g.title} ({list.length})</h2>
                 <ul className="flex flex-col gap-2">
                   {list.map((r) => (
-                    <TaskItem key={r.task.id} task={r.task} now={now} back={back} canWrite={canWrite} members={members} extra={link(r)} />
+                    <TaskItem key={r.task.id} task={r.task} now={now} back={back} role={active.role} members={members} channels={channels} extra={link(r)} />
                   ))}
                 </ul>
               </section>

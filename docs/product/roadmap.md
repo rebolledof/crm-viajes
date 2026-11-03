@@ -17,6 +17,7 @@ Sprints de 2 semanas desde el lunes 19 de octubre de 2026. Felipe dedica 6 horas
 | S00 Arranque | 19 oct a 1 nov | Entrevista con la agencia, repositorio, spec del MVP, stack decidido |
 | S01 Base | 2 a 15 nov | Login, usuarios y roles con dos agencias aisladas |
 | S02 CRM | 16 a 29 nov | Contactos, oportunidades, embudo, tareas y botón de WhatsApp |
+| S02b Seguimientos | 1 nov (adelantado) | Plantillas de tareas automáticas por evento del embudo, con horario laboral y permisos (pedido de Felipe del 1 nov 2026) |
 | S03 Bandeja unificada | 30 nov a 13 dic | Chat web, formulario y correo en una bandeja con responsable, alertas de sin responder y respuestas guardadas |
 | S04 Cotizador | 14 a 27 dic | Cotización versionada con PDF de la agencia |
 | S05 Piloto | 28 dic a 10 ene | Importación CSV, copias, producción y capacitación; WhatsApp si Meta ya aprobó |

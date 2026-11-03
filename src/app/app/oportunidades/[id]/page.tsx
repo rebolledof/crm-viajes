@@ -9,7 +9,7 @@ import { whatsappAllowed } from "@/domain/whatsapp";
 import { getContactDetail, whatsappDraft } from "@/server/contacts";
 import { getOpportunity, listStages } from "@/server/opportunities";
 import { requireActiveAgency } from "@/server/session";
-import { activeMembers } from "@/server/tasks";
+import { activeMembers, contactChannels } from "@/server/tasks";
 import { Flash, NewTaskForm, TaskItem, budget, fechaHora, formatDay, loadOr404, memberName, type SearchParams } from "../../crm-ui";
 import { WhatsappButton } from "../../contactos/whatsapp-button";
 import { MoveForm } from "../move-form";
@@ -24,8 +24,8 @@ export default async function OportunidadPage({ params, searchParams }: { params
     withUser(getDb(), user, (tx) => Promise.all([getOpportunity(tx, user.id, active.agencyId, id), listStages(tx, user.id, active.agencyId), activeMembers(tx, user.id, active.agencyId)])),
   );
   const o = data.opp;
-  const [contact, draft] = await withUser(getDb(), user, (tx) =>
-    Promise.all([getContactDetail(tx, user.id, active.agencyId, o.contactId), whatsappDraft(tx, active.agencyId, o.contactId, o.id)]),
+  const [contact, draft, channels] = await withUser(getDb(), user, (tx) =>
+    Promise.all([getContactDetail(tx, user.id, active.agencyId, o.contactId), whatsappDraft(tx, active.agencyId, o.contactId, o.id), contactChannels(tx, user.id, active.agencyId, [o.contactId])]),
   );
   const canWrite = can(active.role, "crm.write");
   const now = new Date();
@@ -91,7 +91,7 @@ export default async function OportunidadPage({ params, searchParams }: { params
         ) : (
           <ul className="flex flex-col gap-2">
             {data.openTasks.map((t) => (
-              <TaskItem key={t.id} task={t} now={now} back={back} canWrite={canWrite} members={members} />
+              <TaskItem key={t.id} task={t} now={now} back={back} role={active.role} members={members} channels={channels} />
             ))}
           </ul>
         )}

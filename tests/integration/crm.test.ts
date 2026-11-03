@@ -214,7 +214,9 @@ describe("cierre, saltos y reapertura (AC-207, AC-208, AC-212, AC-216)", () => {
 describe("tareas y Mi día (AC-209, AC-210, AC-213)", () => {
   it("una oportunidad abierta sin tareas aparece en Mi día de su responsable; con tarea, no", async () => {
     const cId = await newContact(asesorA, agencyA, "Ricardo Silva");
-    const oId = await as(t.db, asesorA, (tx) => createOpportunity(tx, asesorA.id, agencyA, { contactId: cId, destination: "Cusco" }));
+    // Desde S02b una oportunidad nueva recibe tareas automáticas; en "Contactado" no aplica ninguna plantilla.
+    const contactado = await stageId(asesorA, agencyA, "Contactado");
+    const oId = await as(t.db, asesorA, (tx) => createOpportunity(tx, asesorA.id, agencyA, { contactId: cId, destination: "Cusco", stageId: contactado }));
     let day = await as(t.db, asesorA, (tx) => myDay(tx, asesorA.id, agencyA, new Date()));
     expect(day.withoutNextAction.map((o) => o.id)).toContain(oId);
     const due = new Date(Date.now() - 60_000);
@@ -350,6 +352,29 @@ describe("etapas propias de cada agencia (AC-214 a AC-217)", () => {
     const order = [id, ...all.map((s) => s.id).filter((x) => x !== id)];
     await as(t.db, adminA, (tx) => reorderStages(tx, adminA.id, agencyA, order));
     expect((await as(t.db, adminA, (tx) => listStages(tx, adminA.id, agencyA, { includeInactive: true })))[0].name).toBe("Esperando pago");
+  });
+});
+
+describe("lista de oportunidades con búsqueda (F-01 del informe de pruebas, RF de 5.2)", () => {
+  it("busca por nombre del contacto, destino, correo o teléfono sin distinguir mayúsculas y solo dentro de la agencia", async () => {
+    const cId = await newContact(asesorA, agencyA, "Mariana Quintero", "315 444 5566", "mariana.q@example.com");
+    const oId = await as(t.db, asesorA, (tx) => createOpportunity(tx, asesorA.id, agencyA, { contactId: cId, destination: "Punta Cana" }));
+    const otherC = await newContact(asesorA, agencyA, "Jorge Ibáñez");
+    const otherO = await as(t.db, asesorA, (tx) => createOpportunity(tx, asesorA.id, agencyA, { contactId: otherC, destination: "Madrid" }));
+    const search = (q: string, u = asesorA, ag = agencyA) => as(t.db, u, (tx) => listOpportunities(tx, u.id, ag, { q })).then((r) => r.map((o) => o.id));
+
+    for (const q of ["quintero", "MARIANA", "punta", "mariana.q@", "3154445566", "+57 315 444 5566"]) {
+      const ids = await search(q);
+      expect(ids, q).toContain(oId);
+      expect(ids, q).not.toContain(otherO);
+    }
+    // Un trozo del número (4 dígitos o más) también encuentra la oportunidad.
+    for (const q of ["4445566", "315 444", "5566"]) expect(await search(q), q).toContain(oId);
+    expect(await search("315"), "menos de 4 dígitos no busca por teléfono").not.toContain(oId);
+    expect(await search("   ")).toEqual(expect.arrayContaining([oId, otherO]));
+    // Los comodines de LIKE se buscan como texto, no como patrón.
+    expect(await search("%")).toEqual([]);
+    expect(await search("Quintero", adminB, agencyB)).toEqual([]);
   });
 });
 
