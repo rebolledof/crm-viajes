@@ -2,7 +2,8 @@
 
 // Caja de respuesta de la bandeja (SPEC-003, alcance 9 y 11): escribir "/" muestra las respuestas
 // guardadas; al elegir una se reemplazan {nombre}, {asesor} y {agencia} y se puede editar antes de
-// enviar. Enviar registra la respuesta y abre WhatsApp o el correo con el texto.
+// enviar. Enviar registra la respuesta y abre WhatsApp o el correo con el texto; por chat, el
+// mensaje aparece en la ventana del cliente (parte 2).
 import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "@/components/icons";
 import { Notice } from "@/components/ui";
@@ -11,7 +12,8 @@ import { replyAction, type ReplyState } from "../inbox-actions";
 
 export type ComposerReply = { id: string; title: string; shortcut: string; body: string; personal: boolean };
 
-type Channel = { via: "whatsapp" | "correo"; label: string; blocked: string | null };
+type Channel = { via: "whatsapp" | "correo" | "chat"; label: string; blocked: string | null };
+const VIA_NAME = { whatsapp: "WhatsApp", correo: "Correo", chat: "Chat" } as const;
 
 export function Composer({
   conversationId,
@@ -38,7 +40,7 @@ export function Composer({
   const [handled, setHandled] = useState<number | undefined>(undefined);
   if (state.at !== handled) {
     setHandled(state.at);
-    if (state.link) setText("");
+    if (state.sent) setText("");
     else if (state.error && state.body !== undefined) setText(state.body);
   }
   // Abre WhatsApp en otra pestaña o el programa de correo con el texto.
@@ -126,6 +128,9 @@ export function Composer({
         className={`rounded border px-3 py-2 text-sm text-slate-900 placeholder:text-slate-500 focus:outline-2 focus:outline-brand ${state.error && state.field === "body" ? "border-red-500 bg-red-50" : "border-slate-300 bg-surface"}`}
       />
       {state.error && <Notice tone="error">{state.error}</Notice>}
+      {state.sent && state.via === "chat" && (
+        <Notice tone="ok">Enviado. El cliente lo ve en la ventana del chat; la conversación queda en Pendiente.</Notice>
+      )}
       {state.link && (
         <Notice tone="ok">
           Respuesta registrada.{" "}
@@ -160,8 +165,8 @@ export function Composer({
                 : "border border-slate-300 bg-surface text-slate-800 hover:bg-slate-50"
             }`}
           >
-            <Icon name={c.via === "whatsapp" ? "message" : "mail"} className="size-4" />
-            {pending ? "Registrando…" : c.label}
+            <Icon name={c.via === "whatsapp" ? "message" : c.via === "chat" ? "send" : "mail"} className="size-4" />
+            {pending ? (c.via === "chat" ? "Enviando…" : "Registrando…") : c.label}
           </button>
         ))}
       </div>
@@ -170,7 +175,7 @@ export function Composer({
         <p className={`text-xs ${usable.length === 0 ? "text-amber-800" : "text-slate-600"}`}>
           {channels
             .filter((c) => c.blocked)
-            .map((c) => `${c.via === "whatsapp" ? "WhatsApp" : "Correo"}: ${c.blocked}`)
+            .map((c) => `${VIA_NAME[c.via]}: ${c.blocked}`)
             .join(" ")}
           {usable.length === 0 && " Agrega un teléfono o correo en la ficha del contacto para poder responder."}
         </p>

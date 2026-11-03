@@ -10,7 +10,9 @@ import { isInboxFilter } from "@/domain/inbox";
 import { AppError, CODE_FIELDS, errorMessage, type ErrorCode } from "@/server/errors";
 import {
   assignConversation,
+  createConversationOpportunity,
   createSavedReply,
+  linkConversationOpportunity,
   deleteSavedReply,
   replyConversation,
   resolveConversation,
@@ -88,18 +90,41 @@ export async function resolveConversationAction(fd: FormData): Promise<void> {
   redirect(r.ok ? inboxUrl(fd, id, "resuelta") : errorUrl(fd, id, r.code));
 }
 
-export type ReplyState = { link?: string; via?: ReplyVia; error?: string; field?: string; body?: string; at?: number };
+export type ReplyState = { link?: string; via?: ReplyVia; sent?: boolean; error?: string; field?: string; body?: string; at?: number };
 
-/** Registra la respuesta y devuelve el enlace que abre WhatsApp o el correo con el texto. */
+/**
+ * Registra la respuesta. WhatsApp y correo devuelven el enlace que abre la app con el texto; el
+ * chat no tiene enlace: el mensaje ya está en la ventana del visitante (RF-274).
+ */
 export async function replyAction(_prev: ReplyState, fd: FormData): Promise<ReplyState> {
   const { user, agencyId, db } = await ctx();
   const id = str(fd, "conversationId");
-  const via = str(fd, "via") === "correo" ? "correo" : "whatsapp";
+  const rawVia = str(fd, "via");
+  const via: ReplyVia = rawVia === "correo" ? "correo" : rawVia === "chat" ? "chat" : "whatsapp";
   const body = str(fd, "body");
   const r = await run(() => withUser(db, user, (tx) => replyConversation(tx, user.id, agencyId, id, { body, via })));
   if (!r.ok) return { error: errorMessage(r.code, r.field), field: r.field ?? "body", body, at: Date.now() };
   revalidatePath("/app", "layout");
-  return { link: r.value.link, via, at: Date.now() };
+  return { link: r.value.link ?? undefined, via, sent: true, at: Date.now() };
+}
+
+/** "Crear oportunidad" desde la conversación (RF-275). */
+export async function createConversationOpportunityAction(fd: FormData): Promise<void> {
+  const { user, agencyId, db } = await ctx();
+  const id = str(fd, "conversationId");
+  const r = await run(() => withUser(db, user, (tx) => createConversationOpportunity(tx, user.id, agencyId, id)));
+  revalidatePath("/app", "layout");
+  redirect(r.ok ? inboxUrl(fd, id, "oportunidad_creada") : errorUrl(fd, id, r.code));
+}
+
+/** "Vincular a una oportunidad" abierta del mismo contacto (RF-275). */
+export async function linkConversationOpportunityAction(fd: FormData): Promise<void> {
+  const { user, agencyId, db } = await ctx();
+  const id = str(fd, "conversationId");
+  const oppId = str(fd, "opportunityId");
+  const r = await run(() => withUser(db, user, (tx) => linkConversationOpportunity(tx, user.id, agencyId, id, oppId)));
+  revalidatePath("/app", "layout");
+  redirect(r.ok ? inboxUrl(fd, id, "oportunidad_vinculada") : errorUrl(fd, id, r.code));
 }
 
 // Respuestas guardadas.
@@ -140,7 +165,15 @@ export async function updateInboxSettingsAction(_prev: FormState, fd: FormData):
   const raw = str(fd, "maxMinutes").trim();
   const maxMinutes = /^\d{1,5}$/.test(raw) ? Number(raw) : NaN;
   const r = await run(() =>
-    withUser(db, user, (tx) => updateInboxSettings(tx, user.id, agencyId, { maxMinutes, privacyUrl: str(fd, "privacyUrl"), formActive: str(fd, "formActive") === "on" })),
+    withUser(db, user, (tx) =>
+      updateInboxSettings(tx, user.id, agencyId, {
+        maxMinutes,
+        privacyUrl: str(fd, "privacyUrl"),
+        formActive: str(fd, "formActive") === "on",
+        // Solo cambia el chat si la pantalla mandó su casilla.
+        chatActive: fd.has("chatActiveSent") ? str(fd, "chatActive") === "on" : undefined,
+      }),
+    ),
   );
   if (!r.ok) return failed(fd, r);
   revalidatePath("/app/configuracion/canales");

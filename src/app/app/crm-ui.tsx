@@ -67,6 +67,8 @@ const OK_MESSAGES: Record<string, string> = {
   tomada: "Tomaste la conversación. Ahora está en Mías.",
   asignada: "Responsable de la conversación cambiado.",
   resuelta: "Conversación resuelta. Si el cliente vuelve a escribir, se reabre sola.",
+  oportunidad_creada: "Oportunidad creada y vinculada. Ya arrancaron sus tareas de seguimiento.",
+  oportunidad_vinculada: "Conversación vinculada a la oportunidad.",
   respuesta_creada: "Respuesta guardada creada. Úsala escribiendo / en la caja de respuesta.",
   respuesta_guardada: "Respuesta guardada actualizada.",
   respuesta_borrada: "Respuesta guardada borrada.",
@@ -546,13 +548,15 @@ export function describeActivity(kind: string, data: Record<string, unknown>, me
     case "seguimiento.cancelado":
       return `${String(data.cantidad ?? "")} tareas automáticas canceladas al pasar a ${s("etapa")}`;
     case "bandeja.recibido":
-      return `Mensaje recibido por ${s("canal") === "formulario" ? "el formulario web" : s("canal")}`;
+      return `Mensaje recibido por ${s("canal") === "formulario" ? "el formulario web" : s("canal") === "chat" ? "el chat web" : s("canal")}`;
     case "bandeja.tomada":
       return "Tomó la conversación";
     case "bandeja.asignada":
       return data.a ? `Conversación asignada a ${memberName(members, s("a"))}` : "Conversación devuelta a Sin asignar";
     case "bandeja.respuesta":
-      return `Respondió por ${s("via") === "correo" ? "correo" : "WhatsApp"} desde la bandeja`;
+      return s("via") === "chat" ? "Respondió por el chat web" : `Respondió por ${s("via") === "correo" ? "correo" : "WhatsApp"} desde la bandeja`;
+    case "bandeja.oportunidad":
+      return data.creada ? "Creó la oportunidad desde la conversación" : "Vinculó la conversación a una oportunidad";
     case "bandeja.resuelta":
       return "Conversación resuelta";
     case "correo.abierto":

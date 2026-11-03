@@ -23,6 +23,7 @@ import { mailtoLink } from "@/domain/followups";
 import { MAX_MESSAGE, normalizeShortcut, type InboxFilter } from "@/domain/inbox";
 import { whatsappLink } from "@/domain/whatsapp";
 import { recordAudit, requirePermission } from "./agencies";
+import { createOpportunity } from "./opportunities";
 import { currentConsents, logActivity, sendableEmail, sendablePhone } from "./contacts";
 import { AppError, fieldError, pgError, requireIds, rethrowBusiness } from "./errors";
 
@@ -164,8 +165,19 @@ export async function getConversation(tx: Tx, userId: string, agencyId: string, 
       .limit(5),
   ]);
   const withdrawn = (channel: string) => consents.some((x) => x.channel === channel && x.purpose === "servicio" && x.status === "retirado");
+  // Para "Vincular a una oportunidad" (parte 2): las abiertas del contacto.
+  const linkable = c.opportunityId
+    ? []
+    : await tx
+        .select({ id: opportunities.id, destination: opportunities.destination, stageName: pipelineStages.name, createdAt: opportunities.createdAt })
+        .from(opportunities)
+        .innerJoin(pipelineStages, eq(pipelineStages.id, opportunities.stageId))
+        .where(and(eq(opportunities.contactId, c.contactId), eq(opportunities.agencyId, agencyId), eq(pipelineStages.kind, "abierta")))
+        .orderBy(desc(opportunities.updatedAt))
+        .limit(20);
   return {
     conversation: c,
+    linkableOpportunities: linkable,
     contactName: conv.contactName,
     agencyName: conv.agencyName,
     messages: msgs,
@@ -247,23 +259,27 @@ export async function resolveConversation(tx: Tx, userId: string, agencyId: stri
   await logActivity(tx, { agencyId, contactId: c.contactId, opportunityId: c.opportunityId, actorId: userId, kind: "bandeja.resuelta", data: { conversacion: id } });
 }
 
-export type ReplyVia = "whatsapp" | "correo";
+export type ReplyVia = "whatsapp" | "correo" | "chat";
 
 /**
- * Responder (RF-266). En esta parte el formulario se responde por WhatsApp o por correo desde el
- * programa del asesor: el CRM registra la respuesta y devuelve el enlace que abre la app con el
- * texto. Si la conversación no tenía responsable, quien responde la toma.
+ * Responder (RF-266). El formulario se responde por WhatsApp o por correo desde el programa del
+ * asesor: el CRM registra la respuesta y devuelve el enlace que abre la app con el texto. El chat
+ * se responde en el chat (RF-274): el mensaje aparece en la ventana del visitante y no hay enlace.
+ * Si la conversación no tenía responsable, quien responde la toma.
  */
-export async function replyConversation(tx: Tx, userId: string, agencyId: string, id: string, input: { body: string; via: ReplyVia }): Promise<{ link: string }> {
+export async function replyConversation(tx: Tx, userId: string, agencyId: string, id: string, input: { body: string; via: ReplyVia }): Promise<{ link: string | null }> {
   await requirePermission(tx, userId, agencyId, "crm.write");
   const body = input.body.trim();
   if (!body || body.length > MAX_MESSAGE) throw fieldError("invalid_input", "body");
-  if (input.via !== "whatsapp" && input.via !== "correo") throw new AppError("invalid_input");
+  if (input.via !== "whatsapp" && input.via !== "correo" && input.via !== "chat") throw new AppError("invalid_input");
   const c = await loadForUpdate(tx, agencyId, id);
+  if (input.via === "chat" && c.channel !== "chat") throw new AppError("invalid_input");
   const consents = await currentConsents(tx, c.contactId);
   const withdrawn = (ch: string) => consents.some((x) => x.channel === ch && x.purpose === "servicio" && x.status === "retirado");
-  let link: string;
-  if (input.via === "whatsapp") {
+  let link: string | null = null;
+  if (input.via === "chat") {
+    // Responde a quien escribió en la ventana del chat: no depende del teléfono ni del correo.
+  } else if (input.via === "whatsapp") {
     const phone = await sendablePhone(tx, agencyId, c.contactId);
     if (withdrawn("whatsapp")) throw new AppError("whatsapp_blocked");
     link = whatsappLink(phone, body);
@@ -284,6 +300,49 @@ export async function replyConversation(tx: Tx, userId: string, agencyId: string
   }
   await logActivity(tx, { agencyId, contactId: c.contactId, opportunityId: c.opportunityId, actorId: userId, kind: "bandeja.respuesta", data: { conversacion: id, via: input.via } });
   return { link };
+}
+
+// ---------------------------------------------------------------------------------------------
+// Oportunidad de una conversación (parte 2, RF-275). El chat no la crea solo.
+
+/** "Crear oportunidad": en la primera etapa, origen del canal, responsable el de la conversación. */
+export async function createConversationOpportunity(tx: Tx, userId: string, agencyId: string, id: string): Promise<string> {
+  await requirePermission(tx, userId, agencyId, "crm.write");
+  const c = await loadForUpdate(tx, agencyId, id);
+  if (c.opportunityId) throw new AppError("conversation_has_opportunity");
+  const ownerId = c.assigneeId ?? userId;
+  const source = c.channel === "chat" ? "Chat web" : c.channel === "correo" ? "Correo" : "Formulario web";
+  const oppId = await createOpportunity(tx, userId, agencyId, { contactId: c.contactId, ownerId, source });
+  try {
+    await tx.update(conversations).set({ opportunityId: oppId, ...(c.assigneeId ? {} : { assigneeId: userId }) }).where(eq(conversations.id, id));
+    if (!c.assigneeId) await carryOwnership(tx, { ...c, opportunityId: oppId }, userId);
+  } catch (err) {
+    rethrowBusiness(err);
+  }
+  await logActivity(tx, { agencyId, contactId: c.contactId, opportunityId: oppId, actorId: userId, kind: "bandeja.oportunidad", data: { conversacion: id, oportunidad: oppId, creada: true } });
+  return oppId;
+}
+
+/** "Vincular a una oportunidad": una abierta del mismo contacto. */
+export async function linkConversationOpportunity(tx: Tx, userId: string, agencyId: string, id: string, opportunityId: string): Promise<void> {
+  await requirePermission(tx, userId, agencyId, "crm.write");
+  requireIds(opportunityId);
+  const c = await loadForUpdate(tx, agencyId, id);
+  if (c.opportunityId === opportunityId) return;
+  if (c.opportunityId) throw new AppError("conversation_has_opportunity");
+  const [opp] = await tx
+    .select({ id: opportunities.id, contactId: opportunities.contactId, kind: pipelineStages.kind })
+    .from(opportunities)
+    .innerJoin(pipelineStages, eq(pipelineStages.id, opportunities.stageId))
+    .where(and(eq(opportunities.id, opportunityId), eq(opportunities.agencyId, agencyId)));
+  if (!opp || opp.contactId !== c.contactId) throw new AppError("not_found");
+  if (opp.kind !== "abierta") throw new AppError("invalid_input");
+  try {
+    await tx.update(conversations).set({ opportunityId }).where(eq(conversations.id, id));
+  } catch (err) {
+    rethrowBusiness(err);
+  }
+  await logActivity(tx, { agencyId, contactId: c.contactId, opportunityId, actorId: userId, kind: "bandeja.oportunidad", data: { conversacion: id, oportunidad: opportunityId, creada: false } });
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -368,10 +427,15 @@ export async function getInboxSettings(tx: Tx, userId: string, agencyId: string)
     tx.select({ maxMinutes: agencySettings.maxUnansweredMinutes, privacyUrl: agencySettings.privacyUrl }).from(agencySettings).where(eq(agencySettings.agencyId, agencyId)),
     tx.select().from(inboundChannels).where(eq(inboundChannels.agencyId, agencyId)),
   ]);
-  return { maxMinutes: settings?.maxMinutes ?? 30, privacyUrl: settings?.privacyUrl ?? null, form: channels.find((c) => c.kind === "formulario") ?? null };
+  return {
+    maxMinutes: settings?.maxMinutes ?? 30,
+    privacyUrl: settings?.privacyUrl ?? null,
+    form: channels.find((c) => c.kind === "formulario") ?? null,
+    chat: channels.find((c) => c.kind === "chat") ?? null,
+  };
 }
 
-export async function updateInboxSettings(tx: Tx, userId: string, agencyId: string, input: { maxMinutes: number; privacyUrl: string | null; formActive: boolean }): Promise<void> {
+export async function updateInboxSettings(tx: Tx, userId: string, agencyId: string, input: { maxMinutes: number; privacyUrl: string | null; formActive: boolean; chatActive?: boolean }): Promise<void> {
   await requirePermission(tx, userId, agencyId, "inbox.manage");
   if (!Number.isInteger(input.maxMinutes) || input.maxMinutes < 5 || input.maxMinutes > 1440) throw fieldError("invalid_input", "maxMinutes");
   const privacyUrl = input.privacyUrl?.trim() || null;
@@ -380,6 +444,8 @@ export async function updateInboxSettings(tx: Tx, userId: string, agencyId: stri
   await tx.insert(agencySettings).values({ agencyId, weekdayStart: "08:00", weekdayEnd: "18:00" }).onConflictDoNothing();
   await tx.update(agencySettings).set({ maxUnansweredMinutes: input.maxMinutes, privacyUrl, updatedAt: new Date() }).where(eq(agencySettings.agencyId, agencyId));
   await tx.update(inboundChannels).set({ active: input.formActive, updatedAt: new Date() }).where(and(eq(inboundChannels.agencyId, agencyId), eq(inboundChannels.kind, "formulario")));
+  const chatActive = input.chatActive ?? before.chat?.active ?? false;
+  await tx.update(inboundChannels).set({ active: chatActive, updatedAt: new Date() }).where(and(eq(inboundChannels.agencyId, agencyId), eq(inboundChannels.kind, "chat")));
   await recordAudit(tx, {
     agencyId,
     actorId: userId,
@@ -390,6 +456,7 @@ export async function updateInboxSettings(tx: Tx, userId: string, agencyId: stri
       maxMinutes: { from: before.maxMinutes, to: input.maxMinutes },
       privacyUrl: { from: before.privacyUrl, to: privacyUrl },
       formActive: { from: before.form?.active ?? null, to: input.formActive },
+      chatActive: { from: before.chat?.active ?? null, to: chatActive },
     },
   });
 }
