@@ -16,7 +16,7 @@
 
 ## Comandos verificados
 
-3 nov 2026 en la rama del chat web: lint, typecheck, 106 unitarias, 144 de integración y build sin errores. Recorrido a 375 px con datos sintéticos (capturas en `diseno/implementado/chat/`): encender el chat, primer mensaje con error que conserva lo escrito, respuesta del asesor visible en la ventana en 2 s sin recargar, Enter envía, historial al recargar, "¿Era una consulta de viaje?" y crear oportunidad, chat pausado que conserva el texto, burbuja en la página de prueba con Escape para cerrar, y escritorio.
+3 nov 2026 en la rama del chat web: lint, typecheck, 106 unitarias, 144 de integración y build sin errores. Recorrido a 375 px con datos sintéticos (capturas en `diseno/implementado/chat/`): encender el chat, primer mensaje con error que conserva lo escrito, respuesta del asesor visible en la ventana en 2 s sin recargar, Enter envía, historial al recargar, "¿Era una consulta de viaje?" y crear oportunidad, chat pausado que conserva el texto, burbuja en la página de prueba con Escape para cerrar, y escritorio. Tras la prueba independiente (Sonnet, T-076): lint, typecheck, 108 unitarias, 158 de integración y build sin errores; en el navegador, 0 consultas en 12 s con la burbuja cerrada, Escape desde la web cierra y el texto se conserva cuando vence la llave.
 
 2 nov 2026 en la rama de S03 parte 1, tras corregir la prueba independiente (Sonnet) y aplicar D-14 (con su prueba independiente): lint, typecheck, 96 unitarias, 120 de integración.
 

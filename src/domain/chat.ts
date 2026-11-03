@@ -67,7 +67,9 @@ export function pollDelay(visible: boolean, msSinceActivity: number): number | n
 
 /** Código para pegar en la web de la agencia: carga la burbuja. */
 export function chatSnippet(scriptUrl: string): string {
-  return `<script src="${scriptUrl}" async></script>`;
+  // La dirección va escapada: ni una comilla ni un "<" pueden salir del atributo.
+  const attr = scriptUrl.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  return `<script src="${attr}" async></script>`;
 }
 
 /**
@@ -96,27 +98,38 @@ export function bubbleScript(o: { origin: string; key: string; color: string; ag
     frame.style.display = isOpen ? "block" : "none";
     btn.style.display = isOpen && small ? "none" : "flex";
   }
+  // Avisa a la ventana si se ve o no, para que no pregunte por mensajes con la burbuja cerrada.
+  function tell() {
+    if (frame && frame.contentWindow) frame.contentWindow.postMessage(isOpen ? "crm-chat:shown" : "crm-chat:hidden", origin);
+  }
   function open() {
     if (!frame) {
       frame = document.createElement("iframe");
       frame.src = src;
       frame.title = "Chat con " + name;
+      frame.addEventListener("load", tell);
       document.body.appendChild(frame);
     }
     isOpen = true;
     btn.setAttribute("aria-expanded", "true");
     place();
+    tell();
     frame.focus();
   }
   function close() {
     isOpen = false;
     btn.setAttribute("aria-expanded", "false");
     place();
+    tell();
     btn.focus();
   }
   btn.addEventListener("click", function () { isOpen ? close() : open(); });
   window.addEventListener("message", function (e) {
     if (e.origin === origin && e.data === "crm-chat:close") close();
+  });
+  // Escape también cierra cuando el foco está en la web de la agencia y no dentro del chat.
+  document.addEventListener("keydown", function (e) {
+    if (isOpen && e.key === "Escape") close();
   });
   window.addEventListener("resize", place);
   function mount() { document.body.appendChild(btn); }

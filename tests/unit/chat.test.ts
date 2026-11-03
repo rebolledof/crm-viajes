@@ -64,6 +64,19 @@ describe("burbuja (AC-288)", () => {
     expect(chatSnippet("https://crm.test/c/abc/burbuja.js")).toBe('<script src="https://crm.test/c/abc/burbuja.js" async></script>');
   });
 
+  it("la dirección no puede salirse del atributo (prueba independiente, hallazgo 4)", () => {
+    expect(chatSnippet('https://x.test/"></script><script>alert(1)</script>')).toBe(
+      '<script src="https://x.test/&quot;&gt;&lt;/script&gt;&lt;script&gt;alert(1)&lt;/script&gt;" async></script>',
+    );
+  });
+
+  it("avisa a la ventana si está abierta o cerrada, solo a la dirección del CRM, y Escape cierra desde la web (hallazgos 1 y 9)", () => {
+    const js = bubbleScript({ origin: "https://crm.test", key: "a".repeat(32), color: "#0F6E6E", agencyName: "Andes" });
+    expect(js).toContain('postMessage(isOpen ? "crm-chat:shown" : "crm-chat:hidden", origin)');
+    expect(js).toContain('document.addEventListener("keydown"');
+    expect(js).toMatch(/isOpen && e\.key === "Escape"\) close\(\)/);
+  });
+
   it("solo escucha el aviso de cerrar que viene del CRM y no deja inyectar código con el nombre", () => {
     const js = bubbleScript({ origin: "https://crm.test", key: "a".repeat(32), color: "#0F6E6E", agencyName: 'Viajes "X" </script><script>alert(1)</script>' });
     expect(js).toContain('e.origin === origin && e.data === "crm-chat:close"');

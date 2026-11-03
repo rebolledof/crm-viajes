@@ -12,7 +12,8 @@ import { isFormKey } from "@/server/public-form";
 
 const str = (fd: FormData, k: string) => fd.get(k)?.toString() ?? "";
 
-export type ChatStartState = FormState & { token?: string };
+/** token: llave nueva del visitante. received: el campo trampa se llenó; se dice "recibido" sin guardar nada. */
+export type ChatStartState = FormState & { token?: string; received?: boolean };
 
 const CHAT_ERRORS = {
   channel_closed: "Este chat no está recibiendo mensajes ahora. Escríbele a la agencia por WhatsApp o por correo.",
@@ -42,7 +43,7 @@ export async function startChatAction(_prev: ChatStartState, fd: FormData): Prom
   // Campo trampa: el robot cree que todo salió bien, pero no se guarda nada.
   if (str(fd, "hp_contacto").trim()) {
     console.warn("chat web: mensaje descartado por el campo trampa", { key: key.slice(0, 8) });
-    return { at: Date.now(), token: "descartado" };
+    return { at: Date.now(), received: true };
   }
   const parsed = parseChatStart({ name: str(fd, "name"), phone: str(fd, "phone"), email: str(fd, "email"), message: str(fd, "message"), privacy: str(fd, "privacy") === "on" });
   if (!parsed.ok) return keep(fd, parsed.error.message, parsed.error.field);

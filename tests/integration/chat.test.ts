@@ -288,3 +288,46 @@ describe("acceso (RLS y rol anon)", () => {
     expect(fns.map((f) => f.proname)).toEqual(["chat_info", "chat_messages", "chat_send", "chat_start", "submit_web_form", "web_form_info", "web_form_logo"]);
   });
 });
+
+describe("AC-281: horario de la agencia en la ventana del chat (prueba independiente, hallazgo 8)", () => {
+  const info = (a: Agency) => withAnon(t.db, (tx) => chatInfo(tx, a.chatKey));
+  const setHours = (a: Agency, tz: string, wd: [string, string], sat: [string | null, string | null]) =>
+    t.admin`update public.agency_settings set time_zone = ${tz}, weekday_start = ${wd[0]}, weekday_end = ${wd[1]},
+            saturday_start = ${sat[0]}, saturday_end = ${sat[1]} where agency_id = ${a.id}`;
+  const localNow = (tz: string) => {
+    const p = Object.fromEntries(new Intl.DateTimeFormat("en-CA", { timeZone: tz, hourCycle: "h23", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }).formatToParts(new Date()).map((x) => [x.type, x.value]));
+    return new Date(`${p.year}-${p.month}-${p.day}T${p.hour}:${p.minute}:00Z`);
+  };
+
+  it("la hora local sale de la zona de la agencia", async () => {
+    const a = await newAgency("Horario zona");
+    for (const tz of ["America/Bogota", "Europe/Madrid"]) {
+      await setHours(a, tz, ["08:00", "18:00"], ["08:00", "12:00"]);
+      const i = (await info(a))!;
+      expect(Math.abs(i.localNow.getTime() - localNow(tz).getTime())).toBeLessThan(2 * 60_000);
+    }
+  });
+
+  it("abierto todo el día entre semana y sábado: abierto salvo el domingo, que abre el lunes a las 12 a. m.", async () => {
+    const a = await newAgency("Horario abierto");
+    await setHours(a, "America/Bogota", ["00:00", "23:59:59"], ["00:00", "23:59:59"]);
+    const i = (await info(a))!;
+    if (i.localNow.getUTCDay() === 0) {
+      expect(i.openNow).toBe(false);
+      expect(i.nextOpen.toISOString().slice(11, 16)).toBe("00:00");
+    } else {
+      expect(i.openNow).toBe(true);
+      expect(i.nextOpen.getTime()).toBe(i.localNow.getTime());
+    }
+  });
+
+  it("con una ventana de un segundo a medianoche y sin sábado está cerrado y dice cuándo vuelve", async () => {
+    const a = await newAgency("Horario cerrado");
+    await setHours(a, "America/Bogota", ["00:00", "00:00:01"], [null, null]);
+    const i = (await info(a))!;
+    expect(i.openNow).toBe(false);
+    expect(i.nextOpen.getTime()).toBeGreaterThan(i.localNow.getTime());
+    expect(i.nextOpen.toISOString().slice(11, 16)).toBe("00:00");
+    expect([1, 2, 3, 4, 5]).toContain(i.nextOpen.getUTCDay());
+  });
+});

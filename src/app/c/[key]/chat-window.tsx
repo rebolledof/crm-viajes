@@ -35,6 +35,9 @@ function writeToken(chatKey: string, token: string | null) {
 
 const noSubscribe = () => () => {};
 
+const EXPIRED_NOTICE = "Tu conversación anterior ya no está disponible. Escríbenos de nuevo y un asesor te responde aquí.";
+const EXPIRED_DRAFT_NOTICE = "Tu conversación anterior ya no está disponible, así que empezamos una nueva. Tu mensaje sigue abajo: completa tus datos y pulsa Enviar.";
+
 /** Pide a la web de la agencia que cierre la burbuja (si estamos dentro de su marco). */
 function closeBubble() {
   if (window.parent !== window) window.parent.postMessage("crm-chat:close", "*");
@@ -65,7 +68,12 @@ export function ChatWindow({
   const framed = hydrated && window.parent !== window;
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
+  // Si la conversación venció: aviso en el formulario y el texto que el visitante alcanzó a escribir.
+  const [restart, setRestart] = useState<{ notice: string; draft: string } | null>(null);
+  const [received, setReceived] = useState(false);
   const lastActivity = useRef(0);
+  // La burbuja avisa si está cerrada: entonces no se pregunta por mensajes nuevos.
+  const bubbleHidden = useRef(false);
 
   useEffect(() => {
     lastActivity.current = Date.now();
@@ -80,10 +88,11 @@ export function ChatWindow({
     if (!token) return;
     const list = await loadChatAction(chatKey, token);
     if (list.length === 0) {
-      // Llave vencida o inválida (AC-280): se empieza de cero.
+      // Llave vencida o inválida (AC-280): se empieza de cero, diciendo por qué.
       writeToken(chatKey, null);
       setToken(null);
       setMessages([]);
+      setRestart((r) => r ?? { notice: EXPIRED_NOTICE, draft: "" });
       return;
     }
     setMessages((prev) => (prev.length === list.length && prev.at(-1)?.id === list.at(-1)?.id ? prev : list));
@@ -97,7 +106,8 @@ export function ChatWindow({
     const tick = async () => {
       await refresh().catch(() => {});
       if (stopped) return;
-      const delay = pollDelay(document.visibilityState === "visible", Date.now() - lastActivity.current);
+      const visible = document.visibilityState === "visible" && !bubbleHidden.current;
+      const delay = pollDelay(visible, Date.now() - lastActivity.current);
       if (delay !== null) timer = setTimeout(tick, delay);
     };
     const onVisible = () => {
@@ -106,21 +116,36 @@ export function ChatWindow({
         tick();
       }
     };
+    const onBubble = (e: MessageEvent) => {
+      if (e.source !== window.parent || window.parent === window) return;
+      if (e.data === "crm-chat:hidden") {
+        bubbleHidden.current = true;
+        clearTimeout(timer);
+      } else if (e.data === "crm-chat:shown" && bubbleHidden.current) {
+        bubbleHidden.current = false;
+        clearTimeout(timer);
+        tick();
+      }
+    };
     tick();
     document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("message", onBubble);
     return () => {
       stopped = true;
       clearTimeout(timer);
       document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("message", onBubble);
     };
   }, [token, refresh]);
 
   async function onStart(prev: ChatStartState, fd: FormData): Promise<ChatStartState> {
     const r = await startChatAction(prev, fd);
+    if (r.received) setReceived(true);
     if (r.token) {
       lastActivity.current = Date.now();
       writeToken(chatKey, r.token);
       setNotice("Recibimos tu mensaje. Un asesor te responderá pronto aquí mismo.");
+      setRestart(null);
       setToken(r.token);
     }
     return r;
@@ -152,10 +177,13 @@ export function ChatWindow({
         <p className="p-4 text-sm text-slate-600">Cargando…</p>
       ) : !token ? (
         <div className="flex-1 overflow-y-auto p-4">
-          {!active ? (
+          {received ? (
+            <Notice tone="ok">Recibimos tu mensaje. Un asesor te responderá pronto.</Notice>
+          ) : !active ? (
             <Notice>Este chat no está recibiendo mensajes ahora. Escríbele a {agencyName} por WhatsApp o por correo.</Notice>
           ) : (
             <ActionForm action={onStart} className="flex flex-col gap-3">
+              {restart && <Notice>{restart.notice}</Notice>}
               <input type="hidden" name="key" value={chatKey} />
               <div aria-hidden className="absolute -left-[9999px] h-0 w-0 overflow-hidden">
                 <label>
@@ -174,7 +202,7 @@ export function ChatWindow({
                 <Input name="email" type="email" maxLength={254} autoComplete="email" placeholder="nombre@correo.com" />
               </Field>
               <Field label="Mensaje">
-                <Textarea name="message" required rows={3} maxLength={4000} placeholder="¿En qué te ayudamos?" />
+                <Textarea name="message" required rows={3} maxLength={4000} placeholder="¿En qué te ayudamos?" defaultValue={restart?.draft || undefined} />
               </Field>
               <PrivacyCheckbox agencyName={agencyName} privacyUrl={privacyUrl} />
               <button className={buttonClass}>
@@ -195,8 +223,10 @@ export function ChatWindow({
             setNotice(null);
             await refresh();
           }}
-          onExpired={() => {
+          onExpired={(draft) => {
             writeToken(chatKey, null);
+            setMessages([]);
+            setRestart({ notice: draft ? EXPIRED_DRAFT_NOTICE : EXPIRED_NOTICE, draft });
             setToken(null);
           }}
         />
@@ -220,7 +250,7 @@ function Conversation({
   notice: string | null;
   active: boolean;
   onSent: () => Promise<void>;
-  onExpired: () => void;
+  onExpired: (draft: string) => void;
 }) {
   const [text, setText] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -244,7 +274,7 @@ function Conversation({
     } else {
       // Lo escrito se conserva (regla de usabilidad).
       setError(r.error);
-      if ("expired" in r && r.expired) onExpired();
+      if ("expired" in r && r.expired) onExpired(text);
     }
   }
 
@@ -277,7 +307,8 @@ function Conversation({
             value={text}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
+              // Durante la composición (acentos, teclados asiáticos) Enter confirma la letra, no envía.
+              if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
                 e.preventDefault();
                 e.currentTarget.form?.requestSubmit();
               }

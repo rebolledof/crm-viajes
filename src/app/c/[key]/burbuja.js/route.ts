@@ -1,5 +1,6 @@
 // Burbuja del chat para la web de la agencia (SPEC-003 parte 2, AC-288). Un código que no existe
-// devuelve un script vacío para no romper la web donde se pegó.
+// devuelve un script vacío para no romper la web donde se pegó. La dirección del CRM sale de la
+// petición; la caché pública la separa por Host para que una copia no apunte a otro dominio.
 import { getDb, withAnon } from "@/db/client";
 import { DEFAULT_PRIMARY, normalizeHex } from "@/domain/branding";
 import { bubbleScript } from "@/domain/chat";
@@ -15,6 +16,6 @@ export async function GET(request: Request, { params }: { params: Promise<{ key:
     : "/* Chat no encontrado: revisa el código en Configuración › Canales de entrada. */\n";
   return new Response(body, {
     status: info ? 200 : 404,
-    headers: { "content-type": "text/javascript; charset=utf-8", "cache-control": "public, max-age=300", "x-content-type-options": "nosniff" },
+    headers: { "content-type": "text/javascript; charset=utf-8", "cache-control": "public, max-age=300", vary: "Host, X-Forwarded-Proto", "x-content-type-options": "nosniff" },
   });
 }
