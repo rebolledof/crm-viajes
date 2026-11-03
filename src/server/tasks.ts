@@ -7,7 +7,7 @@ import { isUuid } from "@/domain/params";
 import { DEFAULT_WHATSAPP_TEMPLATE } from "@/domain/whatsapp";
 import { endOfLocalDay, isPriority, isTaskKind, type Priority, type TaskKind } from "@/domain/tasks";
 import { recordAudit, requirePermission } from "./agencies";
-import { currentConsents, logActivity, openWhatsapp } from "./contacts";
+import { currentConsents, logActivity, openWhatsapp, sendableEmail } from "./contacts";
 import { AppError, fieldError, requireIds, rethrowBusiness } from "./errors";
 
 export type TaskInput = {
@@ -171,13 +171,7 @@ export async function openTaskLink(tx: Tx, userId: string, agencyId: string, tas
     return { link: await openWhatsapp(tx, userId, agencyId, task.contactId, { message, opportunityId: task.opportunityId }), channel: "whatsapp" };
   }
   if (task.kind !== "correo") throw new AppError("invalid_input");
-  const [email] = await tx
-    .select({ email: contactEmails.email })
-    .from(contactEmails)
-    .where(and(eq(contactEmails.contactId, task.contactId), eq(contactEmails.agencyId, agencyId)))
-    .orderBy(desc(contactEmails.isPreferred), contactEmails.createdAt)
-    .limit(1);
-  if (!email) throw new AppError("no_email");
+  const email = { email: await sendableEmail(tx, agencyId, task.contactId) };
   const consents = await currentConsents(tx, task.contactId);
   if (consents.some((c) => c.channel === "correo" && c.purpose === "servicio" && c.status === "retirado")) throw new AppError("email_blocked");
   const body = fillMessage(task.message ?? "Hola {nombre},", values);
@@ -196,20 +190,23 @@ export async function contactChannels(tx: Tx, userId: string, agencyId: string, 
   const out = new Map<string, ContactChannels>();
   if (ids.length === 0) return out;
   const [phones, emails, consents] = await Promise.all([
-    tx.selectDistinct({ id: contactPhones.contactId }).from(contactPhones).where(and(eq(contactPhones.agencyId, agencyId), inArray(contactPhones.contactId, ids))),
-    tx.selectDistinct({ id: contactEmails.contactId }).from(contactEmails).where(and(eq(contactEmails.agencyId, agencyId), inArray(contactEmails.contactId, ids))),
+    tx.selectDistinct({ id: contactPhones.contactId, unverified: contactPhones.unverified }).from(contactPhones).where(and(eq(contactPhones.agencyId, agencyId), inArray(contactPhones.contactId, ids))),
+    tx.selectDistinct({ id: contactEmails.contactId, unverified: contactEmails.unverified }).from(contactEmails).where(and(eq(contactEmails.agencyId, agencyId), inArray(contactEmails.contactId, ids))),
     tx
       .selectDistinctOn([contactConsents.contactId, contactConsents.channel], { id: contactConsents.contactId, channel: contactConsents.channel, status: contactConsents.status })
       .from(contactConsents)
       .where(and(eq(contactConsents.agencyId, agencyId), eq(contactConsents.purpose, "servicio"), inArray(contactConsents.contactId, ids)))
       .orderBy(contactConsents.contactId, contactConsents.channel, desc(contactConsents.createdAt), desc(contactConsents.id)),
   ]);
-  const has = (rows: { id: string }[]) => new Set(rows.map((r) => r.id));
-  const withPhone = has(phones);
-  const withEmail = has(emails);
+  // Solo cuenta lo verificado; lo que llegó por el formulario sin confirmar se explica aparte (D-14).
+  const has = (rows: { id: string; unverified: boolean }[], unverified: boolean) => new Set(rows.filter((r) => r.unverified === unverified).map((r) => r.id));
+  const withPhone = has(phones, false);
+  const withEmail = has(emails, false);
+  const pendingPhone = has(phones, true);
+  const pendingEmail = has(emails, true);
   const withdrawn = new Set(consents.filter((c) => c.status === "retirado").map((c) => `${c.id}:${c.channel}`));
   for (const id of ids) {
-    out.set(id, { phone: withPhone.has(id), email: withEmail.has(id), whatsappAllowed: !withdrawn.has(`${id}:whatsapp`), emailAllowed: !withdrawn.has(`${id}:correo`) });
+    out.set(id, { phone: withPhone.has(id), email: withEmail.has(id), phoneUnverified: pendingPhone.has(id), emailUnverified: pendingEmail.has(id), whatsappAllowed: !withdrawn.has(`${id}:whatsapp`), emailAllowed: !withdrawn.has(`${id}:correo`) });
   }
   return out;
 }

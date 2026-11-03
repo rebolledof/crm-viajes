@@ -52,6 +52,7 @@ const OK_MESSAGES: Record<string, string> = {
   clave: "Contraseña actualizada.",
   creado: "Contacto creado.",
   guardado: "Cambios guardados.",
+  verificado: "Dato confirmado. Ya se puede usar para escribirle al cliente.",
   consentimiento: "Consentimiento registrado.",
   creada: "Creada.",
   guardada: "Cambios guardados.",
@@ -63,6 +64,12 @@ const OK_MESSAGES: Record<string, string> = {
   ajustes: "Ajustes guardados.",
   paso: "Paso agregado.",
   borrado: "Paso borrado.",
+  tomada: "Tomaste la conversación. Ahora está en Mías.",
+  asignada: "Responsable de la conversación cambiado.",
+  resuelta: "Conversación resuelta. Si el cliente vuelve a escribir, se reabre sola.",
+  respuesta_creada: "Respuesta guardada creada. Úsala escribiendo / en la caja de respuesta.",
+  respuesta_guardada: "Respuesta guardada actualizada.",
+  respuesta_borrada: "Respuesta guardada borrada.",
 };
 
 export function Flash({ sp }: { sp: Record<string, string | undefined> }) {
@@ -422,7 +429,11 @@ export function TaskItem({
         <div className="flex flex-wrap items-center gap-2">
           {perms.complete && channel && <TaskOpenButton taskId={task.id} channel={channel} back={back} blocked={blocked} compact primary={primary} />}
           {task.kind === "llamada" && task.contactId && channels?.get(task.contactId)?.phone === false && (
-            <span className="text-xs text-amber-800">El contacto no tiene teléfono. Agrégalo en su ficha para poder llamar.</span>
+            <span className="text-xs text-amber-800">
+              {channels.get(task.contactId)?.phoneUnverified
+                ? "El teléfono llegó por el formulario web y está sin verificar. Confírmalo en su ficha antes de llamar."
+                : "El contacto no tiene teléfono. Agrégalo en su ficha para poder llamar."}
+            </span>
           )}
         </div>
       </div>
@@ -507,6 +518,8 @@ export function describeActivity(kind: string, data: Record<string, unknown>, me
     case "contacto.responsable":
     case "oportunidad.responsable":
       return `Responsable cambiado a ${memberName(members, s("a") || null)}`;
+    case "contacto.verificado":
+      return `${s("dato") === "telefono" ? "Teléfono" : "Correo"} del formulario web confirmado`;
     case "consentimiento.cambiado":
       return `Consentimiento de ${s("channel")} para ${s("purpose")}: ${s("status")}${s("source") ? ` (${s("source")})` : ""}`;
     case "whatsapp.abierto":
@@ -532,6 +545,16 @@ export function describeActivity(kind: string, data: Record<string, unknown>, me
       return `Plantilla "${s("plantilla")}": ${String(data.cantidad ?? "")} tareas automáticas creadas`;
     case "seguimiento.cancelado":
       return `${String(data.cantidad ?? "")} tareas automáticas canceladas al pasar a ${s("etapa")}`;
+    case "bandeja.recibido":
+      return `Mensaje recibido por ${s("canal") === "formulario" ? "el formulario web" : s("canal")}`;
+    case "bandeja.tomada":
+      return "Tomó la conversación";
+    case "bandeja.asignada":
+      return data.a ? `Conversación asignada a ${memberName(members, s("a"))}` : "Conversación devuelta a Sin asignar";
+    case "bandeja.respuesta":
+      return `Respondió por ${s("via") === "correo" ? "correo" : "WhatsApp"} desde la bandeja`;
+    case "bandeja.resuelta":
+      return "Conversación resuelta";
     case "correo.abierto":
       return `Correo abierto para ${s("correo")}: “${s("asunto")}”`;
     default:

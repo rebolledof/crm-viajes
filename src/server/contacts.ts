@@ -84,14 +84,24 @@ export async function findDuplicate(tx: Tx, agencyId: string, phones: string[], 
 }
 
 async function writeIdentifiers(tx: Tx, agencyId: string, contactId: string, data: ReturnType<typeof prepareContact>) {
+  // Lo que estaba sin verificar sigue así al guardar la ficha: se confirma con su botón (D-14).
+  const [oldPhones, oldEmails] = await Promise.all([
+    tx.select({ v: contactPhones.e164 }).from(contactPhones).where(and(eq(contactPhones.contactId, contactId), eq(contactPhones.agencyId, agencyId), eq(contactPhones.unverified, true))),
+    tx.select({ v: contactEmails.email }).from(contactEmails).where(and(eq(contactEmails.contactId, contactId), eq(contactEmails.agencyId, agencyId), eq(contactEmails.unverified, true))),
+  ]);
+  const unverifiedPhones = new Set(oldPhones.map((r) => r.v));
+  const unverifiedEmails = new Set(oldEmails.map((r) => r.v));
+  // El preferido es el primero verificado: uno sin verificar no lo es hasta confirmarlo.
+  const firstVerifiedPhone = data.phones.find((p) => !unverifiedPhones.has(p.e164))?.e164;
+  const firstVerifiedEmail = data.emails.find((e) => !unverifiedEmails.has(e));
   await tx.delete(contactPhones).where(and(eq(contactPhones.contactId, contactId), eq(contactPhones.agencyId, agencyId)));
   await tx.delete(contactEmails).where(and(eq(contactEmails.contactId, contactId), eq(contactEmails.agencyId, agencyId)));
   try {
     if (data.phones.length) {
-      await tx.insert(contactPhones).values(data.phones.map((p, i) => ({ agencyId, contactId, e164: p.e164, label: p.label, isPreferred: i === 0 })));
+      await tx.insert(contactPhones).values(data.phones.map((p) => ({ agencyId, contactId, e164: p.e164, label: p.label, isPreferred: p.e164 === firstVerifiedPhone, unverified: unverifiedPhones.has(p.e164) })));
     }
     if (data.emails.length) {
-      await tx.insert(contactEmails).values(data.emails.map((email, i) => ({ agencyId, contactId, email, isPreferred: i === 0 })));
+      await tx.insert(contactEmails).values(data.emails.map((email) => ({ agencyId, contactId, email, isPreferred: email === firstVerifiedEmail, unverified: unverifiedEmails.has(email) })));
     }
   } catch (err) {
     // Otro asesor guardó el mismo dato al mismo tiempo: la restricción única decide.
@@ -165,8 +175,8 @@ export async function listContacts(tx: Tx, userId: string, agencyId: string, q =
       ownerId: contacts.ownerId,
       tags: contacts.tags,
       createdAt: contacts.createdAt,
-      phone: sql<string | null>`(select p.e164 from ${contactPhones} p where p.contact_id = ${CONTACT_ID} and p.is_preferred limit 1)`,
-      email: sql<string | null>`(select e.email from ${contactEmails} e where e.contact_id = ${CONTACT_ID} and e.is_preferred limit 1)`,
+      phone: sql<string | null>`(select p.e164 from ${contactPhones} p where p.contact_id = ${CONTACT_ID} and p.is_preferred and not p.unverified limit 1)`,
+      email: sql<string | null>`(select e.email from ${contactEmails} e where e.contact_id = ${CONTACT_ID} and e.is_preferred and not e.unverified limit 1)`,
       openOpportunities: sql<number>`(select count(*)::int from ${opportunities} o join ${pipelineStages} s on s.id = o.stage_id where o.contact_id = ${CONTACT_ID} and s.kind = 'abierta')`,
       // Siguiente paso: la tarea abierta que vence primero (SPEC-002c, columna "Siguiente paso").
       nextTask: sql<{ title: string; kind: string; due_at: string } | null>`(select json_build_object('title', t.title, 'kind', t.kind, 'due_at', t.due_at) from ${tasks} t where t.contact_id = ${CONTACT_ID} and t.status = 'abierta' order by t.due_at limit 1)`,
@@ -200,8 +210,8 @@ export async function getContactDetail(tx: Tx, userId: string, agencyId: string,
   const [contact] = await tx.select().from(contacts).where(and(eq(contacts.id, contactId), eq(contacts.agencyId, agencyId)));
   if (!contact) throw new AppError("not_found");
   const [phones, emails, consents, opps, openTasks, history] = await Promise.all([
-    tx.select().from(contactPhones).where(eq(contactPhones.contactId, contactId)).orderBy(desc(contactPhones.isPreferred), contactPhones.createdAt),
-    tx.select().from(contactEmails).where(eq(contactEmails.contactId, contactId)).orderBy(desc(contactEmails.isPreferred), contactEmails.createdAt),
+    tx.select().from(contactPhones).where(eq(contactPhones.contactId, contactId)).orderBy(contactPhones.unverified, desc(contactPhones.isPreferred), contactPhones.createdAt),
+    tx.select().from(contactEmails).where(eq(contactEmails.contactId, contactId)).orderBy(contactEmails.unverified, desc(contactEmails.isPreferred), contactEmails.createdAt),
     currentConsents(tx, contactId),
     tx
       .select({ id: opportunities.id, destination: opportunities.destination, stageId: opportunities.stageId, stageName: pipelineStages.name, stageKind: pipelineStages.kind, ownerId: opportunities.ownerId, updatedAt: opportunities.updatedAt })
@@ -259,16 +269,9 @@ export async function openWhatsapp(
   const message = input.message.trim();
   requireIds(contactId, input.opportunityId);
   if (!message || message.length > 2000) throw new AppError("invalid_input");
-  const [phone] = await tx
-    .select({ e164: contactPhones.e164 })
-    .from(contactPhones)
-    .where(and(eq(contactPhones.contactId, contactId), eq(contactPhones.agencyId, agencyId)))
-    .orderBy(desc(contactPhones.isPreferred), contactPhones.createdAt)
-    .limit(1);
-  if (!phone) {
-    const [c] = await tx.select({ id: contacts.id }).from(contacts).where(and(eq(contacts.id, contactId), eq(contacts.agencyId, agencyId)));
-    throw new AppError(c ? "no_phone" : "not_found");
-  }
+  const [c] = await tx.select({ id: contacts.id }).from(contacts).where(and(eq(contacts.id, contactId), eq(contacts.agencyId, agencyId)));
+  if (!c) throw new AppError("not_found");
+  const phone = { e164: await sendablePhone(tx, agencyId, contactId) };
   if (!whatsappAllowed(await currentConsents(tx, contactId))) throw new AppError("whatsapp_blocked");
   if (input.opportunityId) {
     const [o] = await tx.select({ id: opportunities.id }).from(opportunities).where(and(eq(opportunities.id, input.opportunityId), eq(opportunities.contactId, contactId), eq(opportunities.agencyId, agencyId)));
@@ -285,3 +288,54 @@ export async function logActivity(
 ): Promise<void> {
   await tx.insert(activities).values({ agencyId: a.agencyId, contactId: a.contactId, opportunityId: a.opportunityId ?? null, actorId: a.actorId, kind: a.kind, data: a.data ?? {} });
 }
+
+/**
+ * Teléfono para escribirle al contacto: el preferido entre los verificados. Uno que llegó por el
+ * formulario a un contacto existente no se usa hasta confirmarlo (D-14).
+ */
+export async function sendablePhone(tx: Tx, agencyId: string, contactId: string): Promise<string> {
+  const rows = await tx
+    .select({ e164: contactPhones.e164, unverified: contactPhones.unverified })
+    .from(contactPhones)
+    .where(and(eq(contactPhones.contactId, contactId), eq(contactPhones.agencyId, agencyId)))
+    .orderBy(contactPhones.unverified, desc(contactPhones.isPreferred), contactPhones.createdAt);
+  if (rows.length === 0) throw new AppError("no_phone");
+  if (rows[0].unverified) throw new AppError("phone_unverified");
+  return rows[0].e164;
+}
+
+/** Correo para escribirle al contacto, con la misma regla que el teléfono. */
+export async function sendableEmail(tx: Tx, agencyId: string, contactId: string): Promise<string> {
+  const rows = await tx
+    .select({ email: contactEmails.email, unverified: contactEmails.unverified })
+    .from(contactEmails)
+    .where(and(eq(contactEmails.contactId, contactId), eq(contactEmails.agencyId, agencyId)))
+    .orderBy(contactEmails.unverified, desc(contactEmails.isPreferred), contactEmails.createdAt);
+  if (rows.length === 0) throw new AppError("no_email");
+  if (rows[0].unverified) throw new AppError("email_unverified");
+  return rows[0].email;
+}
+
+/** Un asesor confirma un teléfono o correo sin verificar (D-14). Queda en el historial. */
+export async function verifyContactPoint(tx: Tx, userId: string, agencyId: string, input: { kind: "telefono" | "correo"; id: string }): Promise<string> {
+  await requirePermission(tx, userId, agencyId, "crm.write");
+  requireIds(input.id);
+  const table = input.kind === "telefono" ? contactPhones : input.kind === "correo" ? contactEmails : null;
+  if (!table) throw new AppError("invalid_input");
+  const [row] = await tx
+    .update(table)
+    .set({ unverified: false })
+    .where(and(eq(table.id, input.id), eq(table.agencyId, agencyId), eq(table.unverified, true)))
+    .returning({ contactId: table.contactId });
+  if (!row) {
+    const [exists] = await tx.select({ contactId: table.contactId }).from(table).where(and(eq(table.id, input.id), eq(table.agencyId, agencyId)));
+    if (!exists) throw new AppError("not_found");
+    return exists.contactId;
+  }
+  // Si el contacto no tenía otro preferido de ese tipo, este pasa a serlo.
+  const [preferred] = await tx.select({ id: table.id }).from(table).where(and(eq(table.contactId, row.contactId), eq(table.isPreferred, true)));
+  if (!preferred) await tx.update(table).set({ isPreferred: true }).where(eq(table.id, input.id));
+  await logActivity(tx, { agencyId, contactId: row.contactId, actorId: userId, kind: "contacto.verificado", data: { dato: input.kind } });
+  return row.contactId;
+}
+

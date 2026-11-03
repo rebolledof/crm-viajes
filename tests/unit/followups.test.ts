@@ -49,4 +49,12 @@ describe("plantillas de seguimiento (SPEC-002b)", () => {
     expect(channelBlock("whatsapp", { ...ok, emailAllowed: false })).toBeNull();
     expect(channelBlock("whatsapp", undefined)).toBeNull();
   });
+
+  it("D-14: si solo hay un dato sin verificar, dice que hay que confirmarlo en la ficha", () => {
+    const ok = { phone: true, whatsappAllowed: true, email: true, emailAllowed: true };
+    expect(channelBlock("correo", { ...ok, email: false, emailUnverified: true })).toMatch(/sin verificar.*Confírmalo en la ficha/);
+    expect(channelBlock("whatsapp", { ...ok, phone: false, phoneUnverified: true })).toMatch(/sin verificar/);
+    // Si además hay uno verificado, se usa ese y no se bloquea.
+    expect(channelBlock("correo", { ...ok, emailUnverified: true })).toBeNull();
+  });
 });

@@ -12,7 +12,7 @@ import { whatsappAllowed } from "@/domain/whatsapp";
 import { getContactDetail, whatsappDraft } from "@/server/contacts";
 import { requireActiveAgency } from "@/server/session";
 import { activeMembers, contactChannels } from "@/server/tasks";
-import { recordConsentAction } from "../../crm-actions";
+import { recordConsentAction, verifyContactPointAction } from "../../crm-actions";
 import { Flash, NewTaskForm, TaskItem, describeActivity, fechaHora, loadOr404, memberName, type SearchParams } from "../../crm-ui";
 import { WhatsappButton } from "../whatsapp-button";
 import { StagePath } from "../../stage-path";
@@ -169,10 +169,20 @@ export default async function ContactoPage({ params, searchParams }: { params: P
           <Card title="Datos" icon="note">
             <ul className="flex flex-col gap-1 text-sm text-slate-700">
               {detail.phones.map((p) => (
-                <li key={p.id} className="flex items-center gap-2"><Icon name="phone" className="size-3.5 text-slate-500" />{formatPhone(p.e164)}{p.isPreferred && " (preferido)"}</li>
+                <li key={p.id} className="flex flex-wrap items-center gap-2">
+                  <Icon name="phone" className="size-3.5 text-slate-500" />
+                  {formatPhone(p.e164)}
+                  {p.isPreferred && !p.unverified && " (preferido)"}
+                  {p.unverified && <Unverified contactId={c.id} kind="telefono" pointId={p.id} canWrite={canWrite} />}
+                </li>
               ))}
               {detail.emails.map((e) => (
-                <li key={e.id} className="flex items-center gap-2 break-all"><Icon name="mail" className="size-3.5 text-slate-500" />{e.email}{e.isPreferred && " (preferido)"}</li>
+                <li key={e.id} className="flex flex-wrap items-center gap-2 break-all">
+                  <Icon name="mail" className="size-3.5 text-slate-500" />
+                  {e.email}
+                  {e.isPreferred && !e.unverified && " (preferido)"}
+                  {e.unverified && <Unverified contactId={c.id} kind="correo" pointId={e.id} canWrite={canWrite} />}
+                </li>
               ))}
               {c.tags.length > 0 && <li className="flex flex-wrap gap-1 pt-1">{c.tags.map((t) => <Chip key={t}>{t}</Chip>)}</li>}
               {c.notes && <li className="whitespace-pre-line pt-1">{c.notes}</li>}
@@ -182,6 +192,8 @@ export default async function ContactoPage({ params, searchParams }: { params: P
           <Card title="WhatsApp" icon="message">
             {!preferredPhone ? (
               <Notice>Agrega un teléfono para poder escribirle.</Notice>
+            ) : preferredPhone.unverified ? (
+              <Notice>El teléfono llegó por el formulario web y está sin verificar. Confírmalo arriba, en Datos, para escribirle.</Notice>
             ) : !whatsappAllowed(detail.consents) ? (
               <Notice tone="error">El contacto retiró el permiso de WhatsApp para atención del viaje.</Notice>
             ) : canWrite ? (
@@ -246,3 +258,28 @@ export default async function ContactoPage({ params, searchParams }: { params: P
     </div>
   );
 }
+
+/**
+ * Dato sin verificar (D-14): llegó por el formulario web a un contacto que ya existía, así que
+ * pudo escribirlo otra persona. No se usa para escribirle hasta que un asesor lo confirma.
+ */
+function Unverified({ contactId, kind, pointId, canWrite }: { contactId: string; kind: "telefono" | "correo"; pointId: string; canWrite: boolean }) {
+  return (
+    <>
+      <Chip tone="amber" icon="alert">Sin verificar</Chip>
+      {canWrite && (
+        <details className="w-full">
+          <summary className="cursor-pointer text-sm font-medium text-brand-text">Confirmar este {kind === "telefono" ? "teléfono" : "correo"}</summary>
+          <form action={verifyContactPointAction} className="mt-1 flex flex-col gap-2 rounded border border-line bg-surface p-3">
+            <input type="hidden" name="contactId" value={contactId} />
+            <input type="hidden" name="kind" value={kind} />
+            <input type="hidden" name="pointId" value={pointId} />
+            <p className="text-sm text-slate-700">Llegó por el formulario web y pudo escribirlo otra persona. Confírmalo solo si el cliente te dijo que es suyo.</p>
+            <button className={`${buttonClass} self-start`}>Sí, es del cliente</button>
+          </form>
+        </details>
+      )}
+    </>
+  );
+}
+

@@ -4,6 +4,13 @@
 
 ### Añadido
 
+- SPEC-003 Bandeja unificada (parte 1): bandeja con filtros Sin responder, Mías, Sin asignar, Todas y Resueltas, búsqueda por nombre, teléfono o correo, y conversación con "Qué hacer ahora" (Responde → Oportunidad → Siguiente paso).
+- Formulario web público con la marca de la agencia (enlace o código para incrustar): crea o reutiliza el contacto, registra el consentimiento, crea la oportunidad con sus tareas de seguimiento y la conversación. Con campo trampa y límite de envíos.
+- Responsable por conversación: cola "Sin asignar" con botón "Tomar"; el administrador reasigna. Estados abierta, pendiente y resuelta automáticos.
+- Alerta de sin responder con el reloj en horario laboral (30 minutos por defecto, configurable): número rojo en el menú, franja para el administrador en Mi día y en la Bandeja, y primer paso "Responde los mensajes" en el plan del día.
+- Respuestas guardadas de la agencia y personales, con 5 de ejemplo; se insertan escribiendo "/" y reemplazan {nombre}, {asesor} y {agencia}.
+- Administración › Canales de entrada: activar o pausar el formulario, copiar su enlace o código, enlace al aviso de privacidad y tiempo máximo sin respuesta.
+- ADR 0002: entrada pública con el rol anon y funciones del esquema app.
 - Documentación base: constitución, resumen de producto, roadmap, glosario y AGENTS.md.
 - SPEC-000 MVP piloto con los problemas que nombró la agencia piloto; ADR 0001 del stack aceptado.
 - Proyecto Next.js 16.3 con TypeScript estricto, Tailwind y Supabase Auth.
@@ -59,6 +66,10 @@
 - Al cambiar el menú o el tema se vuelve a la misma pantalla sin repetir el aviso anterior.
 - Una tarea de llamada sin teléfono en el contacto lo dice y explica cómo corregirlo.
 - Un logo de más de 512 KB o un archivo que no es imagen aunque se llame .png ya no muestra "No pudimos cargar esta pantalla": se revisa antes de enviarlo, se avisa sobre el campo del logo y los colores escritos se conservan (hallazgo F-02 de QA, AC-242).
+- Prueba independiente de SPEC-003 parte 1 (Sonnet): el enlace mailto codifica el destinatario y el formulario solo acepta correos sin "?" ni "&"; un formulario no vuelve a otorgar un permiso retirado; no se asigna una conversación a alguien de solo lectura; "Resolver" pide confirmación; la casilla del formulario en Canales conserva lo marcado si el guardado falla; el campo trampa ya no lo llena el autocompletado; una conversación resuelta avisa que responder la deja en Pendiente.
+- Datos sin verificar (D-14): un teléfono o correo que llega por el formulario web a un contacto existente queda marcado "Sin verificar" en la ficha y no se usa para responder ni en las tareas hasta que un asesor lo confirma con "Sí, es del cliente". Migración `20261106000000_datos_sin_verificar.sql`. Tras la prueba independiente: un dato sin verificar no queda como preferido al guardar la ficha ni aparece en el listado de contactos; al confirmarlo pasa a preferido si no había otro; la oportunidad y las tareas de llamada explican que falta confirmarlo.
+- Informe de pruebas del 3 nov 2026: el límite de 5 envíos del formulario cuenta los últimos 10 minutos (antes, bloques fijos del reloj dejaban pasar el sexto envío); un código de formulario que no existe muestra "No encontramos este formulario" en español, y cualquier otra página inexistente, "No encontramos esta página". Pruebas automáticas del sexto envío y de agency_id en el cuerpo por la acción del servidor. Migración `20261107000000_limite_ventana_movil.sql`.
+- Prueba independiente de esos ajustes: la página "No encontramos este formulario" ahora la pinta el servidor; antes llegaba en blanco hasta que cargaba JavaScript y con el título del formulario.
 
 ### Corregido (prueba independiente de S02, 1 nov 2026)
 

@@ -372,8 +372,8 @@ describe("hallazgos de la prueba independiente", () => {
     const bare = await as(t.db, a.asesor, (tx) => createContact(tx, a.asesor.id, a.id, { fullName: "Sin datos", phones: [], emails: [] }));
     const channels = (u = a.asesor, ag = a.id) => as(t.db, u, (tx) => contactChannels(tx, u.id, ag, [full, bare, full]));
     let m = await channels();
-    expect(m.get(full)).toEqual({ phone: true, email: true, whatsappAllowed: true, emailAllowed: true });
-    expect(m.get(bare)).toEqual({ phone: false, email: false, whatsappAllowed: true, emailAllowed: true });
+    expect(m.get(full)).toEqual({ phone: true, email: true, whatsappAllowed: true, emailAllowed: true, phoneUnverified: false, emailUnverified: false });
+    expect(m.get(bare)).toEqual({ phone: false, email: false, whatsappAllowed: true, emailAllowed: true, phoneUnverified: false, emailUnverified: false });
     await as(t.db, a.asesor, (tx) => recordConsent(tx, a.asesor.id, a.id, full, { channel: "whatsapp", purpose: "servicio", status: "retirado", source: "Lo pidió por chat" }));
     m = await channels();
     expect(m.get(full)).toMatchObject({ whatsappAllowed: false, emailAllowed: true });
@@ -382,7 +382,7 @@ describe("hallazgos de la prueba independiente", () => {
     expect((await channels()).get(full)).toMatchObject({ whatsappAllowed: true });
     // Otra agencia no averigua nada de los contactos de A.
     const other = await channels(b.admin, b.id);
-    expect(other.get(full)).toEqual({ phone: false, email: false, whatsappAllowed: true, emailAllowed: true });
+    expect(other.get(full)).toEqual({ phone: false, email: false, whatsappAllowed: true, emailAllowed: true, phoneUnverified: false, emailUnverified: false });
   });
 
   it("un identificador malformado en plantillas, pasos o tareas responde 'no encontrado' (como en S02)", async () => {

@@ -79,7 +79,8 @@ export function fillMessage(template: string, values: { nombre: string; agencia:
 
 /** Enlace mailto con asunto y cuerpo; lo abre el programa de correo del asesor. */
 export function mailtoLink(email: string, subject: string, body: string): string {
-  return `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  // El destinatario va codificado: un "?" o "&" en el correo no puede agregar copias ni cambiar el texto.
+  return `mailto:${encodeURIComponent(email).replaceAll("%40", "@")}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 }
 
 /** Valida "HH:MM" de un <input type="time">. */
@@ -89,7 +90,15 @@ export function parseTime(value: string): string | null {
 }
 
 /** Qué tiene el contacto para que un botón de WhatsApp o correo funcione (informe de QA, 2 nov 2026). */
-export type ContactChannels = { phone: boolean; whatsappAllowed: boolean; email: boolean; emailAllowed: boolean };
+export type ContactChannels = {
+  phone: boolean;
+  whatsappAllowed: boolean;
+  email: boolean;
+  emailAllowed: boolean;
+  /** Tiene un teléfono o correo, pero solo sin verificar (D-14). */
+  phoneUnverified?: boolean;
+  emailUnverified?: boolean;
+};
 
 /**
  * Motivo por el que no se puede abrir el canal de la tarea, en palabras de la agencia, o null si se
@@ -99,10 +108,12 @@ export function channelBlock(kind: string, c: ContactChannels | undefined): stri
   if (!c) return null;
   if (kind === "whatsapp") {
     if (!c.whatsappAllowed) return "El cliente retiró el permiso para recibir WhatsApp. Usa otro canal y registra el resultado, o actualiza el permiso en su ficha si lo volvió a dar.";
+    if (!c.phone && c.phoneUnverified) return "El teléfono llegó por el formulario web y está sin verificar. Confírmalo en la ficha del contacto para escribirle.";
     if (!c.phone) return "El contacto no tiene teléfono. Agrégalo en su ficha para escribirle por WhatsApp.";
   }
   if (kind === "correo") {
     if (!c.emailAllowed) return "El cliente retiró el permiso para recibir correos. Usa otro canal y registra el resultado, o actualiza el permiso en su ficha si lo volvió a dar.";
+    if (!c.email && c.emailUnverified) return "El correo llegó por el formulario web y está sin verificar. Confírmalo en la ficha del contacto para escribirle.";
     if (!c.email) return "El contacto no tiene correo. Agrégalo en su ficha para escribirle.";
   }
   return null;

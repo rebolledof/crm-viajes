@@ -40,3 +40,15 @@ export function getDb(): Db {
   }
   return shared;
 }
+
+/**
+ * Ejecuta fn como visitante sin sesión (rol anon), para la entrada pública del formulario web
+ * (SPEC-003). Ese rol solo puede llamar a las funciones de entrada del esquema app; no lee tablas.
+ */
+export async function withAnon<T>(db: Db, fn: (tx: Tx) => Promise<T>): Promise<T> {
+  return db.transaction(async (tx) => {
+    await tx.execute(sql`select set_config('request.jwt.claims', '{"role":"anon"}', true)`);
+    await tx.execute(sql`set local role anon`);
+    return fn(tx);
+  });
+}

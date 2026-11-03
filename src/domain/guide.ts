@@ -4,7 +4,7 @@ import type { StageKind } from "./pipeline";
 import { dueState, type TaskKind } from "./tasks";
 
 export type PlanStepState = "hecho" | "actual" | "pendiente";
-export type PlanStep = { key: "vencidas" | "hoy" | "sin_paso" | "listo"; title: string; detail: string; count: number; state: PlanStepState };
+export type PlanStep = { key: "mensajes" | "vencidas" | "hoy" | "sin_paso" | "listo"; title: string; detail: string; count: number; state: PlanStepState };
 
 function plural(n: number, one: string, many: string): string {
   return `${n} ${n === 1 ? one : many}`;
@@ -14,8 +14,14 @@ function plural(n: number, one: string, many: string): string {
  * "Tu plan de hoy" (RF-245): primero lo vencido, luego lo de hoy, después dar siguiente paso a las
  * oportunidades sin plan. El paso actual es el primero con algo pendiente.
  */
-export function dayPlan(counts: { overdue: number; today: number; withoutNext: number }): PlanStep[] {
+export function dayPlan(counts: { overdue: number; today: number; withoutNext: number; unanswered?: number }): PlanStep[] {
+  // SPEC-003: con la bandeja, responder los mensajes sin respuesta va primero (alcance 12).
+  const messages: Omit<PlanStep, "state">[] =
+    counts.unanswered === undefined
+      ? []
+      : [{ key: "mensajes", title: "Responde los mensajes", detail: counts.unanswered ? `${plural(counts.unanswered, "sin responder", "sin responder")}` : "Nada sin responder", count: counts.unanswered }];
   const steps: Omit<PlanStep, "state">[] = [
+    ...messages,
     { key: "vencidas", title: "Atender vencidas", detail: counts.overdue ? `${plural(counts.overdue, "pendiente", "pendientes")}` : "Nada vencido", count: counts.overdue },
     { key: "hoy", title: "Tareas de hoy", detail: counts.today ? `${plural(counts.today, "pendiente", "pendientes")}` : "Nada para hoy", count: counts.today },
     { key: "sin_paso", title: "Dar siguiente paso", detail: counts.withoutNext ? `${plural(counts.withoutNext, "oportunidad sin plan", "oportunidades sin plan")}` : "Todas tienen plan", count: counts.withoutNext },

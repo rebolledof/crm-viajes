@@ -7,6 +7,7 @@ import { ROLE_LABELS, can } from "@/domain/permissions";
 import { NAV_LAYOUT_LABELS, THEME_LABELS, themeClass, type NavLayout, type Preferences, type Theme } from "@/domain/preferences";
 import { getBranding, getPreferences, type Branding } from "@/server/branding";
 import { getAppContext } from "@/server/session";
+import { inboxCounts } from "@/server/inbox";
 import { dueTodayCount } from "@/server/tasks";
 import { signOutAction } from "../(auth)/actions";
 import { switchAgencyAction } from "./actions";
@@ -21,11 +22,13 @@ import { DrawerLinks, Dropdown, SideLinks, TopTabs, type NavItem } from "./shell
 export default async function AppLayout({ children }: { children: ReactNode }) {
   const { user, memberships, active } = await getAppContext();
   const db = getDb();
-  const [prefs, branding, due] = await withUser(db, user, async (tx) =>
+  const [prefs, branding, due, inbox] = await withUser(db, user, async (tx) =>
     Promise.all([
       getPreferences(tx, user.id),
       active ? getBranding(tx, user.id, active.agencyId) : Promise.resolve<Branding>({ primary: DEFAULT_PRIMARY, accent: DEFAULT_ACCENT, hasLogo: false, version: 0 }),
       active ? dueTodayCount(tx, user.id, active.agencyId, new Date()) : Promise.resolve(0),
+      // SPEC-003: número rojo con las conversaciones sin responder que me tocan (mías o sin asignar).
+      active ? inboxCounts(tx, user.id, active.agencyId, new Date()).then((c) => c.unansweredMine) : Promise.resolve(0),
     ]),
   );
   const vars = brandCssVars(branding);
@@ -35,6 +38,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   const main: NavItem[] = active
     ? [
         { href: "/app", label: "Mi día", icon: "home", badge: due || undefined },
+        { href: "/app/bandeja", label: "Bandeja", icon: "inbox", badge: inbox || undefined, badgeTone: "alert", badgeLabel: "sin responder" },
         { href: "/app/contactos", label: "Contactos", icon: "users" },
         { href: "/app/oportunidades", label: "Oportunidades", icon: "kanban" },
         { href: "/app/tareas", label: "Tareas", icon: "check" },
@@ -46,6 +50,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
         ...(can(active.role, "pipeline.manage") ? [{ href: "/app/embudo", label: "Etapas del embudo", icon: "sliders" } as NavItem] : []),
         ...(can(active.role, "team.manage") ? [{ href: "/app/equipo", label: "Equipo", icon: "users" } as NavItem] : []),
         ...(can(active.role, "audit.read") ? [{ href: "/app/auditoria", label: "Auditoría", icon: "shield" } as NavItem] : []),
+        ...(can(active.role, "inbox.manage") ? [{ href: "/app/configuracion/canales", label: "Canales de entrada", icon: "form" } as NavItem] : []),
         ...(can(active.role, "agency.update") ? [{ href: "/app/configuracion/marca", label: "Marca de la agencia", icon: "palette" } as NavItem] : []),
       ]
     : [];

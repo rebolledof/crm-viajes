@@ -99,6 +99,8 @@ export const contactPhones = pgTable("contact_phones", {
   e164: text("e164").notNull(),
   label: text("label"),
   isPreferred: boolean("is_preferred").notNull().default(false),
+  // D-14: llegó por el formulario a un contacto que ya existía; no se usa hasta que un asesor lo confirma.
+  unverified: boolean("unverified").notNull().default(false),
   createdAt: createdAt(),
 });
 
@@ -108,6 +110,8 @@ export const contactEmails = pgTable("contact_emails", {
   contactId: uuid("contact_id").notNull(),
   email: text("email").notNull(),
   isPreferred: boolean("is_preferred").notNull().default(false),
+  // D-14: llegó por el formulario a un contacto que ya existía; no se usa hasta que un asesor lo confirma.
+  unverified: boolean("unverified").notNull().default(false),
   createdAt: createdAt(),
 });
 
@@ -181,6 +185,8 @@ export const agencySettings = pgTable("agency_settings", {
   saturdayStart: time("saturday_start"),
   saturdayEnd: time("saturday_end"),
   allowPersonalTemplates: boolean("allow_personal_templates").notNull().default(false),
+  maxUnansweredMinutes: integer("max_unanswered_minutes").notNull().default(30),
+  privacyUrl: text("privacy_url"),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -247,7 +253,67 @@ export const userPreferences = pgTable("user_preferences", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+// SPEC-003 · Bandeja unificada.
+export const inboundKind = pgEnum("inbound_kind", ["formulario", "chat", "correo"]);
+export const conversationStatus = pgEnum("conversation_status", ["abierta", "pendiente", "resuelta"]);
+export const messageDirection = pgEnum("message_direction", ["entrante", "saliente"]);
+export const messageVia = pgEnum("message_via", ["formulario", "chat", "correo", "whatsapp"]);
+
+export const inboundChannels = pgTable("inbound_channels", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  agencyId: uuid("agency_id").notNull(),
+  kind: inboundKind("kind").notNull(),
+  publicKey: text("public_key").notNull(),
+  active: boolean("active").notNull().default(true),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const conversations = pgTable("conversations", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  agencyId: uuid("agency_id").notNull(),
+  contactId: uuid("contact_id").notNull(),
+  opportunityId: uuid("opportunity_id"),
+  channel: inboundKind("channel").notNull(),
+  assigneeId: uuid("assignee_id"),
+  status: conversationStatus("status").notNull().default("abierta"),
+  subject: text("subject"),
+  lastInboundAt: timestamp("last_inbound_at", { withTimezone: true }),
+  lastOutboundAt: timestamp("last_outbound_at", { withTimezone: true }),
+  replyDueAt: timestamp("reply_due_at", { withTimezone: true }),
+  resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const messages = pgTable("messages", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  agencyId: uuid("agency_id").notNull(),
+  conversationId: uuid("conversation_id").notNull(),
+  direction: messageDirection("direction").notNull(),
+  via: messageVia("via").notNull(),
+  body: text("body").notNull(),
+  authorId: uuid("author_id"),
+  externalId: text("external_id"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const savedReplies = pgTable("saved_replies", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  agencyId: uuid("agency_id").notNull(),
+  ownerId: uuid("owner_id"),
+  title: text("title").notNull(),
+  shortcut: text("shortcut").notNull(),
+  body: text("body").notNull(),
+  createdBy: uuid("created_by").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const schemaTables = {
+  inbound_channels: inboundChannels,
+  conversations,
+  messages,
+  saved_replies: savedReplies,
   agencies,
   memberships,
   invitations,
