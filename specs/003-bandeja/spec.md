@@ -105,7 +105,8 @@ Cada parte va en su PR, con prueba independiente con otro modelo antes del merge
 - Mientras nadie toma una conversación del formulario, las tareas automáticas de su oportunidad quedan con el administrador activo más antiguo (la base necesita un responsable para cada tarea); al tomarla, pasan a quien la tomó. Decisión del 2 nov 2026 al implementar (ADR 0002).
 - En la parte 1 el formulario se responde por WhatsApp o por correo desde la app del asesor (el CRM registra la respuesta y abre la app con el texto). La salida directa por correo llega con la parte 3.
 - Al responder una conversación sin responsable, quien responde la toma.
-- Límite de envíos públicos: 5 cada 10 minutos por dirección y formulario, y 200 cada 10 minutos por agencia. La dirección no se guarda: solo su huella.
+- Límite de envíos públicos: 5 en los últimos 10 minutos por dirección y formulario, y 200 en los últimos 10 minutos por agencia (ventana móvil desde el 3 nov 2026; antes eran bloques fijos del reloj y un sexto envío que cruzaba el cambio de bloque pasaba). La dirección no se guarda: solo su huella.
+- Un código de formulario que no existe muestra "No encontramos este formulario" en español, sin la marca de ninguna agencia.
 - Cambiar el tiempo máximo aplica a los mensajes que lleguen desde ese momento.
 - D-14 (Felipe, 2 nov 2026): el teléfono o correo que llega por el formulario a un contacto que ya existía queda "sin verificar" hasta que un asesor lo confirma, porque lo pudo escribir otra persona.
 - D-15 (Felipe, 2 nov 2026): cualquier asesor puede resolver una conversación, también la de otro; se reabre sola si el cliente vuelve a escribir.

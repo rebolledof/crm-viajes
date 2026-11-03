@@ -15,7 +15,9 @@
 
 ## Comandos verificados
 
-2 nov 2026 en la rama de S03 parte 1, tras corregir la prueba independiente (Sonnet) y aplicar D-14 (con su prueba independiente): lint, typecheck, 96 unitarias, 120 de integración y build sin errores. axe-core sin fallas en bandeja, canales, respuestas y formulario; recorrido a 375 px con capturas en `diseno/implementado/bandeja/`.
+2 nov 2026 en la rama de S03 parte 1, tras corregir la prueba independiente (Sonnet) y aplicar D-14 (con su prueba independiente): lint, typecheck, 96 unitarias, 120 de integración.
+
+3 nov 2026, tras el informe de pruebas de S03 parte 1: lint, typecheck, 96 unitarias, 124 de integración y build sin errores. Recorrido a 390 px (Mi día, bandeja lista y conversación, Canales, respuestas, ficha, formulario y formulario no encontrado) sin desbordes; seis envíos seguidos desde el navegador: el sexto se rechaza y conserva lo escrito y build sin errores. axe-core sin fallas en bandeja, canales, respuestas y formulario; recorrido a 375 px con capturas en `diseno/implementado/bandeja/`.
 
 2 nov 2026 en la rama del diseño, tras corregir la prueba independiente (Sonnet): lint, typecheck, 78 unitarias, 98 de integración y build sin errores. axe-core sin fallas de contraste en las pantallas clave (claro y oscuro, dos marcas) y ninguna pantalla desborda a 390 px.
 
@@ -28,6 +30,8 @@
 18 oct 2026 en `s01-base`: `npm run lint`, `npm run typecheck`, `npm test`, `npm run test:integration`, `npm run build`: todos sin errores. `next start` sirve /login (200) y redirige /app a /login sin sesión.
 
 ## Verificado manualmente
+
+- 2 y 3 nov 2026, QA en la vista previa del PR #5 (informe final de S03 parte 1): cumplen AC-261, 263 a 273, 275, 276, D-15, formulario pausado, tema oscuro y regresión de S02/S02b. Fallaron AC-274 (el sexto envío pasaba) y AC-262 (404 en inglés); ambos corregidos el 3 nov con prueba. La inyección de agency_id en el cuerpo y la vista a 390 px, que QA no pudo probar, quedaron cubiertas con prueba automática y recorrido local.
 
 - 1 y 2 nov 2026, QA con IA en la vista previa del PR #3: S02 y S02b cumplen salvo F-01 (faltaba la lista con búsqueda de oportunidades) y tres mejoras de usabilidad; las cuatro se corrigieron el 2 nov (T-060). No se probaron en el navegador AC-201, AC-202 ni el ingreso de un usuario inactivo (están cubiertos por pruebas de integración). QA dejó activadas las plantillas propias de asesores en su agencia de prueba.
 - 19 oct 2026, Felipe en la vista previa de Vercel contra `crm-viajes-pruebas`: registro, confirmación de correo, creación de agencia y aceptación de invitación.

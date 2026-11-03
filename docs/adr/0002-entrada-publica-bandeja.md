@@ -12,7 +12,7 @@ El formulario web lo envía un visitante sin sesión. AGENTS.md exige que la age
 2. Esas funciones viven en `app`, que la API REST de Supabase no expone; así nadie puede llamarlas con la clave anónima saltándose el servidor (campo trampa, validación y huella de la dirección).
 3. La agencia sale del código público del canal (aleatorio, 32 caracteres), nunca de un campo del visitante. Un canal pausado rechaza.
 4. Lo que crea un visitante figura como creado por el administrador activo más antiguo de la agencia, que recibe las tareas automáticas hasta que alguien toma la conversación. El historial dice que llegó por el formulario.
-5. Límite de envíos en la base (`app.inbound_rate`): 5 cada 10 minutos por huella de dirección y formulario; 200 por agencia.
+5. Límite de envíos en la base: 5 en los últimos 10 minutos por huella de dirección y formulario; 200 por agencia. Desde el 3 nov 2026 es una ventana móvil (`app.inbound_hits`, un registro por envío aceptado, con bloqueo por clave para envíos simultáneos); los bloques fijos de `app.inbound_rate` dejaban pasar un sexto envío al cruzar el cambio de bloque.
 
 ## Consecuencias
 

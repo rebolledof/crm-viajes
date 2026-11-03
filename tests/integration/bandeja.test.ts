@@ -138,6 +138,18 @@ describe("formulario web (RF-260, RF-261, RF-271, AC-261, AC-273)", () => {
     await submit(a, form(), "9.9.9.10");
   });
 
+  it("AC-274 (informe del 3 nov): el límite cuenta los últimos 10 minutos aunque los envíos crucen el cambio de bloque", async () => {
+    const a = await newAgency("Bandeja ventana");
+    for (let i = 0; i < 5; i++) await submit(a, form(), "9.9.8.1");
+    const [ch] = await t.db.select().from(inboundChannels).where(eq(inboundChannels.publicKey, a.key));
+    // Como si los 5 envíos hubieran sido hace 7 minutos, en el bloque anterior del reloj.
+    await t.admin`update app.inbound_hits set hit_at = hit_at - interval '7 minutes' where key like ${"ip:" + ch.id + ":%"}`;
+    await expectCode(submit(a, form(), "9.9.8.1"), "rate_limited");
+    // Pasados 10 minutos desde esos envíos, vuelve a recibir.
+    await t.admin`update app.inbound_hits set hit_at = hit_at - interval '4 minutes' where key like ${"ip:" + ch.id + ":%"}`;
+    await submit(a, form(), "9.9.8.1");
+  });
+
   it("el rol anon no lee tablas ni llama funciones internas", async () => {
     const a = await newAgency("Bandeja anon");
     await expectDb(withAnon(t.db, (tx) => tx.select().from(conversations)), "42501");
