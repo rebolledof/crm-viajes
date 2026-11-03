@@ -46,7 +46,7 @@ ${chatSnippet(`${origin}/c/${s.chat.publicKey}/burbuja.js`)}
           <Link href="/app/configuracion/canales" className="font-medium underline">Canales de entrada</Link>.
         </Notice>
       )}
-      <iframe srcDoc={doc} title="Web de ejemplo con el chat" className="h-[640px] w-full rounded border border-line bg-white" />
+      <iframe srcDoc={doc} title="Web de ejemplo con el chat" className="h-[75dvh] max-h-[680px] min-h-[460px] w-full rounded border border-line bg-white" />
     </div>
   );
 }

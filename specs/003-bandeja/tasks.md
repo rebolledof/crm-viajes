@@ -11,5 +11,7 @@
 - [x] T-072 Corregir el informe de pruebas del 3 nov 2026: límite de envíos con ventana móvil (AC-274, migración `20261107000000_limite_ventana_movil.sql`), página de formulario no encontrado en español (AC-262), prueba automática del sexto envío y de agency_id en el cuerpo, revisión a 390 px
 - [x] T-073 Prueba independiente de T-072 con otro modelo (3 nov 2026): sin hallazgos altos ni medios; la página de formulario no encontrado ahora la pinta el servidor (se veía en blanco sin JavaScript)
 - [ ] T-032 Felipe prueba la bandeja con mensajes de prueba en la vista previa (migración aplicada en `crm-viajes-pruebas` el 2 nov 2026 con su permiso)
-- [ ] T-027b Chat web (parte 2)
+- [x] T-027b Chat web (parte 2): spec `spec-parte-2-chat.md` (D-16, D-17), migración `20261108000000_chat_web.sql`, ventana `/c/<código>`, burbuja, página de prueba, responder por chat, crear o vincular oportunidad y "¿Era una consulta de viaje?" (AC-272, AC-277 a AC-288)
+- [ ] T-074 Prueba independiente de la parte 2 con otro modelo antes del merge
+- [ ] T-075 Aplicar `20261108000000_chat_web.sql` en `crm-viajes-pruebas` con permiso de Felipe y probar en la vista previa
 - [ ] T-028 Correo entrante y respuesta por correo (parte 3, cuando se decida el servicio de correo)

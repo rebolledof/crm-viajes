@@ -349,7 +349,7 @@ function Conversation({
           <form action={assignConversationAction} className="flex flex-wrap items-center gap-2 border-b border-slate-100 bg-slate-50 px-4 py-2 text-sm">
             {hidden}
             <label htmlFor={`asignar-${c.id}`} className="text-slate-700">Asignar a</label>
-            <select id={`asignar-${c.id}`} name="assigneeId" defaultValue={c.assigneeId ?? ""} className="rounded border border-slate-300 bg-surface px-2 py-1 text-slate-900">
+            <select key={c.assigneeId ?? "cola"} id={`asignar-${c.id}`} name="assigneeId" defaultValue={c.assigneeId ?? ""} className="rounded border border-slate-300 bg-surface px-2 py-1 text-slate-900">
               <option value="">Sin asignar (cola)</option>
               {members.filter((m) => m.role !== "lectura").map((m) => (
                 <option key={m.userId} value={m.userId}>{m.email}</option>

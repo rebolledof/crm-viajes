@@ -4,6 +4,7 @@
 
 ### Añadido
 
+- SPEC-003 parte 2, chat web: burbuja para la web de la agencia (una línea de código), ventana con la marca de la agencia, primer mensaje con nombre, teléfono o correo y aviso de privacidad, respuestas del asesor en la misma ventana sin recargar, historial al volver en el mismo navegador (30 días), aviso de fuera de horario y chat pausado. En la bandeja: "Enviar por chat", "Crear oportunidad", "Vincular a una oportunidad" y "¿Era una consulta de viaje?" al resolver sin oportunidad. Canales: encender el chat, copiar su código y página de prueba solo para el administrador (D-17). Los datos nuevos de un contacto existente llegan sin verificar (D-16). Migración `20261108000000_chat_web.sql`.
 - SPEC-003 Bandeja unificada (parte 1): bandeja con filtros Sin responder, Mías, Sin asignar, Todas y Resueltas, búsqueda por nombre, teléfono o correo, y conversación con "Qué hacer ahora" (Responde → Oportunidad → Siguiente paso).
 - Formulario web público con la marca de la agencia (enlace o código para incrustar): crea o reutiliza el contacto, registra el consentimiento, crea la oportunidad con sus tareas de seguimiento y la conversación. Con campo trampa y límite de envíos.
 - Responsable por conversación: cola "Sin asignar" con botón "Tomar"; el administrador reasigna. Estados abierta, pendiente y resuelta automáticos.

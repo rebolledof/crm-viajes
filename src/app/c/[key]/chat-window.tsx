@@ -259,7 +259,8 @@ function Conversation({
             </p>
           </li>
         ))}
-        {notice && (
+        {/* El aviso de "recibimos tu mensaje" sobra cuando ya respondió un asesor. */}
+        {notice && !messages.some((m) => m.direction === "saliente") && (
           <li className="self-center rounded-full bg-slate-100 px-3 py-1 text-center text-xs text-slate-700" role="status">
             {notice}
           </li>
