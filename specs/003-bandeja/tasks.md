@@ -13,5 +13,5 @@
 - [ ] T-032 Felipe prueba la bandeja con mensajes de prueba en la vista previa (migración aplicada en `crm-viajes-pruebas` el 2 nov 2026 con su permiso)
 - [x] T-027b Chat web (parte 2): spec `spec-parte-2-chat.md` (D-16, D-17), migración `20261108000000_chat_web.sql`, ventana `/c/<código>`, burbuja, página de prueba, responder por chat, crear o vincular oportunidad y "¿Era una consulta de viaje?" (AC-272, AC-277 a AC-288)
 - [x] T-076 Prueba independiente de la parte 2 con otro modelo antes del merge (3 nov 2026: sin altos; corregidos con prueba la consulta con la burbuja cerrada, el texto perdido al vencer la llave, las pruebas de las acciones del chat y de la página de prueba, el horario de `chat_info`, el campo trampa, la dirección del código escapada, `Vary: Host`, Escape desde la web y Enter al componer; el resto anotado en el PR #6)
-- [ ] T-077 Aplicar `20261108000000_chat_web.sql` en `crm-viajes-pruebas` con permiso de Felipe y probar en la vista previa
+- [ ] T-077 Aplicar `20261108000000_chat_web.sql` en `crm-viajes-pruebas` con permiso de Felipe y probar en la vista previa (aplicada por Felipe en el SQL Editor el 3 nov 2026; funciones verificadas iguales a las locales, chat apagado en las 3 agencias; falta la prueba de Felipe en la vista previa)
 - [ ] T-028 Correo entrante y respuesta por correo (parte 3, cuando se decida el servicio de correo)
