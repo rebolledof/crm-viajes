@@ -31,6 +31,26 @@ CRM SaaS para agencias de viajes (React, Next.js y TypeScript). El dueño del pr
 - Datos sintéticos en desarrollo; nunca claves, documentos personales ni datos reales en el repositorio.
 - No conectes cuentas reales, no envíes mensajes reales desde pruebas y no ejecutes migraciones destructivas sin autorización de Felipe.
 
+## Usabilidad (regla de Felipe, 31 oct 2026)
+
+Cada pantalla nueva o cambiada se revisa con esta lista antes de abrir el PR, y el PR dice cómo se revisó:
+
+- Un formulario rechazado conserva todo lo escrito (salvo contraseñas) y resalta el campo con el problema, con un mensaje que dice cómo corregirlo. Usa `ActionForm`, `Input`, `Select` y `Textarea` de `src/components/form.tsx`; el error de servidor lleva el campo (`fieldError`).
+- Los mensajes de error dicen qué pasó y qué hacer, en lenguaje de la agencia; nunca un "error" genérico si se conoce el motivo.
+- Lo obligatorio se marca y se valida también en el navegador cuando se puede (`required`, `type`, `min`, `max`).
+- La acción principal de cada pantalla se ve sin buscarla; las acciones que no se pueden deshacer piden confirmación.
+- Cada lista vacía explica qué hacer para llenarla.
+- La pantalla funciona en un celular (ancho de 375 px) y con teclado.
+- Después de guardar, la persona ve que se guardó y dónde quedó.
+
+## Prueba independiente y tablero (regla de Felipe, 1 nov 2026)
+
+Cuando un cambio se da por terminado y antes del merge:
+
+1. Otro agente, con un modelo distinto al que escribió el código, lo prueba sin haber participado en él. Lee la spec, ejecuta todos los comandos de la sección siguiente, revisa que cada criterio Dado-Cuando-Entonces tenga una prueba que lo cubra y aplica la lista de usabilidad. El PR dice qué modelo probó, qué encontró y qué se corrigió.
+2. Lo que encuentre se corrige (con prueba que lo reproduzca) o queda anotado en el PR con el motivo.
+3. Se actualiza el tablero del proyecto (Tablero CRM Viajes): estado de cada tarea del sprint y decisiones pendientes.
+
 ## Comandos
 
 `npm run lint`, `npm run typecheck`, `npm test` (unitarias), `npm run test:integration` (necesita PostgreSQL local, ver `docs/operations/instalacion.md`), `npm run build`. Todos deben pasar antes de abrir un PR.

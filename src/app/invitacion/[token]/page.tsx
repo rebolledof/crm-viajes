@@ -1,3 +1,4 @@
+import { firstParams } from "@/domain/params";
 import Link from "next/link";
 import { Notice, buttonClass, linkButtonClass } from "@/components/ui";
 import { ERROR_MESSAGES, isErrorCode } from "@/server/errors";
@@ -12,7 +13,7 @@ export default async function InvitacionPage({
   searchParams: Promise<Record<string, string | undefined>>;
 }) {
   const { token } = await params;
-  const sp = await searchParams;
+  const sp = firstParams(await searchParams);
   const user = await getSessionUser();
   const here = `/invitacion/${encodeURIComponent(token)}`;
   return (

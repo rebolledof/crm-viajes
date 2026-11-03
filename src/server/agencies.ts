@@ -11,7 +11,7 @@ import {
   normalizeEmail,
 } from "@/domain/invitations";
 import { can, type Permission, type Role } from "@/domain/permissions";
-import { AppError } from "./errors";
+import { AppError, pgError } from "./errors";
 
 export type MyMembership = { agencyId: string; agencyName: string; role: Role };
 
@@ -173,16 +173,6 @@ export async function listAudit(tx: Tx, userId: string, agencyId: string, limit 
     .limit(limit);
 }
 
-function pgError(err: unknown): { code?: string; message?: string } | undefined {
-  let e: unknown = err;
-  for (let i = 0; i < 3 && e; i++) {
-    if (typeof e === "object" && e && "code" in e && typeof (e as { code: unknown }).code === "string" && /^[0-9A-Z]{5}$/.test((e as { code: string }).code)) {
-      return e as { code?: string; message?: string };
-    }
-    e = (e as { cause?: unknown }).cause;
-  }
-  return undefined;
-}
 function pgCode(err: unknown) {
   return pgError(err)?.code;
 }

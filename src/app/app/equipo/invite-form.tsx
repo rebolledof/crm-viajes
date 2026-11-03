@@ -10,9 +10,9 @@ export function InviteForm() {
   const [copied, setCopied] = useState(false);
   return (
     <div className="flex flex-col gap-3">
-      <form action={action} className="flex flex-wrap items-end gap-3">
+      <form key={state.at ?? 0} action={action} className="flex flex-wrap items-end gap-3">
         <Field label="Correo">
-          <input id="invite-email" name="email" type="email" required className={inputClass} />
+          <input id="invite-email" name="email" type="email" required defaultValue={state.error ? state.email : ""} aria-invalid={state.error ? true : undefined} className={`${inputClass} ${state.error ? "border-red-500 bg-red-50" : ""}`} />
         </Field>
         <Field label="Rol">
           <select id="invite-role" name="role" defaultValue="asesor" className={inputClass}>

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import type { FormState } from "@/components/form";
 import { getDb, withUser } from "@/db/client";
 import { ROLES } from "@/domain/permissions";
 import {
@@ -36,15 +37,19 @@ function fail(path: string, code: ErrorCode): never {
   redirect(`${path}?error=${code}`);
 }
 
-export async function createAgencyAction(formData: FormData) {
+function failedName(formData: FormData, code: ErrorCode): FormState {
+  return { error: code === "invalid_input" ? "Escribe un nombre de 2 a 120 caracteres." : ERROR_MESSAGES[code], field: "name", values: { name: [formData.get("name")?.toString() ?? ""] }, at: Date.now() };
+}
+
+export async function createAgencyAction(_prev: FormState, formData: FormData): Promise<FormState> {
   const user = await requireUser();
   const name = z.string().trim().safeParse(formData.get("name"));
-  if (!name.success) fail("/app/agencia/nueva", "invalid_input");
+  if (!name.success) return failedName(formData, "invalid_input");
   let agencyId = "";
   const err = await attempt(async () => {
     agencyId = await withUser(getDb(), user, (tx) => createAgency(tx, name.data));
   });
-  if (err) fail("/app/agencia/nueva", err);
+  if (err) return failedName(formData, err);
   (await cookies()).set(ACTIVE_AGENCY_COOKIE, agencyId, COOKIE_OPTS);
   redirect("/app");
 }
@@ -57,30 +62,30 @@ export async function switchAgencyAction(formData: FormData) {
   redirect("/app");
 }
 
-export async function renameAgencyAction(formData: FormData) {
+export async function renameAgencyAction(_prev: FormState, formData: FormData): Promise<FormState> {
   const { user, active } = await requireActiveAgency();
   const name = formData.get("name")?.toString() ?? "";
   const err = await attempt(() => withUser(getDb(), user, (tx) => renameAgency(tx, user.id, active.agencyId, name)));
-  if (err) fail("/app", err);
+  if (err) return failedName(formData, err);
   revalidatePath("/app", "layout");
   redirect("/app?ok=agencia");
 }
 
 const inviteSchema = z.object({ email: z.email(), role: z.enum(ROLES) });
 
-export type InviteState = { link?: string; email?: string; error?: string };
+export type InviteState = { link?: string; email?: string; error?: string; at?: number };
 
 export async function inviteAction(_prev: InviteState, formData: FormData): Promise<InviteState> {
   const { user, active } = await requireActiveAgency();
   const parsed = inviteSchema.safeParse({ email: formData.get("email"), role: formData.get("role") });
-  if (!parsed.success) return { error: ERROR_MESSAGES.invalid_input };
+  if (!parsed.success) return { error: "Escribe un correo válido.", email: formData.get("email")?.toString() ?? "", at: Date.now() };
   let token = "";
   const err = await attempt(async () => {
     ({ token } = await withUser(getDb(), user, (tx) =>
       createInvitation(tx, { userId: user.id, agencyId: active.agencyId, email: parsed.data.email, role: parsed.data.role, now: new Date() }),
     ));
   });
-  if (err) return { error: ERROR_MESSAGES[err] };
+  if (err) return { error: ERROR_MESSAGES[err], email: formData.get("email")?.toString() ?? "", at: Date.now() };
   const h = await headers();
   const origin = process.env.NEXT_PUBLIC_SITE_URL ?? `${h.get("x-forwarded-proto") ?? "http"}://${h.get("host")}`;
   revalidatePath("/app/equipo");

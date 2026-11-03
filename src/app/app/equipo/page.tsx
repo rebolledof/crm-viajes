@@ -1,3 +1,4 @@
+import { firstParams } from "@/domain/params";
 import { redirect } from "next/navigation";
 import { Notice } from "@/components/ui";
 import { getDb, withUser } from "@/db/client";
@@ -15,7 +16,7 @@ const STATUS_LABEL = { pendiente: "Pendiente", aceptada: "Aceptada", revocada: "
 export default async function EquipoPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const { user, active } = await requireActiveAgency();
   if (!can(active.role, "team.manage")) redirect("/app");
-  const sp = await searchParams;
+  const sp = firstParams(await searchParams);
   const [members, invites] = await withUser(getDb(), user, (tx) =>
     Promise.all([listMembers(tx, active.agencyId), listInvitations(tx, active.agencyId)]),
   );

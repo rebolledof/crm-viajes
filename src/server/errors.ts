@@ -1,3 +1,5 @@
+import { isUuid } from "@/domain/params";
+
 /** Errores de negocio estables (briefing 15.3). El mensaje es para la persona usuaria. */
 export const ERROR_MESSAGES = {
   permission_denied: "No tienes permiso para hacer esto.",
@@ -6,17 +8,100 @@ export const ERROR_MESSAGES = {
   invitation_invalid: "La invitación no es válida: venció, ya se usó, fue revocada o es para otro correo.",
   slug_taken: "Ya existe una agencia con ese nombre. Prueba con otro.",
   not_authenticated: "Tu sesión terminó. Vuelve a iniciar sesión.",
+  duplicate_contact: "Ya existe un contacto con ese teléfono o correo en tu agencia.",
+  invalid_phone: "El teléfono no es válido. Escríbelo con indicativo si no es de Colombia.",
+  invalid_amount: "El presupuesto no es válido para esa moneda.",
+  lost_reason_required: "Para marcarla perdida elige un motivo.",
+  lost_note_required: "Con el motivo \"Otro\" escribe una nota.",
+  won_evidence_required: "Para marcarla ganada escribe la evidencia (por ejemplo, número de reserva).",
+  result_required: "Para completar la tarea escribe el resultado.",
+  not_active_member: "Esa persona no es miembro activo de la agencia.",
+  last_stage_of_kind: "Debe quedar al menos una etapa activa de cada tipo (abierta, ganada y perdida).",
+  stage_inactive: "Esa etapa está desactivada.",
+  stage_name_taken: "Ya existe una etapa con ese nombre.",
+  whatsapp_blocked: "El contacto retiró el permiso para escribirle por WhatsApp.",
+  no_phone: "El contacto no tiene teléfono.",
+  reopen_reason_required: "Para reabrir una oportunidad cerrada escribe el motivo.",
+  task_contact_mismatch: "Esa oportunidad es de otro contacto. Elige una del mismo contacto o ninguna.",
 } as const;
 
 export type ErrorCode = keyof typeof ERROR_MESSAGES;
 
 export class AppError extends Error {
-  constructor(public readonly code: ErrorCode) {
+  constructor(
+    public readonly code: ErrorCode,
+    /** Dato extra para la interfaz, por ejemplo el contacto que ya existe. */
+    public readonly detail?: string,
+    /** Campo del formulario que causó el error, por ejemplo "phone.1" (nombre e índice). */
+    public readonly field?: string,
+  ) {
     super(code);
     this.name = "AppError";
   }
 }
 
+/** Un identificador malformado (formulario alterado, URL editada) es "no encontrado", no un error interno. */
+export function requireIds(...ids: (string | null | undefined)[]): void {
+  for (const id of ids) if (id != null && !isUuid(id)) throw new AppError("not_found");
+}
+
+/** Error de validación ligado a un campo, para resaltarlo en el formulario. */
+export function fieldError(code: ErrorCode, field: string): AppError {
+  return new AppError(code, undefined, field);
+}
+
+/** Mensajes más precisos cuando se sabe qué campo falló. */
+const FIELD_MESSAGES: Record<string, string> = {
+  "invalid_input:fullName": "Escribe el nombre (máximo 160 caracteres).",
+  "invalid_input:email": "Ese correo no tiene un formato válido.",
+  "invalid_input:language": "El idioma va con 2 letras, por ejemplo es o en.",
+  "invalid_input:travelStart": "Revisa la fecha de ida.",
+  "invalid_input:travelEnd": "La fecha de regreso no puede ser anterior a la de ida.",
+  "invalid_input:travelers": "Los viajeros deben ser un número entre 1 y 999.",
+  "invalid_input:title": "Escribe qué hay que hacer (máximo 200 caracteres).",
+  "invalid_input:dueAt": "Elige la fecha y hora de vencimiento.",
+  "invalid_input:source": "Escribe cómo dio o retiró el permiso el contacto.",
+  "invalid_input:reason": "Escribe el motivo.",
+  "invalid_input:name": "Escribe un nombre de 1 a 60 caracteres.",
+};
+
+export function errorMessage(code: ErrorCode, field?: string): string {
+  const base = field?.split(".")[0];
+  return (base && FIELD_MESSAGES[`${code}:${base}`]) || ERROR_MESSAGES[code];
+}
+
+/** Campo al que pertenece cada error que siempre viene del mismo campo. */
+export const CODE_FIELDS: Partial<Record<ErrorCode, string>> = {
+  invalid_amount: "budgetAmount",
+  lost_reason_required: "lostReason",
+  lost_note_required: "lostNote",
+  won_evidence_required: "wonEvidence",
+  reopen_reason_required: "reason",
+  result_required: "result",
+  stage_name_taken: "name",
+  task_contact_mismatch: "opportunityId",
+};
+
 export function isErrorCode(value: unknown): value is ErrorCode {
   return typeof value === "string" && value in ERROR_MESSAGES;
+}
+
+/** Error de PostgreSQL dentro de los envoltorios de Drizzle. */
+export function pgError(err: unknown): { code?: string; message?: string; constraint_name?: string } | undefined {
+  let e: unknown = err;
+  for (let i = 0; i < 3 && e; i++) {
+    if (typeof e === "object" && e && "code" in e && typeof (e as { code: unknown }).code === "string" && /^[0-9A-Z]{5}$/.test((e as { code: string }).code)) {
+      return e as { code?: string; message?: string; constraint_name?: string };
+    }
+    e = (e as { cause?: unknown }).cause;
+  }
+  return undefined;
+}
+
+/** Las reglas de los triggers lanzan P0001 con un código de negocio como mensaje. */
+export function rethrowBusiness(err: unknown): never {
+  const pg = pgError(err);
+  if (pg?.code === "P0001" && isErrorCode(pg.message)) throw new AppError(pg.message);
+  if (pg?.code === "42501") throw new AppError("permission_denied");
+  throw err;
 }
