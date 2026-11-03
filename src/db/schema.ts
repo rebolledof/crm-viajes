@@ -99,6 +99,8 @@ export const contactPhones = pgTable("contact_phones", {
   e164: text("e164").notNull(),
   label: text("label"),
   isPreferred: boolean("is_preferred").notNull().default(false),
+  // D-14: llegó por el formulario a un contacto que ya existía; no se usa hasta que un asesor lo confirma.
+  unverified: boolean("unverified").notNull().default(false),
   createdAt: createdAt(),
 });
 
@@ -108,6 +110,8 @@ export const contactEmails = pgTable("contact_emails", {
   contactId: uuid("contact_id").notNull(),
   email: text("email").notNull(),
   isPreferred: boolean("is_preferred").notNull().default(false),
+  // D-14: llegó por el formulario a un contacto que ya existía; no se usa hasta que un asesor lo confirma.
+  unverified: boolean("unverified").notNull().default(false),
   createdAt: createdAt(),
 });
 

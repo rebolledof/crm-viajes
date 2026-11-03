@@ -75,6 +75,7 @@ WhatsApp, Instagram y Messenger por API (fase B, cuando Meta apruebe), bot o IA 
 - AC-273 (RF-271): Dado un formulario sin aceptar el aviso de privacidad, entonces no se envía y lo escrito no se borra; aceptado, el contacto queda con el consentimiento, el canal y la fecha.
 - AC-274 (alcance 14): Dado un formulario con el campo trampa lleno o 20 envíos en un minuto desde la misma dirección, entonces no se crean conversaciones nuevas.
 - AC-275 (alcance 12): Dadas 2 conversaciones sin responder de Ana, cuando abre Mi día, entonces el primer paso del plan es "Responde los mensajes (2)"; al responderlas, queda hecho.
+- AC-276 (D-14): Dado un contacto existente con teléfono, cuando llega un formulario con ese teléfono y un correo nuevo, entonces el correo queda "sin verificar", no es el preferido y no se usa para responder ni en tareas hasta que un asesor o administrador lo confirma en la ficha (Lectura no puede); guardar la ficha no lo confirma. Un contacto nuevo del formulario queda con sus datos verificados.
 
 ## Datos (borrador; se detalla en plan.md)
 
@@ -106,6 +107,8 @@ Cada parte va en su PR, con prueba independiente con otro modelo antes del merge
 - Al responder una conversación sin responsable, quien responde la toma.
 - Límite de envíos públicos: 5 cada 10 minutos por dirección y formulario, y 200 cada 10 minutos por agencia. La dirección no se guarda: solo su huella.
 - Cambiar el tiempo máximo aplica a los mensajes que lleguen desde ese momento.
+- D-14 (Felipe, 2 nov 2026): el teléfono o correo que llega por el formulario a un contacto que ya existía queda "sin verificar" hasta que un asesor lo confirma, porque lo pudo escribir otra persona.
+- D-15 (Felipe, 2 nov 2026): cualquier asesor puede resolver una conversación, también la de otro; se reabre sola si el cliente vuelve a escribir.
 - La pregunta "¿Era una consulta de viaje?" al resolver y el botón "Vincular a una oportunidad" llegan con el chat y el correo (partes 2 y 3): en la parte 1 toda conversación del formulario ya tiene oportunidad.
 
 ## Preguntas para Felipe

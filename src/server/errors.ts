@@ -22,6 +22,8 @@ export const ERROR_MESSAGES = {
   stage_name_taken: "Ya existe una etapa con ese nombre.",
   whatsapp_blocked: "El contacto retiró el permiso para escribirle por WhatsApp.",
   no_phone: "El contacto no tiene teléfono.",
+  phone_unverified: "El teléfono llegó por el formulario web y está sin verificar. Confírmalo en la ficha del contacto para usarlo.",
+  email_unverified: "El correo llegó por el formulario web y está sin verificar. Confírmalo en la ficha del contacto para usarlo.",
   reopen_reason_required: "Para reabrir una oportunidad cerrada escribe el motivo.",
   task_locked: "Esta tarea automática no permite ese cambio. Pídeselo a un administrador.",
   personal_templates_off: "El administrador no ha habilitado las plantillas personales.",

@@ -266,8 +266,8 @@ function Conversation({
     ...detail.events.filter((e) => e.kind !== "bandeja.respuesta" && e.kind !== "bandeja.recibido").map((e) => ({ type: "e" as const, at: e.createdAt, e })),
   ].sort((a, b) => a.at.getTime() - b.at.getTime());
   const channels = [
-    { via: "whatsapp" as const, label: "Enviar por WhatsApp", blocked: !detail.phone ? "El contacto no dejó teléfono." : !detail.whatsappAllowed ? "El contacto retiró el permiso de WhatsApp." : null },
-    { via: "correo" as const, label: "Enviar por correo", blocked: !detail.email ? "El contacto no dejó correo." : !detail.emailAllowed ? "El contacto retiró el permiso de correo." : null },
+    { via: "whatsapp" as const, label: "Enviar por WhatsApp", blocked: !detail.phone ? "El contacto no dejó teléfono." : detail.phoneUnverified ? "El teléfono llegó por el formulario y está sin verificar; confírmalo en la ficha del contacto." : !detail.whatsappAllowed ? "El contacto retiró el permiso de WhatsApp." : null },
+    { via: "correo" as const, label: "Enviar por correo", blocked: !detail.email ? "El contacto no dejó correo." : detail.emailUnverified ? "El correo llegó por el formulario y está sin verificar; confírmalo en la ficha del contacto." : !detail.emailAllowed ? "El contacto retiró el permiso de correo." : null },
   ];
   const hidden = (
     <>
@@ -288,8 +288,8 @@ function Conversation({
             <h2 className="truncate font-semibold text-slate-900">{detail.contactName}</h2>
             <p className="truncate text-xs text-slate-600">
               {CHANNEL_LABELS[c.channel]}
-              {detail.phone ? ` · ${formatPhone(detail.phone)}` : ""}
-              {detail.email ? ` · ${detail.email}` : ""}
+              {detail.phone ? ` · ${formatPhone(detail.phone)}${detail.phoneUnverified ? " (sin verificar)" : ""}` : ""}
+              {detail.email ? ` · ${detail.email}${detail.emailUnverified ? " (sin verificar)" : ""}` : ""}
             </p>
           </div>
           <div className="flex w-full flex-wrap items-center gap-2">

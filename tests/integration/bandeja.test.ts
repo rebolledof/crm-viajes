@@ -3,10 +3,10 @@
 import { and, eq, sql } from "drizzle-orm";
 import { afterAll, describe, expect, it } from "vitest";
 import { withAnon, type SessionUser } from "../../src/db/client";
-import { contactConsents, contactPhones, conversations, inboundChannels, messages, opportunities, savedReplies, tasks } from "../../src/db/schema";
+import { contactConsents, contactEmails, contactPhones, conversations, inboundChannels, messages, opportunities, savedReplies, tasks } from "../../src/db/schema";
 import type { WebFormData } from "../../src/domain/inbox";
 import { acceptInvitation, createAgency, createInvitation } from "../../src/server/agencies";
-import { createContact, recordConsent } from "../../src/server/contacts";
+import { createContact, getContactDetail, recordConsent, updateContact, verifyContactPoint } from "../../src/server/contacts";
 import { AppError, pgError } from "../../src/server/errors";
 import {
   assignConversation,
@@ -353,6 +353,42 @@ describe("prueba independiente (T-069)", () => {
     const a = await newAgency("Bandeja H8");
     const convId = await submit(a, form());
     await expectCode(as(t.db, a.admin, (tx) => assignConversation(tx, a.admin.id, a.id, convId, a.lectura.id)), "assignee_read_only");
+  });
+});
+
+describe("datos sin verificar (D-14, decisión de Felipe del 2 nov 2026)", () => {
+  it("un correo que llega por formulario a un contacto existente queda sin verificar y no se usa hasta confirmarlo", async () => {
+    const a = await newAgency("Bandeja D14");
+    const contactId = await as(t.db, a.ana, (tx) => createContact(tx, a.ana.id, a.id, { fullName: "Rosa", phones: [{ raw: "+57 300 444 5566" }], emails: [] }));
+    const convId = await submit(a, form({ phone: "+573004445566", email: "otra.persona@example.com" }));
+    const [email] = await t.db.select().from(contactEmails).where(eq(contactEmails.contactId, contactId));
+    expect(email).toMatchObject({ email: "otra.persona@example.com", unverified: true, isPreferred: false });
+    // El teléfono que ya tenía el contacto sigue verificado.
+    const [phone] = await t.db.select().from(contactPhones).where(eq(contactPhones.contactId, contactId));
+    expect(phone.unverified).toBe(false);
+    await expectCode(as(t.db, a.ana, (tx) => replyConversation(tx, a.ana.id, a.id, convId, { body: "Hola", via: "correo" })), "email_unverified");
+    // Editar el contacto no lo confirma sin querer.
+    await as(t.db, a.ana, (tx) => updateContact(tx, a.ana.id, a.id, contactId, { fullName: "Rosa María", phones: [{ raw: "+57 300 444 5566" }], emails: ["otra.persona@example.com"] }));
+    const d = await as(t.db, a.ana, (tx) => getContactDetail(tx, a.ana.id, a.id, contactId));
+    expect(d.emails[0].unverified).toBe(true);
+    // Guardar la ficha vuelve a escribir los datos, con id nuevo.
+    const emailId = d.emails[0].id;
+    // Lectura no confirma; otra agencia no lo encuentra.
+    const b = await newAgency("Bandeja D14 B");
+    await expectCode(as(t.db, a.lectura, (tx) => verifyContactPoint(tx, a.lectura.id, a.id, { kind: "correo", id: emailId })), "permission_denied");
+    await expectCode(as(t.db, b.admin, (tx) => verifyContactPoint(tx, b.admin.id, b.id, { kind: "correo", id: emailId })), "not_found");
+    await as(t.db, a.ana, (tx) => verifyContactPoint(tx, a.ana.id, a.id, { kind: "correo", id: emailId }));
+    const r = await as(t.db, a.ana, (tx) => replyConversation(tx, a.ana.id, a.id, convId, { body: "Hola", via: "correo" }));
+    expect(r.link.startsWith("mailto:otra.persona@example.com?")).toBe(true);
+  });
+
+  it("un contacto nuevo del formulario queda con sus datos verificados", async () => {
+    const a = await newAgency("Bandeja D14 nuevo");
+    const convId = await submit(a, form({ email: "nuevo@example.com" }));
+    const [conv] = await t.db.select().from(conversations).where(eq(conversations.id, convId));
+    const emails = await t.db.select().from(contactEmails).where(eq(contactEmails.contactId, conv.contactId));
+    const phones = await t.db.select().from(contactPhones).where(eq(contactPhones.contactId, conv.contactId));
+    expect([...emails, ...phones].every((x) => !x.unverified)).toBe(true);
   });
 });
 

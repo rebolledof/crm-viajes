@@ -52,6 +52,7 @@ const OK_MESSAGES: Record<string, string> = {
   clave: "Contraseña actualizada.",
   creado: "Contacto creado.",
   guardado: "Cambios guardados.",
+  verificado: "Dato confirmado. Ya se puede usar para escribirle al cliente.",
   consentimiento: "Consentimiento registrado.",
   creada: "Creada.",
   guardada: "Cambios guardados.",
@@ -513,6 +514,8 @@ export function describeActivity(kind: string, data: Record<string, unknown>, me
     case "contacto.responsable":
     case "oportunidad.responsable":
       return `Responsable cambiado a ${memberName(members, s("a") || null)}`;
+    case "contacto.verificado":
+      return `${s("dato") === "telefono" ? "Teléfono" : "Correo"} del formulario web confirmado`;
     case "consentimiento.cambiado":
       return `Consentimiento de ${s("channel")} para ${s("purpose")}: ${s("status")}${s("source") ? ` (${s("source")})` : ""}`;
     case "whatsapp.abierto":

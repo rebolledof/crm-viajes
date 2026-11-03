@@ -23,7 +23,7 @@ import { mailtoLink } from "@/domain/followups";
 import { MAX_MESSAGE, normalizeShortcut, type InboxFilter } from "@/domain/inbox";
 import { whatsappLink } from "@/domain/whatsapp";
 import { recordAudit, requirePermission } from "./agencies";
-import { currentConsents, logActivity } from "./contacts";
+import { currentConsents, logActivity, sendableEmail, sendablePhone } from "./contacts";
 import { AppError, fieldError, pgError, requireIds, rethrowBusiness } from "./errors";
 
 /** Condición "sin responder": abierta y con el plazo vencido (RF-265). */
@@ -143,8 +143,8 @@ export async function getConversation(tx: Tx, userId: string, agencyId: string, 
       .from(activities)
       .where(and(eq(activities.contactId, c.contactId), sql`${activities.data} ->> 'conversacion' = ${id}`, sql`${activities.kind} like 'bandeja.%'`))
       .orderBy(asc(activities.createdAt)),
-    tx.select({ e164: contactPhones.e164 }).from(contactPhones).where(eq(contactPhones.contactId, c.contactId)).orderBy(desc(contactPhones.isPreferred), asc(contactPhones.createdAt)),
-    tx.select({ email: contactEmails.email }).from(contactEmails).where(eq(contactEmails.contactId, c.contactId)).orderBy(desc(contactEmails.isPreferred), asc(contactEmails.createdAt)),
+    tx.select({ e164: contactPhones.e164, unverified: contactPhones.unverified }).from(contactPhones).where(eq(contactPhones.contactId, c.contactId)).orderBy(contactPhones.unverified, desc(contactPhones.isPreferred), asc(contactPhones.createdAt)),
+    tx.select({ email: contactEmails.email, unverified: contactEmails.unverified }).from(contactEmails).where(eq(contactEmails.contactId, c.contactId)).orderBy(contactEmails.unverified, desc(contactEmails.isPreferred), asc(contactEmails.createdAt)),
     currentConsents(tx, c.contactId),
     c.opportunityId
       ? tx
@@ -172,6 +172,9 @@ export async function getConversation(tx: Tx, userId: string, agencyId: string, 
     events,
     phone: phones[0]?.e164 ?? null,
     email: emails[0]?.email ?? null,
+    // Lo primero es lo verificado; si lo único que hay está sin verificar, se muestra marcado (D-14).
+    phoneUnverified: phones[0]?.unverified ?? false,
+    emailUnverified: emails[0]?.unverified ?? false,
     whatsappAllowed: !withdrawn("whatsapp"),
     emailAllowed: !withdrawn("correo"),
     opportunity: opp[0] ?? null,
@@ -261,16 +264,14 @@ export async function replyConversation(tx: Tx, userId: string, agencyId: string
   const withdrawn = (ch: string) => consents.some((x) => x.channel === ch && x.purpose === "servicio" && x.status === "retirado");
   let link: string;
   if (input.via === "whatsapp") {
-    const [phone] = await tx.select({ e164: contactPhones.e164 }).from(contactPhones).where(eq(contactPhones.contactId, c.contactId)).orderBy(desc(contactPhones.isPreferred), asc(contactPhones.createdAt)).limit(1);
-    if (!phone) throw new AppError("no_phone");
+    const phone = await sendablePhone(tx, agencyId, c.contactId);
     if (withdrawn("whatsapp")) throw new AppError("whatsapp_blocked");
-    link = whatsappLink(phone.e164, body);
+    link = whatsappLink(phone, body);
   } else {
-    const [email] = await tx.select({ email: contactEmails.email }).from(contactEmails).where(eq(contactEmails.contactId, c.contactId)).orderBy(desc(contactEmails.isPreferred), asc(contactEmails.createdAt)).limit(1);
-    if (!email) throw new AppError("no_email");
+    const email = await sendableEmail(tx, agencyId, c.contactId);
     if (withdrawn("correo")) throw new AppError("email_blocked");
     const [agency] = await tx.select({ name: agencies.name }).from(agencies).where(eq(agencies.id, agencyId));
-    link = mailtoLink(email.email, c.subject ? `Re: ${c.subject}` : `Tu consulta con ${agency?.name ?? "la agencia"}`, body);
+    link = mailtoLink(email, c.subject ? `Re: ${c.subject}` : `Tu consulta con ${agency?.name ?? "la agencia"}`, body);
   }
   try {
     await tx.insert(messages).values({ agencyId, conversationId: id, direction: "saliente", via: input.via, body, authorId: userId });

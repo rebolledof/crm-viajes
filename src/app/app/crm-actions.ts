@@ -7,7 +7,7 @@ import { redirect } from "next/navigation";
 import { getDb, withUser } from "@/db/client";
 import { isLossReason, isStageKind } from "@/domain/pipeline";
 import { isPriority, isTaskKind, parseBogotaDateTime } from "@/domain/tasks";
-import { createContact, openWhatsapp, recordConsent, updateContact, type ContactInput } from "@/server/contacts";
+import { createContact, openWhatsapp, recordConsent, updateContact, verifyContactPoint, type ContactInput } from "@/server/contacts";
 import type { FormState } from "@/components/form";
 import { AppError, CODE_FIELDS, ERROR_MESSAGES, errorMessage, type ErrorCode } from "@/server/errors";
 import { createOpportunity, createStage, moveOpportunity, reorderStages, updateOpportunity, updateStage } from "@/server/opportunities";
@@ -277,3 +277,16 @@ export async function moveStageAction(fd: FormData) {
   revalidatePath("/app/embudo");
   redirect("/app/embudo");
 }
+
+/** Confirma un teléfono o correo que llegó sin verificar por el formulario web (D-14). */
+export async function verifyContactPointAction(fd: FormData): Promise<void> {
+  const { user, agencyId, db } = await ctx();
+  const contactId = str(fd, "contactId");
+  const kind = str(fd, "kind");
+  const back = `/app/contactos/${encodeURIComponent(contactId)}`;
+  if (kind !== "telefono" && kind !== "correo") redirect(`${back}?error=invalid_input`);
+  const r = await run(() => withUser(db, user, (tx) => verifyContactPoint(tx, user.id, agencyId, { kind, id: str(fd, "pointId") })));
+  revalidatePath(back);
+  redirect(r.ok ? `${back}?ok=verificado` : `${back}?error=${r.code}`);
+}
+
