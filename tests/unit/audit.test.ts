@@ -21,6 +21,13 @@ describe("describeAudit", () => {
     expect(describeAudit(ev("stage.updated", { active: true }), names)).toEqual({ text: "Activó la etapa «Nuevo»", details: [] });
     expect(text(ev("stage.updated", { active: false }))).toBe("Desactivó la etapa «Nuevo»");
     expect(text(ev("stage.updated", { name: "Primer contacto" }))).toBe("Renombró la etapa a «Primer contacto»");
+    expect(describeAudit(ev("stage.updated", { goal: "Conocer fechas" }), names)).toEqual({ text: "Cambió la meta de la etapa «Nuevo»", details: ["Meta: Conocer fechas"] });
+    expect(text(ev("stage.updated", { goal: null }))).toBe("Quitó la meta de la etapa «Nuevo»");
+    expect(describeAudit(ev("branding.updated", { primaryColor: { de: "#0F6E6E", a: "#C2185B" }, logo: "cambiado" }), names)).toEqual({
+      text: "Cambió la marca de la agencia",
+      details: ["Color principal: #0F6E6E → #C2185B", "Logo: subió uno nuevo"],
+    });
+    expect(text(ev("stage.updated", { name: "Primer contacto", goal: "x" }))).toBe("Renombró la etapa a «Primer contacto» y cambió su meta");
   });
 
   it("oportunidades, tareas, consentimientos y WhatsApp con nombres y detalles legibles", () => {

@@ -218,6 +218,10 @@ export async function completeTaskAction(_prev: FormState, fd: FormData): Promis
   const r = await run(() => withUser(db, user, (tx) => completeTask(tx, user.id, agencyId, str(fd, "taskId"), str(fd, "result"))));
   if (!r.ok) return failed(fd, r);
   revalidatePath(to.split("?")[0]);
+  // Era la última tarea de una oportunidad abierta: se pide el siguiente paso (SPEC-002c RF-247).
+  if (r.value.needsNextStep && r.value.opportunityId) {
+    redirect(`/app/oportunidades/${r.value.opportunityId}?ok=completada&siguiente=1#siguiente-paso`);
+  }
   redirect(withParam(to, "ok", "completada"));
 }
 
@@ -244,11 +248,13 @@ export async function updateStageAction(_prev: FormState, fd: FormData): Promise
   const { user, agencyId, db } = await ctx();
   const active = fd.get("active");
   const name = fd.get("name");
+  const goal = fd.get("goal");
   const r = await run(() =>
     withUser(db, user, (tx) =>
       updateStage(tx, user.id, agencyId, str(fd, "stageId"), {
         name: name === null ? undefined : name.toString(),
         active: active === null ? undefined : active === "true",
+        goal: goal === null ? undefined : goal.toString(),
       }),
     ),
   );

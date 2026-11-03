@@ -1,3 +1,5 @@
+import Link from "next/link";
+import { PageHeader, linkButtonClass } from "@/components/ui";
 import { firstParams } from "@/domain/params";
 import { redirect } from "next/navigation";
 import { getDb, withUser } from "@/db/client";
@@ -13,8 +15,8 @@ export default async function NuevoContactoPage({ searchParams }: { searchParams
   const sp = firstParams(await searchParams);
   const members = await withUser(getDb(), user, (tx) => activeMembers(tx, user.id, active.agencyId));
   return (
-    <div className="flex flex-col gap-6">
-      <h1 className="text-2xl font-semibold text-slate-900">Nuevo contacto</h1>
+    <div className="flex flex-col gap-4">
+      <PageHeader icon="users" eyebrow={<Link href="/app/contactos" className={linkButtonClass}>Contactos</Link>} title="Nuevo contacto" />
       <Flash sp={sp} />
       <ContactForm action={createContactAction} members={members} values={{ ownerId: user.id }} submit="Crear contacto" />
     </div>

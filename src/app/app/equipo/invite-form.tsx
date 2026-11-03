@@ -30,7 +30,7 @@ export function InviteForm() {
             Invitación creada para <strong>{state.email}</strong>. Envíale este enlace; vence en 7 días y solo se muestra ahora.
           </p>
           <div className="flex flex-wrap items-center gap-2">
-            <code className="min-w-0 flex-1 break-all rounded bg-white px-2 py-1 text-xs text-slate-800">{state.link}</code>
+            <code className="min-w-0 flex-1 break-all rounded bg-surface px-2 py-1 text-xs text-slate-800">{state.link}</code>
             <button
               type="button"
               className="text-sky-700 hover:underline"

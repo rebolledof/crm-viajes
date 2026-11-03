@@ -48,8 +48,14 @@ export async function createTask(tx: Tx, userId: string, agencyId: string, input
   }
 }
 
+export type CompleteResult = {
+  opportunityId: string | null;
+  /** La oportunidad sigue abierta y se quedó sin tareas abiertas: hay que darle el siguiente paso (RF-247). */
+  needsNextStep: boolean;
+};
+
 /** Completar exige resultado (RF-211). */
-export async function completeTask(tx: Tx, userId: string, agencyId: string, taskId: string, result: string): Promise<void> {
+export async function completeTask(tx: Tx, userId: string, agencyId: string, taskId: string, result: string): Promise<CompleteResult> {
   await requirePermission(tx, userId, agencyId, "crm.write");
   requireIds(taskId);
   const text = result.trim();
@@ -63,6 +69,16 @@ export async function completeTask(tx: Tx, userId: string, agencyId: string, tas
   if (!row) throw new AppError("not_found");
   await logActivity(tx, { agencyId, contactId: row.contactId, opportunityId: row.opportunityId, actorId: userId, kind: "tarea.completada", data: { titulo: row.title, resultado: text } });
   await recordAudit(tx, { agencyId, actorId: userId, action: "task.completed", objectType: "task", objectId: taskId, changes: { result: text } });
+  if (!row.opportunityId) return { opportunityId: null, needsNextStep: false };
+  const [state] = await tx
+    .select({
+      open: sql<boolean>`${pipelineStages.kind} = 'abierta'`,
+      tasksLeft: sql<number>`(select count(*)::int from ${tasks} t where t.opportunity_id = ${row.opportunityId} and t.status = 'abierta')`,
+    })
+    .from(opportunities)
+    .innerJoin(pipelineStages, eq(pipelineStages.id, opportunities.stageId))
+    .where(eq(opportunities.id, row.opportunityId));
+  return { opportunityId: row.opportunityId, needsNextStep: !!state?.open && state.tasksLeft === 0 };
 }
 
 async function loadOpenTask(tx: Tx, agencyId: string, taskId: string) {
@@ -198,23 +214,35 @@ export async function contactChannels(tx: Tx, userId: string, agencyId: string, 
   return out;
 }
 
+/** Cuántas tareas mías vencen hoy o ya vencieron: el número junto a "Mi día" en el menú. */
+export async function dueTodayCount(tx: Tx, userId: string, agencyId: string, now: Date): Promise<number> {
+  await requirePermission(tx, userId, agencyId, "crm.read");
+  const [{ n }] = await tx
+    .select({ n: sql<number>`count(*)::int` })
+    .from(tasks)
+    .where(and(eq(tasks.agencyId, agencyId), eq(tasks.assigneeId, userId), eq(tasks.status, "abierta"), lt(tasks.dueAt, endOfLocalDay(now))));
+  return n;
+}
+
 /** Mis tareas vencidas y de hoy, y mis oportunidades abiertas sin próxima acción (RF-210). */
 export async function myDay(tx: Tx, userId: string, agencyId: string, now: Date) {
   await requirePermission(tx, userId, agencyId, "crm.read");
   const end = endOfLocalDay(now);
   const due = await tx
-    .select({ task: tasks, contactName: contacts.fullName, destination: opportunities.destination })
+    .select({ task: tasks, contactName: contacts.fullName, destination: opportunities.destination, stageName: pipelineStages.name })
     .from(tasks)
     .innerJoin(contacts, eq(contacts.id, tasks.contactId))
     .leftJoin(opportunities, eq(opportunities.id, tasks.opportunityId))
+    .leftJoin(pipelineStages, eq(pipelineStages.id, opportunities.stageId))
     .where(and(eq(tasks.agencyId, agencyId), eq(tasks.assigneeId, userId), eq(tasks.status, "abierta"), lt(tasks.dueAt, end)))
     .orderBy(asc(tasks.dueAt));
   // Lo que viene después de hoy, para que una tarea futura no "desaparezca" de la vista diaria.
   const upcoming = await tx
-    .select({ task: tasks, contactName: contacts.fullName, destination: opportunities.destination })
+    .select({ task: tasks, contactName: contacts.fullName, destination: opportunities.destination, stageName: pipelineStages.name })
     .from(tasks)
     .innerJoin(contacts, eq(contacts.id, tasks.contactId))
     .leftJoin(opportunities, eq(opportunities.id, tasks.opportunityId))
+    .leftJoin(pipelineStages, eq(pipelineStages.id, opportunities.stageId))
     .where(and(eq(tasks.agencyId, agencyId), eq(tasks.assigneeId, userId), eq(tasks.status, "abierta"), gte(tasks.dueAt, end)))
     .orderBy(asc(tasks.dueAt))
     .limit(50);
@@ -226,7 +254,13 @@ export async function myDay(tx: Tx, userId: string, agencyId: string, now: Date)
     .leftJoin(tasks, and(eq(tasks.opportunityId, opportunities.id), eq(tasks.status, "abierta")))
     .where(and(eq(opportunities.agencyId, agencyId), eq(opportunities.ownerId, userId), eq(pipelineStages.kind, "abierta"), isNull(tasks.id)))
     .orderBy(asc(opportunities.updatedAt));
-  return { due, upcoming, withoutNextAction, endOfDay: end };
+  // Tareas mías completadas hoy, para la barra de avance del plan del día (SPEC-002c).
+  const startOfDay = new Date(end.getTime() - 24 * 3600_000);
+  const [{ doneToday }] = await tx
+    .select({ doneToday: sql<number>`count(*)::int` })
+    .from(tasks)
+    .where(and(eq(tasks.agencyId, agencyId), eq(tasks.assigneeId, userId), eq(tasks.status, "completada"), gte(tasks.completedAt, startOfDay)));
+  return { due, upcoming, withoutNextAction, doneToday, endOfDay: end };
 }
 
 /** Miembros activos para elegir responsable o asignado. */

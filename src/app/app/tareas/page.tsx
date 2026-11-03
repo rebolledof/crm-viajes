@@ -1,6 +1,6 @@
 import { firstParams } from "@/domain/params";
 import Link from "next/link";
-import { Notice, buttonClass, inputClass, linkButtonClass } from "@/components/ui";
+import { Notice, buttonClass, inputClass, linkButtonClass, PageHeader } from "@/components/ui";
 import { getDb, withUser } from "@/db/client";
 import { TASK_KINDS, TASK_KIND_LABELS, dueState, isTaskKind } from "@/domain/tasks";
 import { requireActiveAgency } from "@/server/session";
@@ -10,7 +10,7 @@ import { Flash, TaskItem, fechaHora, memberName, type SearchParams } from "../cr
 const STATUS_LABELS: Record<TaskStatus, string> = { abierta: "Abiertas", completada: "Completadas", cancelada: "Canceladas" };
 const GROUPS = [
   { key: "vencida", title: "Vencidas", tone: "text-red-700" },
-  { key: "hoy", title: "Hoy", tone: "text-amber-700" },
+  { key: "hoy", title: "Hoy", tone: "text-amber-800" },
   { key: "proxima", title: "Próximas", tone: "text-slate-800" },
 ] as const;
 
@@ -39,10 +39,12 @@ export default async function TareasPage({ searchParams }: { searchParams: Searc
   );
 
   return (
-    <div className="flex flex-col gap-6">
-      <h1 className="text-2xl font-semibold text-slate-900">Tareas</h1>
+    <div className="flex flex-col gap-4">
+      <PageHeader icon="check" title="Tareas">
+        <p className="text-sm text-slate-600">Todas las tareas de la agencia. Filtra por responsable, estado o tipo.</p>
+      </PageHeader>
       <Flash sp={sp} />
-      <form className="flex flex-wrap items-end gap-3 rounded-lg border border-slate-200 bg-white p-4 text-sm">
+      <form className="flex flex-wrap items-end gap-3 rounded-lg border border-slate-200 bg-surface p-4 text-sm">
         <label className="flex flex-col gap-1">
           <span className="font-medium text-slate-700">Responsable</span>
           <select name="responsable" defaultValue={owner} className={inputClass}>
@@ -99,7 +101,7 @@ export default async function TareasPage({ searchParams }: { searchParams: Searc
         : rows.length > 0 && (
             <ul className="flex flex-col gap-2">
               {rows.map((r) => (
-                <li key={r.task.id} className="flex flex-col gap-1 rounded-md border border-slate-200 bg-white p-3 text-sm">
+                <li key={r.task.id} className="flex flex-col gap-1 rounded-md border border-slate-200 bg-surface p-3 text-sm">
                   <div className="flex flex-wrap items-baseline gap-x-3">
                     <span className="font-medium text-slate-900">{r.task.title}</span>
                     <span className="text-slate-600">

@@ -168,6 +168,9 @@ export async function listContacts(tx: Tx, userId: string, agencyId: string, q =
       phone: sql<string | null>`(select p.e164 from ${contactPhones} p where p.contact_id = ${CONTACT_ID} and p.is_preferred limit 1)`,
       email: sql<string | null>`(select e.email from ${contactEmails} e where e.contact_id = ${CONTACT_ID} and e.is_preferred limit 1)`,
       openOpportunities: sql<number>`(select count(*)::int from ${opportunities} o join ${pipelineStages} s on s.id = o.stage_id where o.contact_id = ${CONTACT_ID} and s.kind = 'abierta')`,
+      // Siguiente paso: la tarea abierta que vence primero (SPEC-002c, columna "Siguiente paso").
+      nextTask: sql<{ title: string; kind: string; due_at: string } | null>`(select json_build_object('title', t.title, 'kind', t.kind, 'due_at', t.due_at) from ${tasks} t where t.contact_id = ${CONTACT_ID} and t.status = 'abierta' order by t.due_at limit 1)`,
+      stageName: sql<string | null>`(select s.name from ${opportunities} o join ${pipelineStages} s on s.id = o.stage_id where o.contact_id = ${CONTACT_ID} and s.kind = 'abierta' order by o.updated_at desc limit 1)`,
     })
     .from(contacts)
     .where(and(eq(contacts.agencyId, agencyId), search))
@@ -201,7 +204,7 @@ export async function getContactDetail(tx: Tx, userId: string, agencyId: string,
     tx.select().from(contactEmails).where(eq(contactEmails.contactId, contactId)).orderBy(desc(contactEmails.isPreferred), contactEmails.createdAt),
     currentConsents(tx, contactId),
     tx
-      .select({ id: opportunities.id, destination: opportunities.destination, stageName: pipelineStages.name, stageKind: pipelineStages.kind, ownerId: opportunities.ownerId, updatedAt: opportunities.updatedAt })
+      .select({ id: opportunities.id, destination: opportunities.destination, stageId: opportunities.stageId, stageName: pipelineStages.name, stageKind: pipelineStages.kind, ownerId: opportunities.ownerId, updatedAt: opportunities.updatedAt })
       .from(opportunities)
       .innerJoin(pipelineStages, eq(pipelineStages.id, opportunities.stageId))
       .where(eq(opportunities.contactId, contactId))

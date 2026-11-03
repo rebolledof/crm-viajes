@@ -1,6 +1,6 @@
 import { firstParams } from "@/domain/params";
 import { redirect } from "next/navigation";
-import { Notice } from "@/components/ui";
+import { Notice, PageHeader } from "@/components/ui";
 import { getDb, withUser } from "@/db/client";
 import { invitationStatus } from "@/domain/invitations";
 import { ROLES, ROLE_LABELS, can } from "@/domain/permissions";
@@ -23,18 +23,20 @@ export default async function EquipoPage({ searchParams }: { searchParams: Promi
   const now = new Date();
 
   return (
-    <div className="flex flex-col gap-8">
-      <h1 className="text-2xl font-semibold text-slate-900">Equipo</h1>
+    <div className="flex flex-col gap-4">
+      <PageHeader icon="users" title="Equipo">
+        <p className="text-sm text-slate-600">Invita personas y define qué puede hacer cada una.</p>
+      </PageHeader>
       {isErrorCode(sp.error) && <Notice tone="error">{ERROR_MESSAGES[sp.error]}</Notice>}
 
-      <section className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-4">
+      <section className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-surface p-4">
         <h2 className="font-medium text-slate-900">Invitar a una persona</h2>
         <InviteForm />
       </section>
 
       <section className="flex flex-col gap-3">
         <h2 className="font-medium text-slate-900">Miembros</h2>
-        <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+        <div className="overflow-x-auto rounded-lg border border-slate-200 bg-surface">
           <table className="w-full text-left text-sm">
             <thead className="bg-slate-50 text-slate-600">
               <tr><th className="px-3 py-2">Correo</th><th className="px-3 py-2">Rol</th><th className="px-3 py-2">Estado</th><th className="px-3 py-2">Acciones</th></tr>
@@ -79,7 +81,7 @@ export default async function EquipoPage({ searchParams }: { searchParams: Promi
         {invites.length === 0 ? (
           <p className="text-sm text-slate-600">Todavía no has invitado a nadie.</p>
         ) : (
-          <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+          <div className="overflow-x-auto rounded-lg border border-slate-200 bg-surface">
             <table className="w-full text-left text-sm">
               <thead className="bg-slate-50 text-slate-600">
                 <tr><th className="px-3 py-2">Correo</th><th className="px-3 py-2">Rol</th><th className="px-3 py-2">Vence</th><th className="px-3 py-2">Estado</th><th className="px-3 py-2">Acciones</th></tr>

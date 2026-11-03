@@ -103,7 +103,22 @@ export function describeAudit(e: AuditEventLike, n: AuditNames = {}): AuditDescr
       if (str(c.name)) parts.push(`Renombró la etapa a «${str(c.name)}»`);
       if (c.active === true) parts.push(parts.length ? "y la activó" : `Activó ${stage}`);
       if (c.active === false) parts.push(parts.length ? "y la desactivó" : `Desactivó ${stage}`);
-      return { text: parts.join(" ") || `Editó ${stage}`, details: [] };
+      if ("goal" in c) parts.push(parts.length ? (str(c.goal) ? "y cambió su meta" : "y quitó su meta") : str(c.goal) ? `Cambió la meta de ${stage}` : `Quitó la meta de ${stage}`);
+      return { text: parts.join(" ") || `Editó ${stage}`, details: lines([["Meta", str(c.goal)]]) };
+    }
+    case "branding.updated": {
+      const color = (v: unknown) => {
+        const x = v as { de?: unknown; a?: unknown } | undefined;
+        return x && str(x.a) ? `${str(x.de) ?? "de fábrica"} → ${str(x.a)}` : undefined;
+      };
+      return {
+        text: "Cambió la marca de la agencia",
+        details: lines([
+          ["Color principal", color(c.primaryColor)],
+          ["Color de acento", color(c.accentColor)],
+          ["Logo", c.logo === "cambiado" ? "subió uno nuevo" : c.logo === "quitado" ? "lo quitó" : undefined],
+        ]),
+      };
     }
     case "stage.reordered":
       return { text: "Cambió el orden de las etapas del embudo", details: [] };

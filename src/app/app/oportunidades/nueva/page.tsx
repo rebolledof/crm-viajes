@@ -1,7 +1,7 @@
 import { firstParams } from "@/domain/params";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { linkButtonClass } from "@/components/ui";
+import { linkButtonClass, PageHeader } from "@/components/ui";
 import { getDb, withUser } from "@/db/client";
 import { can } from "@/domain/permissions";
 import { getContactDetail } from "@/server/contacts";
@@ -22,11 +22,8 @@ export default async function NuevaOportunidadPage({ searchParams }: { searchPar
     ),
   );
   return (
-    <div className="flex flex-col gap-6">
-      <div>
-        <p className="text-sm"><Link href={`/app/contactos/${contactId}`} className={linkButtonClass}>{detail.contact.fullName}</Link></p>
-        <h1 className="text-2xl font-semibold text-slate-900">Nueva oportunidad</h1>
-      </div>
+    <div className="flex flex-col gap-4">
+      <PageHeader icon="plane" eyebrow={<Link href={`/app/contactos/${contactId}`} className={linkButtonClass}>{detail.contact.fullName}</Link>} title="Nueva oportunidad" />
       <Flash sp={sp} />
       <OpportunityForm
         action={createOpportunityAction}

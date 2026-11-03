@@ -13,6 +13,8 @@ export type FormState = {
   /** Lo que la persona había escrito, por nombre de campo. */
   values?: Record<string, string[]>;
   link?: { href: string; label: string };
+  /** Ruta a la que ir cuando todo salió bien, si la acción no redirige ella misma (formulario de marca). */
+  redirectTo?: string;
   at?: number;
 };
 

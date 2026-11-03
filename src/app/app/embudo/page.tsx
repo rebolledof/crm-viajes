@@ -1,7 +1,7 @@
 import { firstParams } from "@/domain/params";
 import { redirect } from "next/navigation";
 import { ActionForm, Input, Select } from "@/components/form";
-import { Field, Notice, buttonClass } from "@/components/ui";
+import { Field, Notice, PageHeader, buttonClass } from "@/components/ui";
 import { getDb, withUser } from "@/db/client";
 import { STAGE_KINDS, STAGE_KIND_LABELS } from "@/domain/pipeline";
 import { can } from "@/domain/permissions";
@@ -20,17 +20,17 @@ export default async function EmbudoPage({ searchParams }: { searchParams: Searc
   const stages = await withUser(getDb(), user, (tx) => listStages(tx, user.id, active.agencyId, { includeInactive: true }));
   const order = stages.map((s) => s.id).join(",");
   return (
-    <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-slate-900">Etapas del embudo</h1>
+    <div className="flex flex-col gap-4">
+      <PageHeader icon="sliders" title="Etapas del embudo">
         <p className="text-sm text-slate-600">
           Cada agencia define sus etapas. Una oportunidad puede saltar a cualquier etapa activa. Desactivar una etapa no mueve las oportunidades que ya están en ella.
+          La meta de cada etapa le dice al asesor qué debe lograr antes de pasar a la siguiente.
         </p>
-      </div>
+      </PageHeader>
       <Flash sp={sp} />
       <ol className="flex flex-col gap-2">
         {stages.map((s, i) => (
-          <li key={s.id} className={`flex flex-wrap items-center gap-3 rounded-md border border-slate-200 p-3 ${s.active ? "bg-white" : "bg-slate-100"}`}>
+          <li key={s.id} className={`flex flex-wrap items-center gap-3 rounded-md border border-slate-200 p-3 ${s.active ? "bg-surface" : "bg-slate-100"}`}>
             <div className="flex gap-1">
               {(["up", "down"] as const).map((dir) => (
                 <form key={dir} action={moveStageAction}>
@@ -43,11 +43,19 @@ export default async function EmbudoPage({ searchParams }: { searchParams: Searc
                 </form>
               ))}
             </div>
-            <ActionForm action={updateStageAction} className="flex flex-1 flex-wrap items-center gap-2">
+            <ActionForm action={updateStageAction} className="flex flex-1 flex-wrap items-end gap-2">
               <input type="hidden" name="stageId" value={s.id} />
-              <label className="sr-only" htmlFor={`name-${s.id}`}>Nombre</label>
-              <Input id={`name-${s.id}`} name="name" defaultValue={s.name} required maxLength={60} className="flex-1" />
-              <button className={small}>Renombrar</button>
+              <div className="flex min-w-40 flex-1 flex-col gap-1 text-xs">
+                <label className="font-medium text-slate-700" htmlFor={`name-${s.id}`}>Nombre</label>
+                <Input id={`name-${s.id}`} name="name" defaultValue={s.name} required maxLength={60} />
+              </div>
+              {s.kind === "abierta" && (
+                <div className="flex min-w-56 flex-[2] flex-col gap-1 text-xs">
+                  <label className="font-medium text-slate-700" htmlFor={`goal-${s.id}`}>Meta de la etapa (opcional)</label>
+                  <Input id={`goal-${s.id}`} name="goal" defaultValue={s.goal ?? ""} maxLength={120} placeholder="Por ejemplo: conocer fechas, viajeros y presupuesto" />
+                </div>
+              )}
+              <button className={small}>Guardar</button>
             </ActionForm>
             <span className="text-xs text-slate-600">{STAGE_KIND_LABELS[s.kind]}</span>
             <ActionForm action={updateStageAction}>
@@ -58,8 +66,8 @@ export default async function EmbudoPage({ searchParams }: { searchParams: Searc
           </li>
         ))}
       </ol>
-      {stages.length === 0 && <Notice>La agencia no tiene etapas.</Notice>}
-      <ActionForm action={createStageAction} className="flex flex-wrap items-end gap-3 rounded-lg border border-slate-200 bg-white p-4">
+      {stages.length === 0 && <Notice>La agencia no tiene etapas. Agrega la primera abajo.</Notice>}
+      <ActionForm action={createStageAction} className="flex flex-wrap items-end gap-3 rounded-lg border border-slate-200 bg-surface p-4">
         <Field label="Nueva etapa">
           <Input name="name" required maxLength={60} />
         </Field>

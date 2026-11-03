@@ -43,6 +43,23 @@
 - La auditoría muestra en español los eventos de contactos, oportunidades, etapas y tareas, con "de etapa a etapa" y la razón.
 - Los campos obligatorios llevan un asterisco rojo.
 
+- SPEC-002c Nuevo diseño (estilo A): encabezado con el logo y el nombre de la agencia, pestañas con la pestaña activa marcada, tarjetas y encabezado común en todas las pantallas.
+- Marca por agencia: el administrador elige color principal, color de acento y logo (PNG, WebP o JPG de hasta 512 KB) en "Marca de la agencia", con vista previa en vivo y aviso si el color es muy claro. Sin logo se muestran las iniciales. Cada cambio queda en auditoría con el color anterior y el nuevo.
+- Cada persona elige el menú arriba o a la izquierda (que se puede comprimir a solo íconos) y el tema Claro, Oscuro o Automático; se guarda en su cuenta y se aplica sin parpadeo. Por defecto: arriba y claro.
+- Mi día muestra "Tu plan de hoy" en cuatro pasos con flechas (vencidas, hoy, dar siguiente paso, día al día), el avance del día, las tareas agrupadas con la etapa de su oportunidad y un botón "Definir paso" para las oportunidades sin tarea.
+- La ficha de la oportunidad muestra el camino de etapas con la actual resaltada, la meta de la etapa y "Qué hacer ahora". Al completar la última tarea de una oportunidad abierta pregunta "¿Cuál es el siguiente paso?".
+- El tablero de oportunidades tiene flechas entre columnas, la meta de cada etapa y una marca roja en las oportunidades vencidas o sin siguiente paso.
+- La lista de contactos muestra la etapa del viaje en curso y el siguiente paso (vencido, hoy, programado o "Sin siguiente paso"); en el celular se ve como tarjetas.
+- La ficha del contacto muestra el viaje en curso con su camino de etapas.
+- En "Etapas del embudo" el administrador escribe la meta de cada etapa.
+- El nombre de la agencia se cambia ahora en "Marca de la agencia" (antes estaba en Mi día).
+- Login, registro y recuperar contraseña con el nuevo estilo.
+- Contraste AA revisado con axe-core en claro y oscuro con dos marcas.
+- "¿Cuál es el siguiente paso?" se puede dejar para después; la oportunidad queda en «Sin siguiente paso» de Mi día (prueba independiente).
+- Al cambiar el menú o el tema se vuelve a la misma pantalla sin repetir el aviso anterior.
+- Una tarea de llamada sin teléfono en el contacto lo dice y explica cómo corregirlo.
+- Un logo de más de 512 KB o un archivo que no es imagen aunque se llame .png ya no muestra "No pudimos cargar esta pantalla": se revisa antes de enviarlo, se avisa sobre el campo del logo y los colores escritos se conservan (hallazgo F-02 de QA, AC-242).
+
 ### Corregido (prueba independiente de S02, 1 nov 2026)
 
 - Las tareas, oportunidades y contactos de una persona retirada de la agencia ya se pueden completar, cancelar, mover y editar; antes daban error. Asignarle algo nuevo sigue prohibido (migración 20261103000200).
