@@ -1,13 +1,12 @@
-import type { Metadata } from "next";
 import { Icon } from "@/components/icons";
 
-export const metadata: Metadata = { title: "Formulario no encontrado", robots: { index: false, follow: false } };
-
 /**
- * Código de formulario que no existe (AC-262, informe de pruebas del 3 nov 2026). No se sabe de qué
+ * Código de formulario que no existe (AC-262, informe de pruebas del 3 nov 2026). La pinta page.tsx
+ * directamente: con notFound() esta versión de Next manda un HTML vacío y el texto solo aparece con
+ * JavaScript (prueba independiente del 3 nov 2026). No se sabe de qué
  * agencia es, así que no lleva marca de ninguna: explica qué pasó y qué puede hacer el cliente.
  */
-export default function FormNotFound() {
+export function FormNotFound() {
   return (
     <div className="flex min-h-screen flex-col items-center bg-canvas px-4 py-8">
       <div className="w-full max-w-xl rounded border border-line bg-surface px-5 py-8 text-center shadow-[0_2px_2px_rgba(0,0,0,0.05)]" role="status">

@@ -2,7 +2,10 @@
 // acción del servidor (como un POST real), no solo por la función de la base.
 // - AC-274: el sexto envío seguido desde la misma dirección se rechaza y no crea datos.
 // - AC-262: un agency_id o agencyId agregado al cuerpo del formulario se ignora.
+// - AC-262: un código que no existe muestra "No encontramos este formulario" en el HTML del servidor,
+//   sin depender de JavaScript (prueba independiente del 3 nov 2026).
 import { and, eq } from "drizzle-orm";
+import { renderToStaticMarkup } from "react-dom/server";
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { inject } from "vitest";
 import { contacts, conversations, inboundChannels } from "../../src/db/schema";
@@ -35,6 +38,7 @@ vi.mock("next/navigation", () => ({
 }));
 
 const { submitWebFormAction } = await import("../../src/app/f/[key]/actions");
+const formPage = await import("../../src/app/f/[key]/page");
 
 const t = testDb();
 afterAll(() => t.close());
@@ -98,5 +102,19 @@ describe("formulario web por la acción del servidor (informe de pruebas, 3 nov 
     expect(await post(body(a.key, { agency_id: b.id, agencyId: b.id, agency: b.id }))).toBe("enviado");
     expect(await t.db.select().from(conversations).where(eq(conversations.agencyId, b.id))).toHaveLength(0);
     expect(await t.db.select().from(contacts).where(eq(contacts.agencyId, a.id))).toHaveLength(1);
+  });
+
+  it("AC-262: un código que no existe se explica en el HTML del servidor, con su título", async () => {
+    const params = Promise.resolve({ key: "noexiste123" });
+    const html = renderToStaticMarkup(await formPage.default({ params, searchParams: Promise.resolve({}) }));
+    expect(html).toContain("No encontramos este formulario");
+    expect(html).toContain("pedir el enlace correcto");
+    expect((await formPage.generateMetadata({ params })).title).toBe("Formulario no encontrado");
+  });
+
+  it("un código válido sigue mostrando el formulario de su agencia", async () => {
+    const a = await newAgency("Página válida");
+    const params = Promise.resolve({ key: a.key });
+    expect((await formPage.generateMetadata({ params })).title).toBe("Pide tu cotización");
   });
 });

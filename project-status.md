@@ -17,6 +17,8 @@
 
 2 nov 2026 en la rama de S03 parte 1, tras corregir la prueba independiente (Sonnet) y aplicar D-14 (con su prueba independiente): lint, typecheck, 96 unitarias, 120 de integración.
 
+3 nov 2026, tras la prueba independiente (Sonnet) de los ajustes del informe: lint, typecheck, 96 unitarias, 126 de integración y build sin errores. La página de formulario no encontrado se comprobó con `next start` a 375 px, con y sin JavaScript.
+
 3 nov 2026, tras el informe de pruebas de S03 parte 1: lint, typecheck, 96 unitarias, 124 de integración y build sin errores. Recorrido a 390 px (Mi día, bandeja lista y conversación, Canales, respuestas, ficha, formulario y formulario no encontrado) sin desbordes; seis envíos seguidos desde el navegador: el sexto se rechaza y conserva lo escrito y build sin errores. axe-core sin fallas en bandeja, canales, respuestas y formulario; recorrido a 375 px con capturas en `diseno/implementado/bandeja/`.
 
 2 nov 2026 en la rama del diseño, tras corregir la prueba independiente (Sonnet): lint, typecheck, 78 unitarias, 98 de integración y build sin errores. axe-core sin fallas de contraste en las pantallas clave (claro y oscuro, dos marcas) y ninguna pantalla desborda a 390 px.

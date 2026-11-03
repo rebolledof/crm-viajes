@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { cache } from "react";
 import { ActionForm, Input, Textarea } from "@/components/form";
 import { Icon } from "@/components/icons";
 import { Field, Notice, buttonClass } from "@/components/ui";
@@ -8,11 +8,19 @@ import { DEFAULT_ACCENT, DEFAULT_PRIMARY, agencyInitials, brandCssVars, cssBlock
 import { firstParams } from "@/domain/params";
 import { webFormInfo } from "@/server/public-form";
 import { submitWebFormAction } from "./actions";
+import { FormNotFound } from "./form-not-found";
 import { PrivacyCheckbox } from "./privacy-checkbox";
 
-export const metadata: Metadata = { title: "Pide tu cotización", robots: { index: false, follow: false } };
+// Una sola consulta por petición aunque la usen generateMetadata y la página.
+const formInfo = cache((key: string) => withAnon(getDb(), (tx) => webFormInfo(tx, key)));
 
 type Props = { params: Promise<{ key: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> };
+
+export async function generateMetadata({ params }: Pick<Props, "params">): Promise<Metadata> {
+  const { key } = await params;
+  const info = await formInfo(key);
+  return { title: info ? "Pide tu cotización" : "Formulario no encontrado", robots: { index: false, follow: false } };
+}
 
 /**
  * Formulario web público de la agencia (SPEC-003, alcance 6). Lleva su nombre, logo y colores; se
@@ -21,8 +29,8 @@ type Props = { params: Promise<{ key: string }>; searchParams: Promise<Record<st
 export default async function WebFormPage({ params, searchParams }: Props) {
   const { key } = await params;
   const sp = firstParams(await searchParams);
-  const info = await withAnon(getDb(), (tx) => webFormInfo(tx, key));
-  if (!info) notFound();
+  const info = await formInfo(key);
+  if (!info) return <FormNotFound />;
   const embed = sp.embed === "1";
   const vars = brandCssVars({ primary: normalizeHex(info.primary) ?? DEFAULT_PRIMARY, accent: normalizeHex(info.accent) ?? DEFAULT_ACCENT });
 
