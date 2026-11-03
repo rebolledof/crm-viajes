@@ -429,7 +429,11 @@ export function TaskItem({
         <div className="flex flex-wrap items-center gap-2">
           {perms.complete && channel && <TaskOpenButton taskId={task.id} channel={channel} back={back} blocked={blocked} compact primary={primary} />}
           {task.kind === "llamada" && task.contactId && channels?.get(task.contactId)?.phone === false && (
-            <span className="text-xs text-amber-800">El contacto no tiene teléfono. Agrégalo en su ficha para poder llamar.</span>
+            <span className="text-xs text-amber-800">
+              {channels.get(task.contactId)?.phoneUnverified
+                ? "El teléfono llegó por el formulario web y está sin verificar. Confírmalo en su ficha antes de llamar."
+                : "El contacto no tiene teléfono. Agrégalo en su ficha para poder llamar."}
+            </span>
           )}
         </div>
       </div>

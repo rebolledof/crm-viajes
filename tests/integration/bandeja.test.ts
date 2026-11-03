@@ -6,7 +6,8 @@ import { withAnon, type SessionUser } from "../../src/db/client";
 import { contactConsents, contactEmails, contactPhones, conversations, inboundChannels, messages, opportunities, savedReplies, tasks } from "../../src/db/schema";
 import type { WebFormData } from "../../src/domain/inbox";
 import { acceptInvitation, createAgency, createInvitation } from "../../src/server/agencies";
-import { createContact, getContactDetail, recordConsent, updateContact, verifyContactPoint } from "../../src/server/contacts";
+import { createContact, getContactDetail, listContacts, openWhatsapp, recordConsent, updateContact, verifyContactPoint } from "../../src/server/contacts";
+import { contactChannels, openTaskLink } from "../../src/server/tasks";
 import { AppError, pgError } from "../../src/server/errors";
 import {
   assignConversation,
@@ -389,6 +390,36 @@ describe("datos sin verificar (D-14, decisión de Felipe del 2 nov 2026)", () =>
     const emails = await t.db.select().from(contactEmails).where(eq(contactEmails.contactId, conv.contactId));
     const phones = await t.db.select().from(contactPhones).where(eq(contactPhones.contactId, conv.contactId));
     expect([...emails, ...phones].every((x) => !x.unverified)).toBe(true);
+  });
+
+  it("prueba independiente de D-14: un teléfono sin verificar no se usa en tareas ni en WhatsApp, y guardar la ficha no lo vuelve preferido", async () => {
+    const a = await newAgency("Bandeja D14 tel");
+    const contactId = await as(t.db, a.ana, (tx) => createContact(tx, a.ana.id, a.id, { fullName: "Tomás", phones: [], emails: ["tomas@example.com"] }));
+    const convId = await submit(a, form({ phone: "+573007778899", email: "tomas@example.com" }));
+    const [conv] = await t.db.select().from(conversations).where(eq(conversations.id, convId));
+    expect(conv.contactId).toBe(contactId);
+    const [phone] = await t.db.select().from(contactPhones).where(eq(contactPhones.contactId, contactId));
+    expect(phone).toMatchObject({ unverified: true, isPreferred: false });
+
+    const wa = (await t.db.select().from(tasks).where(eq(tasks.opportunityId, conv.opportunityId!))).find((x) => x.kind === "whatsapp")!;
+    await expectCode(as(t.db, a.ana, (tx) => openTaskLink(tx, a.ana.id, a.id, wa.id)), "phone_unverified");
+    await expectCode(as(t.db, a.ana, (tx) => openWhatsapp(tx, a.ana.id, a.id, contactId, { message: "Hola" })), "phone_unverified");
+    const ch = await as(t.db, a.ana, (tx) => contactChannels(tx, a.ana.id, a.id, [contactId]));
+    expect(ch.get(contactId)).toMatchObject({ phone: false, phoneUnverified: true, email: true });
+
+    // Guardar la ficha con el teléfono primero no lo vuelve preferido ni lo muestra como dato normal.
+    await as(t.db, a.ana, (tx) => updateContact(tx, a.ana.id, a.id, contactId, { fullName: "Tomás", phones: [{ raw: "+57 300 777 8899" }], emails: ["tomas@example.com"] }));
+    const [after] = await t.db.select().from(contactPhones).where(eq(contactPhones.contactId, contactId));
+    expect(after).toMatchObject({ unverified: true, isPreferred: false });
+    const [row] = await as(t.db, a.ana, (tx) => listContacts(tx, a.ana.id, a.id, "Tomás"));
+    expect(row.phone).toBeNull();
+    expect(row.email).toBe("tomas@example.com");
+
+    // Al confirmarlo pasa a ser el preferido, porque no hay otro teléfono.
+    await as(t.db, a.ana, (tx) => verifyContactPoint(tx, a.ana.id, a.id, { kind: "telefono", id: after.id }));
+    const [ok] = await t.db.select().from(contactPhones).where(eq(contactPhones.contactId, contactId));
+    expect(ok).toMatchObject({ unverified: false, isPreferred: true });
+    expect((await as(t.db, a.ana, (tx) => openTaskLink(tx, a.ana.id, a.id, wa.id))).channel).toBe("whatsapp");
   });
 });
 

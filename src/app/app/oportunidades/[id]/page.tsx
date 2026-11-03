@@ -168,6 +168,8 @@ export default async function OportunidadPage({ params, searchParams }: { params
             <Card title="WhatsApp" icon="message">
               {contact.phones.length === 0 ? (
                 <Notice>El contacto no tiene teléfono. Agrégalo en la ficha del contacto.</Notice>
+              ) : contact.phones.every((p) => p.unverified) ? (
+                <Notice>El teléfono llegó por el formulario web y está sin verificar. Confírmalo en la ficha del contacto para escribirle.</Notice>
               ) : !whatsappAllowed(contact.consents) ? (
                 <Notice tone="error">El contacto retiró el permiso de WhatsApp para atención del viaje.</Notice>
               ) : (
