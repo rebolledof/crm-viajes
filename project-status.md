@@ -1,21 +1,31 @@
 # Estado del proyecto
 
-Última actualización: 18 de octubre de 2026 · Sprint S00 Arranque (19 oct a 1 nov)
+Última actualización: 19 de octubre de 2026 · Sprint S00 Arranque (19 oct a 1 nov), con S01 adelantado
 
 ## Hecho
 
 - Plan acelerado y tablero de control (https://claude.ai/artifact/FQcdn8dR5iGm41nWQQVmUf).
-- Repositorio creado y conectado.
-- Constitución, resumen de producto, roadmap, glosario y AGENTS.md.
-- Borrador de SPEC-000 MVP piloto y ADR 0001 del stack.
+- Documentación SDD base, SPEC-000 ajustada con la entrevista de la agencia y ADR 0001 aceptado.
+- S01 en código (rama `s01-base`): Next.js 16.3, Supabase Auth, esquema de agencias, membresías, invitaciones y auditoría con RLS; pantallas de login, registro, agencia, equipo, invitación y auditoría; CI en GitHub Actions.
+- Pruebas: 14 unitarias y 21 de integración contra PostgreSQL 16 real (aislamiento A/B, roles, invitaciones vencidas, revocadas y de otro correo, membresía revocada, auditoría, coherencia del esquema).
 
-## Pendiente en S00
+## Comandos verificados el 18 oct 2026
 
-- Felipe: aprobar el ADR 0001 (Next.js, Supabase y Vercel).
-- Felipe: entrevista de 1 hora con la agencia.
-- Felipe: iniciar la verificación de Meta Business.
-- Felipe: crear cuentas gratuitas de Supabase y Vercel.
-- Claude: ajustar SPEC-000 con lo que salga de la entrevista.
+`npm run lint`, `npm run typecheck`, `npm test`, `npm run test:integration`, `npm run build`: todos sin errores. `next start` sirve /login (200) y redirige /app a /login sin sesión.
+
+## Verificado manualmente
+
+- 19 oct 2026, Felipe en la vista previa de Vercel contra `crm-viajes-pruebas`: registro, confirmación de correo, creación de agencia y aceptación de invitación.
+
+## No verificado todavía
+
+- Recorrido E2E con Playwright: llega con las pantallas de negocio en S02.
+
+## Pendiente
+
+- Antes del piloto con datos reales: pasar Supabase y Vercel a planes Pro (el plan Hobby de Vercel no permite uso comercial y el gratuito de Supabase no tiene copias).
+- Felipe: iniciar la verificación de Meta Business (ahora es crítica para la bandeja).
+- Felipe: canales que usa la agencia, volumen de mensajes y dirección de su web.
 
 ## Bloqueos
 
@@ -23,4 +33,4 @@ Ninguno de código. La política de datos personales bloquea cargar datos reales
 
 ## Siguiente tarea
 
-S01: proyecto Next.js con CI, esquema con agencias y RLS, login e invitaciones.
+S02: contactos, oportunidades, embudo, tareas y botón de WhatsApp.
