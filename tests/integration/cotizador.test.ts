@@ -3,7 +3,7 @@
 import { and, eq, sql } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { SessionUser } from "../../src/db/client";
-import { auditEvents, catalogServices, quoteItems, quoteVersions, quotes } from "../../src/db/schema";
+import { auditEvents, catalogServices, quoteItems, quoteVersionCosts, quoteVersions, quotes } from "../../src/db/schema";
 import { addDays, colombiaToday, quoteTotals } from "../../src/domain/quotes";
 import { acceptInvitation, createAgency, createInvitation } from "../../src/server/agencies";
 import { createContact } from "../../src/server/contacts";
@@ -177,7 +177,7 @@ describe("cálculo en la base (RF-401 a RF-403)", () => {
     if (!v.canSeeCosts) throw new Error("costes");
     expect(v.missingRate).toBe(true);
     expect(v.items[0].lineCost).toBeNull();
-    await as(t.db, asesorA, (tx) => tx.update(quoteVersions).set({ exchangeRate: "3900" }).where(eq(quoteVersions.id, q.versionId)));
+    await as(t.db, asesorA, (tx) => tx.update(quoteVersionCosts).set({ exchangeRate: "3900" }).where(eq(quoteVersionCosts.quoteVersionId, q.versionId)));
     v = await as(t.db, asesorA, (tx) => getQuoteVersion(tx, asesorA.id, agencyA, q.versionId, now()));
     if (!v.canSeeCosts) throw new Error("costes");
     expect(v.items[0].lineCost).toBe("2340000.00");
@@ -202,7 +202,8 @@ describe("enviar y congelar (RF-403, RF-404)", () => {
   it("al enviar guarda el total, quién la envió, el margen mínimo y la marca de ese momento", async () => {
     const q = await newDraft();
     await send(asesorA, q.versionId);
-    const [v] = await t.admin`select status, sale_total::text, sent_by, min_margin_pct::text, brand from quote_versions where id = ${q.versionId}`;
+    const [v] = await t.admin`select v.status, v.sale_total::text, v.sent_by, c.min_margin_pct::text, v.brand
+      from quote_versions v join quote_version_costs c on c.quote_version_id = v.id where v.id = ${q.versionId}`;
     expect(v).toMatchObject({ status: "enviada", sale_total: "5100000.00", sent_by: asesorA.id, min_margin_pct: "10.00" });
     expect(v.brand).toMatchObject({ name: "Andes Cotizador", primary_color: "#0F6E6E" });
   });
@@ -308,7 +309,7 @@ describe("Lectura no ve costes (RF-406, AC-410)", () => {
     expect(v.canSeeCosts).toBe(false);
     expect(v.saleTotal).toBe("5100000");
     expect(v.items[0]).toEqual({ id: expect.any(String), position: 0, description: "Hotel 4 noches, habitación doble", quantity: "4.00", unit: "noche", unitPrice: "750000.0000", lineTotal: "3000000.00" });
-    expect(JSON.stringify(v)).not.toMatch(/unitCost|lineCost|2400000|margin|profit/);
+    expect(JSON.stringify(v)).not.toMatch(/unitCost|lineCost|2400000|margin|Margin|profit|exchange|4000/);
   });
 
   it("tampoco llamando directo a la base", async () => {
@@ -317,6 +318,11 @@ describe("Lectura no ve costes (RF-406, AC-410)", () => {
     expect(rows).toEqual([]);
     const cat = await as(t.db, lecturaA, (tx) => tx.select().from(catalogServices));
     expect(cat).toEqual([]);
+    // Hallazgo M1 de QA: el tipo de cambio y el margen mínimo tampoco.
+    const costs = await as(t.db, lecturaA, (tx) => tx.select().from(quoteVersionCosts).where(eq(quoteVersionCosts.quoteVersionId, q.versionId)));
+    expect(costs).toEqual([]);
+    const cols = await t.admin`select column_name from information_schema.columns where table_name = 'quote_versions'`;
+    expect(cols.map((c) => c.column_name)).not.toEqual(expect.arrayContaining(["exchange_rate"]));
   });
 
   it("no crea, no edita y no envía", async () => {
@@ -364,5 +370,78 @@ describe("catálogo simple (RF-412, AC-413)", () => {
     await as(t.db, adminA, (tx) => tx.update(catalogServices).set({ unitPrice: "200000" }).where(eq(catalogServices.id, svc.id)));
     const [item] = await t.admin`select unit_price::text, line_total::text, catalog_service_id from quote_items where quote_version_id = ${q.versionId}`;
     expect(item).toEqual({ unit_price: "180000.0000", line_total: "180000.00", catalog_service_id: svc.id });
+  });
+});
+
+describe("hallazgos de la prueba independiente (QA, 5 nov 2026)", () => {
+  it("A1: un ítem no se cuela en una versión que se está enviando en otra transacción", async () => {
+    const q = await newDraft();
+    let release!: () => void;
+    let sentInA!: () => void;
+    const held = new Promise<void>((r) => (release = r));
+    const sending = new Promise<void>((r) => (sentInA = r));
+    const a = as(t.db, asesorA, async (tx) => {
+      await tx.update(quoteVersions).set({ status: "enviada" }).where(eq(quoteVersions.id, q.versionId));
+      sentInA();
+      await held;
+    });
+    await sending;
+    let settled = false;
+    const b = as(t.db, adminA, (tx) => tx.insert(quoteItems).values({ agencyId: agencyA, quoteVersionId: q.versionId, position: 7, description: "Colado", quantity: "1", unitPrice: "777", costCurrency: "COP" })).finally(() => (settled = true));
+    b.catch(() => {});
+    await new Promise((r) => setTimeout(r, 300));
+    expect(settled).toBe(false); // espera a que la otra transacción termine
+    release();
+    await a;
+    await expectDb(b, "quote_version_locked");
+    const [v] = await t.admin`select v.sale_total::text as total, (select sum(line_total)::text from quote_items i where i.quote_version_id = v.id) as items from quote_versions v where v.id = ${q.versionId}`;
+    expect(v.total).toBe(v.items);
+  });
+
+  it("M2: un borrador con ítems se puede borrar si hay otra versión; la única versión no (B3)", async () => {
+    const q = await newDraft();
+    await expectDb(as(t.db, asesorA, (tx) => tx.delete(quoteVersions).where(eq(quoteVersions.id, q.versionId))), "quote_last_version");
+    await send(asesorA, q.versionId);
+    const next = await as(t.db, asesorA, (tx) => createNextVersion(tx, asesorA.id, agencyA, q.versionId));
+    const del = await as(t.db, asesorA, (tx) => tx.delete(quoteVersions).where(eq(quoteVersions.id, next.versionId)).returning({ id: quoteVersions.id }));
+    expect(del).toHaveLength(1);
+    const left = await t.admin`select count(*)::int as n from quote_items where quote_version_id = ${next.versionId}`;
+    expect(left[0].n).toBe(0);
+  });
+
+  it("M3: un importe que no cabe se avisa en su campo, sin error técnico", async () => {
+    const q = await as(t.db, asesorA, (tx) => createQuote(tx, asesorA.id, agencyA, { opportunityId: oppA, now: now() }));
+    const huge = { ...cartagena, exchangeRate: "1.000.000", items: [{ description: "Grande", quantity: "9999", unit: "servicio", unitPrice: "999999999999", unitCost: "0", costCurrency: "COP" }] };
+    await expect(as(t.db, asesorA, (tx) => saveDraft(tx, asesorA.id, agencyA, q.versionId, huge))).rejects.toSatisfy((e: unknown) => e instanceof AppError && e.code === "amount_too_large" && e.field === "unitPrice.0");
+    const cost = { ...huge, items: [{ description: "Coste", quantity: "9999", unit: "servicio", unitPrice: "1", unitCost: "999999", costCurrency: "USD" }] };
+    await expect(as(t.db, asesorA, (tx) => saveDraft(tx, asesorA.id, agencyA, q.versionId, cost))).rejects.toSatisfy((e: unknown) => e instanceof AppError && e.code === "amount_too_large" && e.field === "unitCost.0");
+  });
+
+  it("B1: nadie marca sustituida a mano una versión vigente", async () => {
+    const q = await newDraft();
+    await send(asesorA, q.versionId);
+    await expectDb(as(t.db, asesorA, (tx) => tx.update(quoteVersions).set({ status: "sustituida" }).where(eq(quoteVersions.id, q.versionId))), "invalid_quote_transition");
+  });
+
+  it("B2: un ítem no apunta a un servicio del catálogo que no existe o es de otra agencia", async () => {
+    const q = await newDraft();
+    const [svcB] = await as(t.db, adminB, (tx) => tx.insert(catalogServices).values({ agencyId: agencyB, description: "De B", unit: "servicio", costCurrency: "COP", priceCurrency: "COP", createdBy: adminB.id }).returning());
+    const item = { ...cartagena.items[2], catalogServiceId: svcB.id };
+    await expect(as(t.db, asesorA, (tx) => saveDraft(tx, asesorA.id, agencyA, q.versionId, { ...cartagena, items: [item] }))).rejects.toThrow();
+  });
+
+  it("B6: si otra persona crea el borrador al mismo tiempo, el mensaje lo dice", async () => {
+    const q = await newDraft();
+    await send(asesorA, q.versionId);
+    const results = await Promise.allSettled([
+      as(t.db, asesorA, (tx) => createNextVersion(tx, asesorA.id, agencyA, q.versionId)),
+      as(t.db, adminA, (tx) => createNextVersion(tx, adminA.id, agencyA, q.versionId)),
+    ]);
+    const drafts = await t.admin`select count(*)::int as n from quote_versions where quote_id = ${q.quoteId} and status = 'borrador'`;
+    expect(drafts[0].n).toBe(1);
+    for (const r of results) {
+      if (r.status === "rejected") expect(r.reason).toBeInstanceOf(AppError);
+      if (r.status === "rejected") expect((r.reason as AppError).code).toBe("quote_draft_exists");
+    }
   });
 });

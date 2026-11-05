@@ -44,6 +44,9 @@ export const ERROR_MESSAGES = {
   exchange_rate_required: "Escribe el tipo de cambio que usaste (por ejemplo 4.000 pesos por dólar).",
   valid_until_required: "Escribe hasta qué fecha es válida la cotización.",
   valid_until_past: "La fecha de validez ya pasó. Elige hoy o una fecha posterior.",
+  amount_too_large: "El importe es demasiado grande (máximo 999.999.999.999). Revisa la cantidad, el precio y el tipo de cambio.",
+  quote_last_version: "No se puede borrar la única versión de una cotización.",
+  quote_draft_exists: "Otra persona acaba de crear la versión nueva de esta cotización. Recarga la página para abrirla.",
 } as const;
 
 export type ErrorCode = keyof typeof ERROR_MESSAGES;
@@ -160,5 +163,6 @@ export function rethrowBusiness(err: unknown): never {
   const pg = pgError(err);
   if (pg?.code === "P0001" && isErrorCode(pg.message)) throw new AppError(pg.message);
   if (pg?.code === "42501") throw new AppError("permission_denied");
+  if (pg?.code === "22003") throw new AppError("amount_too_large");
   throw err;
 }

@@ -3,8 +3,9 @@
 // para devolver errores ligados a su campo y conservar lo escrito.
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import type { Tx } from "@/db/client";
-import { contacts, opportunities, quoteItems, quoteSettings, quoteVersions, quotes } from "@/db/schema";
+import { contacts, opportunities, quoteItems, quoteSettings, quoteVersionCosts, quoteVersions, quotes } from "@/db/schema";
 import { isCurrency, type Currency } from "@/domain/money";
+import Decimal from "decimal.js";
 import { can } from "@/domain/permissions";
 import {
   QUOTE_LIMITS,
@@ -14,6 +15,7 @@ import {
   daysToExpire,
   displayStatus,
   indicators,
+  lineTotals,
   isQuoteUnit,
   parseExchangeRate,
   parseQuantity,
@@ -23,7 +25,7 @@ import {
 } from "@/domain/quotes";
 import { recordAudit, requirePermission } from "./agencies";
 import { logActivity } from "./contacts";
-import { AppError, fieldError, requireIds, rethrowBusiness } from "./errors";
+import { AppError, fieldError, pgError, requireIds, rethrowBusiness } from "./errors";
 
 const DEFAULT_SETTINGS = { minMarginPct: "10.00", validityDays: 5, defaultIncludes: null, defaultExcludes: null, defaultPaymentTerms: null, defaultCancellation: null };
 
@@ -164,6 +166,17 @@ export function parseDraft(input: DraftInput) {
     requireIds(catalogServiceId);
     return { description, supplier, quantity, unit: it.unit, unitPrice, unitCost, costCurrency: it.costCurrency, catalogServiceId };
   });
+  // Ningún total puede pasar de 999.999.999.999 (columnas numeric(14,2)): se avisa en su campo en
+  // vez de dejar que la base falle con un error técnico (informe de QA, 5 nov 2026).
+  const MAX = new Decimal("1e12");
+  let total = new Decimal(0);
+  items.forEach((it, i) => {
+    const line = lineTotals(it, input.saleCurrency as Currency, exchangeRate);
+    if (new Decimal(line.sale).greaterThanOrEqualTo(MAX)) throw new AppError("amount_too_large", undefined, `unitPrice.${i}`);
+    if (line.cost !== null && new Decimal(line.cost).greaterThanOrEqualTo(MAX)) throw new AppError("amount_too_large", undefined, `unitCost.${i}`);
+    total = total.plus(line.sale);
+  });
+  if (total.greaterThanOrEqualTo(MAX)) throw new AppError("amount_too_large", undefined, "items");
   return { title, clientName, destination, travelStart, travelEnd, travelers, saleCurrency: input.saleCurrency, exchangeRate, validUntil, includes, excludes, paymentTerms, cancellationPolicy, showItemPrices: !!input.showItemPrices, items };
 }
 
@@ -175,9 +188,13 @@ export async function saveDraft(tx: Tx, userId: string, agencyId: string, versio
   const [current] = await tx.select({ status: quoteVersions.status }).from(quoteVersions).where(and(eq(quoteVersions.id, versionId), eq(quoteVersions.agencyId, agencyId)));
   if (!current) throw new AppError("not_found");
   if (current.status !== "borrador") throw new AppError("quote_version_locked");
-  const { items, ...header } = draft;
+  const { items, exchangeRate, ...header } = draft;
   try {
     await tx.update(quoteVersions).set(header).where(and(eq(quoteVersions.id, versionId), eq(quoteVersions.agencyId, agencyId)));
+    await tx
+      .insert(quoteVersionCosts)
+      .values({ quoteVersionId: versionId, agencyId, exchangeRate })
+      .onConflictDoUpdate({ target: quoteVersionCosts.quoteVersionId, set: { exchangeRate } });
     await tx.delete(quoteItems).where(and(eq(quoteItems.quoteVersionId, versionId), eq(quoteItems.agencyId, agencyId)));
     if (items.length) {
       await tx.insert(quoteItems).values(items.map((it, position) => ({ ...it, agencyId, quoteVersionId: versionId, position })));
@@ -199,6 +216,7 @@ export async function createNextVersion(tx: Tx, userId: string, agencyId: string
   const [draft] = await tx.select({ id: quoteVersions.id }).from(quoteVersions).where(and(eq(quoteVersions.quoteId, source.quoteId), eq(quoteVersions.status, "borrador")));
   if (draft) return { versionId: draft.id, created: false };
   const items = await tx.select().from(quoteItems).where(eq(quoteItems.quoteVersionId, fromVersionId)).orderBy(asc(quoteItems.position), asc(quoteItems.createdAt));
+  const [costs] = await tx.select({ exchangeRate: quoteVersionCosts.exchangeRate }).from(quoteVersionCosts).where(eq(quoteVersionCosts.quoteVersionId, fromVersionId));
   try {
     const [created] = await tx
       .insert(quoteVersions)
@@ -212,7 +230,6 @@ export async function createNextVersion(tx: Tx, userId: string, agencyId: string
         travelEnd: source.travelEnd,
         travelers: source.travelers,
         saleCurrency: source.saleCurrency,
-        exchangeRate: source.exchangeRate,
         validUntil: source.validUntil,
         includes: source.includes,
         excludes: source.excludes,
@@ -222,6 +239,7 @@ export async function createNextVersion(tx: Tx, userId: string, agencyId: string
         createdBy: userId,
       })
       .returning({ id: quoteVersions.id, version: quoteVersions.version });
+    if (costs?.exchangeRate) await tx.insert(quoteVersionCosts).values({ quoteVersionId: created.id, agencyId, exchangeRate: costs.exchangeRate });
     if (items.length) {
       await tx.insert(quoteItems).values(
         items.map((it) => ({
@@ -242,6 +260,8 @@ export async function createNextVersion(tx: Tx, userId: string, agencyId: string
     await recordAudit(tx, { agencyId, actorId: userId, action: "quote.version_created", objectType: "quote", objectId: source.quoteId, changes: { version: created.version, desde: source.version } });
     return { versionId: created.id, created: true };
   } catch (err) {
+    // Otra persona creó el borrador al mismo tiempo (índice de un solo borrador).
+    if (pgError(err)?.code === "23505") throw new AppError("quote_draft_exists");
     rethrowBusiness(err);
   }
 }
@@ -268,7 +288,35 @@ export async function getQuoteVersion(tx: Tx, userId: string, agencyId: string, 
   const base = {
     number: row.number,
     opportunityId: row.opportunityId,
-    version,
+    // Lista blanca: lo mismo que verá el cliente, sin datos internos (RF-406).
+    version: {
+      id: version.id,
+      quoteId: version.quoteId,
+      version: version.version,
+      status: version.status,
+      title: version.title,
+      clientName: version.clientName,
+      destination: version.destination,
+      travelStart: version.travelStart,
+      travelEnd: version.travelEnd,
+      travelers: version.travelers,
+      saleCurrency: version.saleCurrency,
+      validUntil: version.validUntil,
+      includes: version.includes,
+      excludes: version.excludes,
+      paymentTerms: version.paymentTerms,
+      cancellationPolicy: version.cancellationPolicy,
+      showItemPrices: version.showItemPrices,
+      saleTotal: version.saleTotal,
+      brand: version.brand,
+      sentAt: version.sentAt,
+      sentBy: version.sentBy,
+      decidedAt: version.decidedAt,
+      decidedBy: version.decidedBy,
+      createdBy: version.createdBy,
+      createdAt: version.createdAt,
+      updatedAt: version.updatedAt,
+    },
     status: displayStatus(version.status, version.validUntil, today),
     daysToExpire: daysToExpire(version.status, version.validUntil, today),
   };
@@ -278,7 +326,8 @@ export async function getQuoteVersion(tx: Tx, userId: string, agencyId: string, 
     return { ...base, canSeeCosts: false as const, items, saleTotal: sumAmounts(items.map((i) => i.lineTotal)) };
   }
   const items = await tx.select().from(quoteItems).where(eq(quoteItems.quoteVersionId, versionId)).orderBy(asc(quoteItems.position), asc(quoteItems.createdAt));
-  const minMargin = version.minMarginPct ?? (await getQuoteSettings(tx, userId, agencyId)).minMarginPct;
+  const [costs] = await tx.select().from(quoteVersionCosts).where(eq(quoteVersionCosts.quoteVersionId, versionId));
+  const minMargin = costs?.minMarginPct ?? (await getQuoteSettings(tx, userId, agencyId)).minMarginPct;
   const missingRate = items.some((i) => i.lineCost === null);
   const withIndicators = items.map((i) => ({
     ...i,
@@ -297,6 +346,7 @@ export async function getQuoteVersion(tx: Tx, userId: string, agencyId: string, 
     saleTotal,
     totals,
     missingRate,
+    exchangeRate: costs?.exchangeRate ?? null,
     minMarginPct: minMargin,
     lowMarginTotal: !missingRate && belowMinMargin(saleTotal, costTotal, minMargin),
   };

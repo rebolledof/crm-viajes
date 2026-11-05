@@ -10,8 +10,8 @@ La constitución exige que lo enviado se conserve (principio 3) y que las cifras
 
 1. Las reglas de estado viven en triggers de PostgreSQL (`app.quote_versions_rules`, `app.quote_items_compute`): una versión que no está en borrador rechaza cualquier cambio de datos o de ítems, y los estados solo avanzan. Como no dependen de RLS, valen también para el dueño de la base.
 2. La base calcula y guarda el total de cada ítem con la regla `half_up_item_v1`, que se guarda en cada versión. Si la regla cambia en el futuro, será una regla nueva con otro nombre y las versiones viejas conservan la suya.
-3. El coste va en la misma tabla de ítems, que solo leen administrador y asesor. Lectura y el PDF leen los ítems por `app.quote_items_for_client`, que no devuelve coste.
-4. Enviar es cambiar el estado a "enviada"; la base valida y congela (total, margen mínimo, marca y logo). Lo que no es dinero ni inmutabilidad (mover la oportunidad, auditoría del envío, PDF) lo hace la aplicación en la misma transacción.
+3. El coste va en la tabla de ítems, y el tipo de cambio y el margen mínimo en `quote_version_costs`; las dos solo las leen administrador y asesor (con el tipo de cambio se podría deducir el coste). Lectura y el PDF leen los ítems por `app.quote_items_for_client`, que no devuelve coste.
+4. Enviar es cambiar el estado a "enviada"; la base valida y congela (total, margen mínimo, marca y logo). Los triggers bloquean la versión `for share` para que un ítem no entre mientras otra transacción la envía. Lo que no es dinero ni inmutabilidad (mover la oportunidad, auditoría del envío, PDF) lo hace la aplicación en la misma transacción.
 
 ## Consecuencias
 

@@ -81,7 +81,8 @@ Enlace privado para que el cliente vea y acepte en línea (S09), reserva desde l
 ## Datos (borrador; se detalla en plan.md)
 
 - `quotes`: agency_id, opportunity_id, número, título, moneda de venta, creada por, fechas.
-- `quote_versions`: agency_id, quote_id, número de versión, estado, datos del cliente y del viaje, condiciones, tipo de cambio, totales calculados, margen mínimo vigente, marca de la agencia copiada, ruta o contenido del PDF, enviada por y cuándo. Un disparador impide cambiar una versión que no está en Borrador.
+- `quote_versions`: agency_id, quote_id, número de versión, estado, datos del cliente y del viaje, condiciones, totales calculados, marca de la agencia copiada, ruta o contenido del PDF, enviada por y cuándo. Un disparador impide cambiar una versión que no está en Borrador.
+- `quote_version_costs`: tipo de cambio y margen mínimo vigente de cada versión; solo administrador y asesor.
 - `quote_items`: agency_id, quote_version_id, posición, descripción, proveedor, cantidad, unidad, coste unitario y su moneda, venta unitaria, totales por ítem.
 - `catalog_services` y `quote_settings` (margen mínimo, vigencia y textos por defecto).
 - Importes en `numeric` con moneda en columna propia; nunca `float`. Todas las tablas con `agency_id`, RLS y pruebas de acceso cruzado. Las columnas de coste no llegan al rol Lectura (vista o función que las excluye).

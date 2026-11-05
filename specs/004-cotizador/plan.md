@@ -7,7 +7,8 @@ Una migración nueva y aditiva: `20261109000000_cotizador.sql`. Solo crea tipos,
 | Tabla | Contenido | Reglas clave |
 | --- | --- | --- |
 | `quotes` | cotización de una oportunidad, con su número | número consecutivo por agencia con `app.quote_counters` (insert … on conflict, bloquea la fila del contador); el número que mande el cliente se ignora |
-| `quote_versions` | datos del cliente y del viaje, moneda de venta, tipo de cambio, vigencia, condiciones, mostrar precios por ítem; al enviar: total, margen mínimo, marca y logo copiados, quién y cuándo | un solo borrador y una sola aceptada por cotización (índices parciales); el trigger `quote_versions_rules` decide qué cambio vale |
+| `quote_versions` | datos del cliente y del viaje, moneda de venta, vigencia, condiciones, mostrar precios por ítem; al enviar: total, marca y logo copiados, quién y cuándo | un solo borrador y una sola aceptada por cotización (índices parciales); el trigger `quote_versions_rules` decide qué cambio vale |
+| `quote_version_costs` | tipo de cambio y margen mínimo de cada versión (datos internos) | solo administrador y asesor la leen; el tipo de cambio solo cambia en borrador y al cambiar recalcula los ítems; se borra con su versión |
 | `quote_items` | descripción, proveedor, cantidad, unidad, precio y coste unitarios con moneda del coste, referencia al catálogo, totales calculados | el trigger `quote_items_compute` calcula `line_total` y `line_cost` y rechaza cualquier cambio si la versión no es borrador; solo administrador y asesor leen la tabla |
 | `catalog_services` | servicios reutilizables con coste y venta de referencia | lo leen administrador y asesor; lo cambia el administrador; se copia a la cotización |
 | `quote_settings` | margen mínimo (10 %), vigencia por defecto (5 días) y textos por defecto | sin fila valen los valores por defecto; solo el administrador la escribe |
@@ -25,10 +26,14 @@ Una migración nueva y aditiva: `20261109000000_cotizador.sql`. Solo crea tipos,
 - Borrador → enviada: exige al menos un ítem, tipo de cambio si algún coste está en otra moneda y vigencia de hoy en adelante (hora de Colombia). Copia el total, el margen mínimo, nombre y colores de la agencia y el logo. Las enviadas anteriores de la misma cotización pasan a sustituida (trigger `quote_versions_after`).
 - Enviada → aceptada, rechazada o sustituida. Ningún otro cambio: ni datos, ni ítems, ni borrar, ni siquiera con el usuario dueño de la base (el trigger no depende de RLS).
 - "Vencida" no se guarda: se calcula al leer con la fecha de Colombia.
+- Pasar a sustituida solo vale si hay otra enviada más reciente de la misma cotización.
+- Borrar: un borrador sí (sus ítems y su fila de costes se van con él), salvo que sea la única versión (`quote_last_version`); una enviada nunca (`quote_version_locked`).
+- Concurrencia: los triggers de ítems y costes leen la versión `for share`, así un ítem no entra en una versión que se está enviando en otra transacción. Dos "nueva versión" a la vez chocan en el índice de borrador único y la segunda recibe `quote_draft_exists`.
+- Importes: cada línea y el total deben ser menores que 1e12; si no, `amount_too_large` en el campo del ítem (también si la base desborda, código 22003).
 
 ## Costes ocultos para Lectura
 
-Lectura no puede leer `quote_items` ni `catalog_services` (RLS). Para ver los ítems usa `app.quote_items_for_client(version)`, que devuelve solo descripción, cantidad, unidad, precio y total. `getQuoteVersion` elige la fuente según el permiso `quotes.costs`. El PDF de la parte 4 usará la misma función.
+Lectura no puede leer `quote_items`, `catalog_services` ni `quote_version_costs` (RLS). Para ver los ítems usa `app.quote_items_for_client(version)`, que devuelve solo descripción, cantidad, unidad, precio y total. `getQuoteVersion` elige la fuente según el permiso `quotes.costs`. El PDF de la parte 4 usará la misma función.
 
 ## Código (parte 1)
 

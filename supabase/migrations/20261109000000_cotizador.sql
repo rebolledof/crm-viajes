@@ -7,8 +7,9 @@
 --   * Una versión que no está en Borrador no cambia nunca: ni sus datos ni sus ítems (RF-405).
 --   * El total de cada ítem lo calcula la base con decimales exactos y la regla de redondeo de la
 --     versión (RF-401); lo que mande el cliente en esas columnas se ignora.
---   * Coste, utilidad y margen solo los leen administrador y asesor (RF-406): la tabla de ítems
---     no se le muestra a Lectura, que usa app.quote_items_for_client.
+--   * Coste, utilidad, margen y tipo de cambio solo los leen administrador y asesor (RF-406): las
+--     tablas quote_items y quote_version_costs no se le muestran a Lectura, que usa
+--     app.quote_items_for_client.
 
 create type public.quote_status as enum ('borrador', 'enviada', 'sustituida', 'aceptada', 'rechazada');
 create type public.quote_unit as enum ('persona', 'noche', 'habitacion', 'servicio');
@@ -92,8 +93,6 @@ create table public.quote_versions (
   travel_end date,
   travelers integer check (travelers is null or travelers between 1 and 999),
   sale_currency public.currency_code not null default 'COP',
-  -- Pesos colombianos por 1 dólar. Obligatorio para enviar si algún coste está en otra moneda.
-  exchange_rate numeric(14, 4) check (exchange_rate is null or (exchange_rate > 0 and exchange_rate <= 1000000)),
   valid_until date,
   includes text check (includes is null or length(includes) <= 4000),
   excludes text check (excludes is null or length(excludes) <= 4000),
@@ -101,9 +100,8 @@ create table public.quote_versions (
   cancellation_policy text check (cancellation_policy is null or length(cancellation_policy) <= 4000),
   show_item_prices boolean not null default true,
   rounding_rule text not null default 'half_up_item_v1',
-  -- Se llenan solos al enviar (RF-404): total, margen mínimo y marca de la agencia de ese momento.
+  -- Se llenan solos al enviar (RF-404): total y marca de la agencia de ese momento.
   sale_total numeric(14, 2),
-  min_margin_pct numeric(5, 2),
   brand jsonb,
   brand_logo bytea,
   brand_logo_type text,
@@ -125,6 +123,17 @@ create unique index quote_versions_one_draft_idx on public.quote_versions (quote
 create unique index quote_versions_one_accepted_idx on public.quote_versions (quote_id) where status = 'aceptada';
 create index quote_versions_agency_idx on public.quote_versions (agency_id, status, valid_until);
 
+-- Datos internos de la versión, que Lectura no ve (RF-406): tipo de cambio (pesos colombianos por
+-- 1 dólar, obligatorio para enviar si algún coste está en otra moneda) y margen mínimo, que se
+-- copia de los ajustes al enviar. Sin fila, no hay tipo de cambio.
+create table public.quote_version_costs (
+  quote_version_id uuid primary key,
+  agency_id uuid not null,
+  exchange_rate numeric(14, 4) check (exchange_rate is null or (exchange_rate > 0 and exchange_rate <= 1000000)),
+  min_margin_pct numeric(5, 2),
+  foreign key (agency_id, quote_version_id) references public.quote_versions (agency_id, id) on delete cascade
+);
+
 create table public.quote_items (
   id uuid primary key default gen_random_uuid(),
   agency_id uuid not null,
@@ -142,7 +151,8 @@ create table public.quote_items (
   line_total numeric(14, 2) not null default 0,
   line_cost numeric(14, 2),
   created_at timestamptz not null default now(),
-  foreign key (agency_id, quote_version_id) references public.quote_versions (agency_id, id) on delete cascade
+  foreign key (agency_id, quote_version_id) references public.quote_versions (agency_id, id) on delete cascade,
+  foreign key (agency_id, catalog_service_id) references public.catalog_services (agency_id, id)
 );
 create index quote_items_version_idx on public.quote_items (quote_version_id, position);
 
@@ -160,16 +170,24 @@ as $$
   end;
 $$;
 
+-- Lee la versión con FOR SHARE: así choca con el UPDATE que la envía y un ítem no se puede
+-- colar en una versión que se está enviando en otra transacción (informe de QA, 5 nov 2026).
 create function app.quote_items_compute() returns trigger
 language plpgsql security definer set search_path = ''
 as $$
 declare
   v public.quote_versions%rowtype;
+  v_rate numeric;
 begin
   select * into v from public.quote_versions
     where id = coalesce(new.quote_version_id, old.quote_version_id)
-      and agency_id = coalesce(new.agency_id, old.agency_id);
+      and agency_id = coalesce(new.agency_id, old.agency_id)
+    for share;
   if not found then
+    -- Borrado en cascada de un borrador: la versión ya no está.
+    if tg_op = 'DELETE' then
+      return old;
+    end if;
     raise exception 'not_found' using errcode = 'P0001';
   end if;
   if v.status <> 'borrador' then
@@ -181,13 +199,59 @@ begin
   if tg_op = 'UPDATE' and (new.quote_version_id <> old.quote_version_id or new.agency_id <> old.agency_id) then
     raise exception 'quote_version_locked' using errcode = 'P0001';
   end if;
+  select c.exchange_rate into v_rate from public.quote_version_costs c where c.quote_version_id = v.id;
   new.line_total := app.quote_line_amount(new.quantity, new.unit_price, v.sale_currency, v.sale_currency, null);
-  new.line_cost := app.quote_line_amount(new.quantity, new.unit_cost, new.cost_currency, v.sale_currency, v.exchange_rate);
+  new.line_cost := app.quote_line_amount(new.quantity, new.unit_cost, new.cost_currency, v.sale_currency, v_rate);
   return new;
 end;
 $$;
 create trigger quote_items_compute before insert or update or delete on public.quote_items
   for each row execute function app.quote_items_compute();
+
+-- Los datos internos solo cambian en borrador; al cambiar el tipo de cambio se recalculan los ítems.
+create function app.quote_version_costs_rules() returns trigger
+language plpgsql security definer set search_path = ''
+as $$
+declare
+  v_status public.quote_status;
+begin
+  select status into v_status from public.quote_versions
+    where id = coalesce(new.quote_version_id, old.quote_version_id)
+      and agency_id = coalesce(new.agency_id, old.agency_id)
+    for share;
+  if not found then
+    if tg_op = 'DELETE' then
+      return old;
+    end if;
+    raise exception 'not_found' using errcode = 'P0001';
+  end if;
+  if v_status <> 'borrador' then
+    raise exception 'quote_version_locked' using errcode = 'P0001';
+  end if;
+  if tg_op = 'DELETE' then
+    return old;
+  end if;
+  if tg_op = 'UPDATE' and (new.quote_version_id <> old.quote_version_id or new.agency_id <> old.agency_id) then
+    raise exception 'quote_version_locked' using errcode = 'P0001';
+  end if;
+  return new;
+end;
+$$;
+create trigger quote_version_costs_rules before insert or update or delete on public.quote_version_costs
+  for each row execute function app.quote_version_costs_rules();
+
+create function app.quote_version_costs_after() returns trigger
+language plpgsql security definer set search_path = ''
+as $$
+begin
+  if tg_op = 'INSERT' or new.exchange_rate is distinct from old.exchange_rate then
+    update public.quote_items set quantity = quantity where quote_version_id = new.quote_version_id;
+  end if;
+  return null;
+end;
+$$;
+create trigger quote_version_costs_after after insert or update on public.quote_version_costs
+  for each row execute function app.quote_version_costs_after();
 
 create function app.quote_versions_rules() returns trigger
 language plpgsql security definer set search_path = ''
@@ -202,7 +266,6 @@ begin
     new.status := 'borrador';
     new.rounding_rule := 'half_up_item_v1';
     new.sale_total := null;
-    new.min_margin_pct := null;
     new.brand := null;
     new.brand_logo := null;
     new.brand_logo_type := null;
@@ -239,8 +302,11 @@ begin
       raise exception 'valid_until_past' using errcode = 'P0001';
     end if;
     select coalesce(sum(i.line_total), 0) into new.sale_total from public.quote_items i where i.quote_version_id = new.id;
-    select coalesce((select s.min_margin_pct from public.quote_settings s where s.agency_id = new.agency_id), 10)
-      into new.min_margin_pct;
+    -- La versión sigue en borrador dentro de este trigger, así que la fila interna se puede escribir.
+    insert into public.quote_version_costs (quote_version_id, agency_id, min_margin_pct)
+      values (new.id, new.agency_id,
+        coalesce((select s.min_margin_pct from public.quote_settings s where s.agency_id = new.agency_id), 10))
+      on conflict (quote_version_id) do update set min_margin_pct = excluded.min_margin_pct;
     select a.name into v_agency_name from public.agencies a where a.id = new.agency_id;
     select * into v_brand from public.agency_branding b where b.agency_id = new.agency_id;
     new.brand := jsonb_build_object(
@@ -267,6 +333,13 @@ begin
   if old.status <> 'enviada' or new.status not in ('sustituida', 'aceptada', 'rechazada') then
     raise exception 'invalid_quote_transition' using errcode = 'P0001';
   end if;
+  -- Solo queda sustituida cuando se envía otra versión de la misma cotización.
+  if new.status = 'sustituida' and not exists (
+    select 1 from public.quote_versions o
+    where o.quote_id = new.quote_id and o.id <> new.id and o.status = 'enviada' and o.sent_at >= old.sent_at
+  ) then
+    raise exception 'invalid_quote_transition' using errcode = 'P0001';
+  end if;
   if new.status in ('aceptada', 'rechazada') then
     new.decided_at := now();
     new.decided_by := auth.uid();
@@ -290,8 +363,7 @@ begin
   if old.status = 'borrador' and new.status = 'enviada' then
     update public.quote_versions set status = 'sustituida'
       where quote_id = new.quote_id and id <> new.id and status = 'enviada';
-  elsif new.status = 'borrador' and (new.sale_currency is distinct from old.sale_currency
-        or new.exchange_rate is distinct from old.exchange_rate) then
+  elsif new.status = 'borrador' and new.sale_currency is distinct from old.sale_currency then
     update public.quote_items set quantity = quantity where quote_version_id = new.id;
   end if;
   return null;
@@ -300,13 +372,19 @@ $$;
 create trigger quote_versions_after after update on public.quote_versions
   for each row execute function app.quote_versions_after();
 
--- Una versión enviada no se borra. Un borrador sí (por ejemplo, si se creó por error).
+-- Una versión enviada no se borra. Un borrador sí (por ejemplo, si se creó por error), salvo que
+-- sea la única versión de la cotización.
 create function app.quote_versions_no_delete() returns trigger
 language plpgsql security definer set search_path = ''
 as $$
 begin
-  if old.status <> 'borrador' and exists (select 1 from public.quotes q where q.id = old.quote_id) then
-    raise exception 'quote_version_locked' using errcode = 'P0001';
+  if exists (select 1 from public.quotes q where q.id = old.quote_id) then
+    if old.status <> 'borrador' then
+      raise exception 'quote_version_locked' using errcode = 'P0001';
+    end if;
+    if not exists (select 1 from public.quote_versions o where o.quote_id = old.quote_id and o.id <> old.id) then
+      raise exception 'quote_last_version' using errcode = 'P0001';
+    end if;
   end if;
   return old;
 end;
@@ -343,6 +421,7 @@ alter table public.catalog_services enable row level security;
 alter table public.quotes enable row level security;
 alter table public.quote_versions enable row level security;
 alter table public.quote_items enable row level security;
+alter table public.quote_version_costs enable row level security;
 
 create policy quote_settings_select on public.quote_settings for select to authenticated using (app.is_member(agency_id));
 create policy quote_settings_insert on public.quote_settings for insert to authenticated
@@ -372,6 +451,12 @@ create policy quote_versions_update on public.quote_versions for update to authe
 create policy quote_versions_delete on public.quote_versions for delete to authenticated
   using (app.has_role(agency_id, array['admin', 'asesor']::public.agency_role[]) and status = 'borrador');
 
+create policy quote_version_costs_select on public.quote_version_costs for select to authenticated
+  using (app.has_role(agency_id, array['admin', 'asesor']::public.agency_role[]));
+create policy quote_version_costs_write on public.quote_version_costs for all to authenticated
+  using (app.has_role(agency_id, array['admin', 'asesor']::public.agency_role[]))
+  with check (app.has_role(agency_id, array['admin', 'asesor']::public.agency_role[]));
+
 create policy quote_items_select on public.quote_items for select to authenticated
   using (app.has_role(agency_id, array['admin', 'asesor']::public.agency_role[]));
 create policy quote_items_write on public.quote_items for all to authenticated
@@ -380,7 +465,7 @@ create policy quote_items_write on public.quote_items for all to authenticated
 
 -- Privilegios mínimos.
 revoke all on public.quote_settings, public.catalog_services, public.quotes, public.quote_versions,
-  public.quote_items from anon, authenticated;
+  public.quote_items, public.quote_version_costs from anon, authenticated;
 revoke all on app.quote_counters from anon, authenticated;
 grant select, insert on public.quote_settings to authenticated;
 grant update (min_margin_pct, validity_days, default_includes, default_excludes, default_payment_terms,
@@ -391,9 +476,11 @@ grant update (description, supplier, unit, unit_cost, cost_currency, unit_price,
 grant select, insert on public.quotes to authenticated;
 grant select, insert, delete on public.quote_versions to authenticated;
 grant update (status, title, client_name, destination, travel_start, travel_end, travelers, sale_currency,
-  exchange_rate, valid_until, includes, excludes, payment_terms, cancellation_policy, show_item_prices)
+  valid_until, includes, excludes, payment_terms, cancellation_policy, show_item_prices)
   on public.quote_versions to authenticated;
 grant select, insert, delete on public.quote_items to authenticated;
+grant select, insert on public.quote_version_costs to authenticated;
+grant update (exchange_rate) on public.quote_version_costs to authenticated;
 grant update (position, description, supplier, quantity, unit, unit_price, unit_cost, cost_currency, catalog_service_id)
   on public.quote_items to authenticated;
 revoke all on all functions in schema app from public;

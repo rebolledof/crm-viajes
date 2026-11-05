@@ -374,7 +374,6 @@ export const quoteVersions = pgTable("quote_versions", {
   travelEnd: date("travel_end"),
   travelers: integer("travelers"),
   saleCurrency: currencyCode("sale_currency").notNull().default("COP"),
-  exchangeRate: numeric("exchange_rate", { precision: 14, scale: 4 }),
   validUntil: date("valid_until"),
   includes: text("includes"),
   excludes: text("excludes"),
@@ -383,7 +382,6 @@ export const quoteVersions = pgTable("quote_versions", {
   showItemPrices: boolean("show_item_prices").notNull().default(true),
   roundingRule: text("rounding_rule").notNull().default("half_up_item_v1"),
   saleTotal: numeric("sale_total", { precision: 14, scale: 2 }),
-  minMarginPct: numeric("min_margin_pct", { precision: 5, scale: 2 }),
   brand: jsonb("brand").$type<{ name: string; primary_color: string; accent_color: string }>(),
   brandLogo: bytea("brand_logo"),
   brandLogoType: text("brand_logo_type"),
@@ -394,6 +392,16 @@ export const quoteVersions = pgTable("quote_versions", {
   createdBy: uuid("created_by").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** Datos internos de la versión que Lectura no ve (RF-406). */
+export const quoteVersionCosts = pgTable("quote_version_costs", {
+  quoteVersionId: uuid("quote_version_id").primaryKey(),
+  agencyId: uuid("agency_id").notNull(),
+  /** Pesos colombianos por 1 dólar. */
+  exchangeRate: numeric("exchange_rate", { precision: 14, scale: 4 }),
+  /** Se copia de los ajustes al enviar. */
+  minMarginPct: numeric("min_margin_pct", { precision: 5, scale: 2 }),
 });
 
 export const quoteItems = pgTable("quote_items", {
@@ -421,6 +429,7 @@ export const schemaTables = {
   quotes,
   quote_versions: quoteVersions,
   quote_items: quoteItems,
+  quote_version_costs: quoteVersionCosts,
   inbound_channels: inboundChannels,
   conversations,
   messages,
