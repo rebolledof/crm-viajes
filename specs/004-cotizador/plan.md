@@ -57,6 +57,7 @@ Lectura no puede leer `quote_items`, `catalog_services` ni `quote_version_costs`
 - Una versión que no es borrador, o cualquier versión vista por Lectura, se muestra como en el paso 3, con la lista de versiones y "Crear versión N" (o "Abrir el borrador" si ya hay uno).
 - Ficha de la oportunidad: tarjeta "Cotizaciones" con "Nueva cotización" y cada cotización con su estado y versión. La tarjeta completa (historial, aceptar y rechazar) llega en la parte 3.
 - Administración › Ajustes de cotizaciones (margen mínimo, vigencia y textos por defecto) y Administración › Catálogo de servicios (crear, cambiar y desactivar), solo para el administrador. Auditoría: `catalog.created`, `catalog.updated`, `quote_settings.updated`.
+- Si hay cambios sin guardar, salir por un enlace o cerrar la pestaña pregunta antes (`UnsavedGuard`). Los botones que guardan no se pueden pulsar dos veces mientras guardan. `saveDraftPart` bloquea la versión (`for update`) para que dos pestañas no se pisen.
 - Enviar todavía no está: el paso 3 lo dice. Llega en la parte 3 junto con el PDF de la parte 4.
 
 ## Siguientes partes

@@ -396,6 +396,10 @@ export type DraftPart = Partial<DraftInput>;
  */
 export async function saveDraftPart(tx: Tx, userId: string, agencyId: string, versionId: string, part: DraftPart): Promise<void> {
   await requirePermission(tx, userId, agencyId, "quotes.write");
+  requireIds(versionId);
+  // Bloquea la versión: si dos pestañas guardan pasos distintos a la vez, la segunda lee lo que
+  // guardó la primera y no la pisa (prueba independiente de la parte 2, hallazgo 3).
+  await tx.execute(sql`select 1 from public.quote_versions where id = ${versionId} and agency_id = ${agencyId} for update`);
   const v = await getQuoteVersion(tx, userId, agencyId, versionId, new Date());
   if (!v.canSeeCosts) throw new AppError("permission_denied");
   if (v.version.status !== "borrador") throw new AppError("quote_version_locked");

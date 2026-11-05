@@ -18,7 +18,7 @@
 
 ## Comandos verificados
 
-5 nov 2026 en la rama de S04 parte 2: lint, typecheck, 151 unitarias, 195 de integración y build sin errores. Recorrido con Playwright contra PostgreSQL local y una sesión simulada: crear desde la oportunidad, 4 servicios (uno en USD, dos del catálogo), guardar sin tipo de cambio, error en el servicio 2 que conserva todo, condiciones, revisar (total 5.100.000 COP, margen 17,1 %, aviso en el seguro con 8,3 %), a 375 px sin desborde, Lectura sin costes, ajustes y catálogo con error y guardado.
+5 nov 2026 en la rama de S04 parte 2, tras corregir la prueba independiente (Sonnet, T-083): lint, typecheck, 151 unitarias, 197 de integración y build sin errores. Recorrido con Playwright contra PostgreSQL local y una sesión simulada: crear desde la oportunidad, 4 servicios (uno en USD, dos del catálogo), guardar sin tipo de cambio, error en el servicio 2 que conserva todo, condiciones, revisar (total 5.100.000 COP, margen 17,1 %, aviso en el seguro con 8,3 %), a 375 px sin desborde, Lectura sin costes, ajustes y catálogo con error y guardado.
 
 5 nov 2026 en la rama de S04 parte 1, tras corregir la prueba independiente (Sonnet, T-082): lint, typecheck, 144 unitarias, 190 de integración y build sin errores.
 

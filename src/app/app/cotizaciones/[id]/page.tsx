@@ -23,6 +23,7 @@ import { errorMessage } from "@/server/errors";
 import { getQuoteScreen, listCatalog } from "@/server/quotes";
 import { requireActiveAgency } from "@/server/session";
 import { Flash, fecha, fechaHora, formatDay, loadOr404, type SearchParams } from "../../crm-ui";
+import { ExternalSubmit, PendingButton, UnsavedGuard } from "@/components/unsaved-guard";
 import { createNextVersionAction, saveQuoteStepAction } from "../../quote-actions";
 import { ItemsStep, type CatalogOption } from "./items-step";
 
@@ -81,9 +82,9 @@ export default async function CotizacionPage({ params, searchParams }: { params:
           <>
             {editable && step !== 3 && (
               <span className="hidden sm:block">
-                <button type="submit" form="cotizacion-paso" name="goTo" value="3" className={secondaryButtonClass}>
+                <ExternalSubmit formId="cotizacion-paso" value="3" noValidate className={secondaryButtonClass}>
                   <Icon name="eye" className="size-4" /> Ver como el cliente
-                </button>
+                </ExternalSubmit>
               </span>
             )}
             {!editable && canWrite && v.status !== "borrador" && (
@@ -92,7 +93,7 @@ export default async function CotizacionPage({ params, searchParams }: { params:
               ) : (
                 <form action={createNextVersionAction}>
                   <input type="hidden" name="versionId" value={v.id} />
-                  <button type="submit" className={buttonClass}><Icon name="plus" className="size-4" /> Crear versión {nextNumber}</button>
+                  <PendingButton className={buttonClass}><Icon name="plus" className="size-4" /> Crear versión {nextNumber}</PendingButton>
                 </form>
               )
             )}
@@ -107,6 +108,7 @@ export default async function CotizacionPage({ params, searchParams }: { params:
       <Flash sp={sp} />
 
       {editable && <Stepper step={step} />}
+      {editable && step !== 3 && <UnsavedGuard formId="cotizacion-paso" />}
       {!editable && q.versions.length > 1 && <VersionList q={q} />}
 
       {editable && step === 1 && (
@@ -160,7 +162,7 @@ function Stepper({ step }: { step: 1 | 2 | 3 }) {
               ) : step === 3 ? (
                 <Link href={`?paso=${n}`} className="flex items-center gap-2 rounded text-sm hover:underline">{inner}</Link>
               ) : (
-                <button type="submit" form="cotizacion-paso" name="goTo" value={n} className="flex items-center gap-2 rounded text-sm hover:underline">{inner}</button>
+                <ExternalSubmit formId="cotizacion-paso" value={String(n)} noValidate className="flex items-center gap-2 rounded text-sm hover:underline">{inner}</ExternalSubmit>
               )}
             </li>
           );
@@ -238,7 +240,7 @@ function ConditionsStep({ q }: { q: Screen }) {
         </div>
       </Card>
       <div className="sticky bottom-0 z-10 -mx-4 flex flex-wrap items-center justify-end gap-2 border-t border-line bg-surface px-4 py-3 sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:p-0">
-        <button type="submit" name="goTo" value="1" className={secondaryButtonClass}><Icon name="left" className="size-4" /> Servicios</button>
+        <button type="submit" name="goTo" value="1" formNoValidate className={secondaryButtonClass}><Icon name="left" className="size-4" /> Servicios</button>
         <button type="submit" name="goTo" value="2" className={secondaryButtonClass}>Guardar</button>
         <button type="submit" name="goTo" value="3" className={buttonClass}>Siguiente: revisar <Icon name="right" className="size-4" /></button>
       </div>

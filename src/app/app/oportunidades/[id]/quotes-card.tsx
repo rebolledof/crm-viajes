@@ -4,6 +4,7 @@ import { Card, Chip, buttonClass, linkButtonClass, type ChipTone } from "@/compo
 import type { Currency } from "@/domain/money";
 import { QUOTE_STATUS_LABELS, formatAmount, formatQuoteNumber, type QuoteDisplayStatus } from "@/domain/quotes";
 import type { listOpportunityQuotes } from "@/server/quotes";
+import { PendingButton } from "@/components/unsaved-guard";
 import { createQuoteAction } from "../../quote-actions";
 
 const TONES: Record<QuoteDisplayStatus, ChipTone> = { borrador: "gray", enviada: "brand", sustituida: "violet", aceptada: "green", rechazada: "red", vencida: "amber" };
@@ -13,10 +14,10 @@ export function QuotesCard({ opportunityId, quotes, canCreate }: { opportunityId
   const create = canCreate && (
     <form action={createQuoteAction}>
       <input type="hidden" name="opportunityId" value={opportunityId} />
-      <button type="submit" className={quotes.length ? linkButtonClass : buttonClass}>
+      <PendingButton className={quotes.length ? linkButtonClass : buttonClass}>
         <Icon name="plus" className="mr-1 inline size-4 align-[-3px]" />
         Nueva cotización
-      </button>
+      </PendingButton>
     </form>
   );
   return (

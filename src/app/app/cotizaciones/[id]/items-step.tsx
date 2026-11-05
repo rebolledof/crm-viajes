@@ -135,8 +135,13 @@ function ItemsFields({ versionId, saleCurrency: savedCurrency, exchangeRate: sav
       [copy[index], copy[to]] = [copy[to], copy[index]];
       return copy;
     });
-  const remove = (key: number, label: string) => {
+  const remove = (key: number, label: string, index: number) => {
     setRows((rs) => rs.filter((r) => r.key !== key));
+    // El foco va al servicio que queda en su lugar o a "Agregar servicio" (uso con teclado).
+    requestAnimationFrame(() => {
+      const items = document.querySelectorAll<HTMLInputElement>('li[aria-label^="Servicio "] input[name="description"]');
+      (items[Math.min(index, items.length - 1)] ?? document.getElementById("agregar-servicio"))?.focus();
+    });
     setNotice(`Quitaste «${label || "servicio sin descripción"}». Se borra de la cotización cuando guardes; si fue un error, recarga la página sin guardar.`);
   };
   const addBlank = () => {
@@ -287,7 +292,7 @@ function ItemsFields({ versionId, saleCurrency: savedCurrency, exchangeRate: sav
                         <button type="button" onClick={() => move(i, 1)} disabled={i === rows.length - 1} className="rounded p-1.5 text-slate-600 hover:bg-slate-100 disabled:opacity-30" aria-label={`Bajar el servicio ${i + 1}`}>
                           <Icon name="down" className="size-4" />
                         </button>
-                        <button type="button" onClick={() => remove(r.key, r.description)} className="rounded p-1.5 text-red-700 hover:bg-red-50" aria-label={`Quitar el servicio ${i + 1}`}>
+                        <button type="button" onClick={() => remove(r.key, r.description, i)} className="rounded p-1.5 text-red-700 hover:bg-red-50" aria-label={`Quitar el servicio ${i + 1}`}>
                           <Icon name="trash" className="size-4" />
                         </button>
                       </span>
@@ -299,7 +304,7 @@ function ItemsFields({ versionId, saleCurrency: savedCurrency, exchangeRate: sav
           )}
 
           <footer className="flex flex-wrap items-center gap-2 border-t border-slate-100 px-4 py-3">
-            <button type="button" onClick={addBlank} className={secondaryButtonClass} disabled={rows.length >= 60}>
+            <button type="button" id="agregar-servicio" onClick={addBlank} className={secondaryButtonClass} disabled={rows.length >= 60}>
               <Icon name="plus" className="size-4" /> Agregar servicio
             </button>
             {catalog.length > 0 && (

@@ -518,3 +518,26 @@ describe("parte 2: pantalla de 3 pasos, catálogo y ajustes", () => {
     await as(t.db, adminA, (tx) => updateQuoteSettings(tx, adminA.id, agencyA, { minMarginPct: "10", validityDays: "5" }));
   });
 });
+
+describe("parte 2: hallazgos de la prueba independiente (5 nov 2026)", () => {
+  it("hallazgo 3: dos pestañas guardan pasos distintos a la vez y no se pisan", async () => {
+    const q = await newDraft();
+    const items = cartagena.items.slice(0, 1);
+    await Promise.all([
+      as(t.db, asesorA, (tx) => saveDraftPart(tx, asesorA.id, agencyA, q.versionId, { saleCurrency: "COP", exchangeRate: "4.000", items })),
+      as(t.db, adminA, (tx) => saveDraftPart(tx, adminA.id, agencyA, q.versionId, { title: "Título desde otra pestaña" })),
+    ]);
+    const v = await as(t.db, asesorA, (tx) => getQuoteVersion(tx, asesorA.id, agencyA, q.versionId, now()));
+    expect(v.version.title).toBe("Título desde otra pestaña");
+    expect(v.items.map((i) => i.description)).toEqual(items.map((i) => i.description));
+  });
+
+  it("AC-413: un servicio copiado del catálogo no cambia cuando el administrador cambia el catálogo", async () => {
+    const id = await as(t.db, adminA, (tx) => saveCatalogService(tx, adminA.id, agencyA, null, { description: "Traslado del catálogo", unit: "servicio", unitCost: "120.000", costCurrency: "COP", unitPrice: "180.000", priceCurrency: "COP", active: true }));
+    const q = await newDraft();
+    await as(t.db, asesorA, (tx) => saveDraftPart(tx, asesorA.id, agencyA, q.versionId, { items: [{ description: "Traslado del catálogo", quantity: "1", unit: "servicio", unitPrice: "180.000", unitCost: "120.000", costCurrency: "COP", catalogServiceId: id }] }));
+    await as(t.db, adminA, (tx) => saveCatalogService(tx, adminA.id, agencyA, id, { description: "Traslado del catálogo", unit: "servicio", unitCost: "150.000", costCurrency: "COP", unitPrice: "200.000", priceCurrency: "COP", active: true }));
+    const v = await as(t.db, asesorA, (tx) => getQuoteVersion(tx, asesorA.id, agencyA, q.versionId, now()));
+    expect(v.items[0]).toMatchObject({ unitPrice: "180000.0000", lineTotal: "180000.00", catalogServiceId: id });
+  });
+});
