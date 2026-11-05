@@ -111,6 +111,7 @@ Cada parte va en su PR, con prueba independiente con otro modelo antes del merge
 - D-14 (Felipe, 2 nov 2026): el teléfono o correo que llega por el formulario a un contacto que ya existía queda "sin verificar" hasta que un asesor lo confirma, porque lo pudo escribir otra persona.
 - D-15 (Felipe, 2 nov 2026): cualquier asesor puede resolver una conversación, también la de otro; se reabre sola si el cliente vuelve a escribir.
 - La pregunta "¿Era una consulta de viaje?" al resolver y el botón "Vincular a una oportunidad" llegan con el chat y el correo (partes 2 y 3): en la parte 1 toda conversación del formulario ya tiene oportunidad.
+- D-16 y D-17 (Felipe, 3 nov 2026): ver `spec-parte-2-chat.md`. Los datos nuevos que llegan por el chat a un contacto existente quedan sin verificar; hay una página de prueba del chat solo para el administrador.
 
 ## Preguntas para Felipe
 

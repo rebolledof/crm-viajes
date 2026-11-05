@@ -392,7 +392,7 @@ describe("datos sin verificar (D-14, decisión de Felipe del 2 nov 2026)", () =>
     await expectCode(as(t.db, b.admin, (tx) => verifyContactPoint(tx, b.admin.id, b.id, { kind: "correo", id: emailId })), "not_found");
     await as(t.db, a.ana, (tx) => verifyContactPoint(tx, a.ana.id, a.id, { kind: "correo", id: emailId }));
     const r = await as(t.db, a.ana, (tx) => replyConversation(tx, a.ana.id, a.id, convId, { body: "Hola", via: "correo" }));
-    expect(r.link.startsWith("mailto:otra.persona@example.com?")).toBe(true);
+    expect(r.link!.startsWith("mailto:otra.persona@example.com?")).toBe(true);
   });
 
   it("un contacto nuevo del formulario queda con sus datos verificados", async () => {

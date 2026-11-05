@@ -38,3 +38,32 @@ Una migración nueva y aditiva: `20261105000000_bandeja.sql`. No borra ni cambia
 - Unitarias (`tests/unit/bandeja.test.ts`): sin responder, tiempo de espera, siguiente paso, guía, permisos por rol, plan del día (AC-275), respuestas guardadas (AC-271), formulario (AC-273) y código para incrustar.
 - Integración (`tests/integration/bandeja.test.ts`, PostgreSQL real): formulario completo con tareas y consentimientos (AC-261), contacto existente y responsable (AC-264), agencia por código y formulario pausado (AC-262), límite de envíos y campo vacío (AC-274), rol anon sin acceso a tablas ni funciones internas, tomar y reasignar (AC-263), estados (AC-265), reloj de horario laboral (AC-266, AC-267), conteos y alerta (AC-266, AC-275), respuesta con autor y canal (AC-268), permisos retirados, Lectura y otra agencia (AC-269), respuestas guardadas (AC-270).
 - AC-260 (correo duplicado) y AC-272 (chat) llegan con las partes 3 y 2.
+
+# Parte 2: chat web
+
+## Datos
+
+Migración aditiva `20261108000000_chat_web.sql`:
+
+| Objeto | Contenido | Reglas clave |
+| --- | --- | --- |
+| `inbound_channels` (kind `chat`) | un canal por agencia, pausado al crearse | `seed_inbox` lo siembra; las agencias existentes lo reciben en la migración |
+| `chat_visitors` | conversación y huella sha256 de la llave del visitante | RLS sin políticas y sin permisos: solo las funciones del chat la leen |
+| `app.chat_info` | marca, activo, si la agencia está en horario, hora en que abre y hora local | anon |
+| `app.chat_start` | valida, límite (5 por dirección y chat, 200 por agencia), contacto con D-16, consentimiento, conversación sin oportunidad (responsable si el contacto tiene oportunidad abierta), primer mensaje y huella | anon |
+| `app.chat_send` | valida la llave (30 días), límite de 30 mensajes por conversación en 10 minutos, mensaje entrante (reabre) | anon |
+| `app.chat_messages` | mensajes de chat y formulario de esa conversación, con el nombre de pila del asesor | anon; llave inválida: ninguna fila |
+| `app.web_form_logo` | sirve el logo también con el código del chat | anon |
+
+## Código
+
+- `src/domain/chat.ts`: validación del primer mensaje y de los siguientes, aviso de fuera de horario, ritmo de consulta, código para pegar y script de la burbuja.
+- `src/server/public-chat.ts`: llave nueva (32 bytes) y su huella, información, inicio, envío y lectura con `withAnon`.
+- `src/server/inbox.ts`: `replyConversation` acepta `chat` (sin enlace), `createConversationOpportunity`, `linkConversationOpportunity`, `getConversation.linkableOpportunities` y el interruptor del chat en los ajustes.
+- Pantallas: `/c/[key]` (ventana), `/c/[key]/burbuja.js` (script), `/app/configuracion/canales/prueba-chat` (D-17, la web de ejemplo va en un marco para que la burbuja no quede en el resto del CRM), tarjeta "Chat web" en Canales, "Enviar por chat", "Crear oportunidad", "Vincular" y "¿Era una consulta de viaje?" en la Bandeja.
+
+## Pruebas
+
+- Unitarias (`tests/unit/chat.test.ts`): primer mensaje y máximo de letras (AC-285), llave, fuera de horario (AC-281), ritmo de consulta y burbuja (AC-288: solo escucha al CRM y no deja inyectar código con el nombre de la agencia).
+- Integración (`tests/integration/chat.test.ts`): canal pausado por defecto y códigos que no se cruzan, AC-277, AC-286 (D-16), AC-264 por chat, validación en la base, AC-278, vía de la respuesta, AC-279, AC-272 (llave de otro, inventada y de otra agencia), AC-280, AC-282, AC-285 (sexto chat y ráfaga), AC-283 (crear y vincular, con otra agencia y otro contacto), Lectura y acceso de roles a `chat_visitors` y funciones de anon.
+- AC-284 y AC-287 se revisaron en el navegador (recorrido a 375 px y en escritorio).

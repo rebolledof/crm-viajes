@@ -297,6 +297,15 @@ export const messages = pgTable("messages", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+/** Visitantes del chat web (SPEC-003 parte 2): solo la huella de su llave. Nadie de la app la lee. */
+export const chatVisitors = pgTable("chat_visitors", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  agencyId: uuid("agency_id").notNull(),
+  conversationId: uuid("conversation_id").notNull(),
+  tokenHash: text("token_hash").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const savedReplies = pgTable("saved_replies", {
   id: uuid("id").primaryKey().defaultRandom(),
   agencyId: uuid("agency_id").notNull(),
@@ -314,6 +323,7 @@ export const schemaTables = {
   conversations,
   messages,
   saved_replies: savedReplies,
+  chat_visitors: chatVisitors,
   agencies,
   memberships,
   invitations,

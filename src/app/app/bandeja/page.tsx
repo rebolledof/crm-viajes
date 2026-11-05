@@ -27,7 +27,13 @@ import { getConversation, inboxCounts, listConversations, listSavedReplies, memb
 import { requireActiveAgency } from "@/server/session";
 import { activeMembers } from "@/server/tasks";
 import { Flash, describeActivity, fechaHora, type SearchParams } from "../crm-ui";
-import { assignConversationAction, resolveConversationAction, takeConversationAction } from "../inbox-actions";
+import {
+  assignConversationAction,
+  createConversationOpportunityAction,
+  linkConversationOpportunityAction,
+  resolveConversationAction,
+  takeConversationAction,
+} from "../inbox-actions";
 import { Composer } from "./composer";
 
 const CHANNEL_ICON: Record<InboundKind, IconName> = { formulario: "form", chat: "message", correo: "mail" };
@@ -265,9 +271,12 @@ function Conversation({
     ...detail.messages.map((m) => ({ type: "m" as const, at: m.createdAt, m })),
     ...detail.events.filter((e) => e.kind !== "bandeja.respuesta" && e.kind !== "bandeja.recibido").map((e) => ({ type: "e" as const, at: e.createdAt, e })),
   ].sort((a, b) => a.at.getTime() - b.at.getTime());
+  const isChat = c.channel === "chat";
   const channels = [
-    { via: "whatsapp" as const, label: "Enviar por WhatsApp", blocked: !detail.phone ? "El contacto no dejó teléfono." : detail.phoneUnverified ? "El teléfono llegó por el formulario y está sin verificar; confírmalo en la ficha del contacto." : !detail.whatsappAllowed ? "El contacto retiró el permiso de WhatsApp." : null },
-    { via: "correo" as const, label: "Enviar por correo", blocked: !detail.email ? "El contacto no dejó correo." : detail.emailUnverified ? "El correo llegó por el formulario y está sin verificar; confírmalo en la ficha del contacto." : !detail.emailAllowed ? "El contacto retiró el permiso de correo." : null },
+    // El chat se responde en el chat; WhatsApp y correo quedan como alternativa si dejó esos datos.
+    ...(isChat ? [{ via: "chat" as const, label: "Enviar por chat", blocked: null }] : []),
+    { via: "whatsapp" as const, label: "Enviar por WhatsApp", blocked: !detail.phone ? "El contacto no dejó teléfono." : detail.phoneUnverified ? "El teléfono llegó por el formulario o el chat y está sin verificar; confírmalo en la ficha del contacto." : !detail.whatsappAllowed ? "El contacto retiró el permiso de WhatsApp." : null },
+    { via: "correo" as const, label: "Enviar por correo", blocked: !detail.email ? "El contacto no dejó correo." : detail.emailUnverified ? "El correo llegó por el formulario o el chat y está sin verificar; confírmalo en la ficha del contacto." : !detail.emailAllowed ? "El contacto retiró el permiso de correo." : null },
   ];
   const hidden = (
     <>
@@ -309,11 +318,29 @@ function Conversation({
                 <summary className="inline-flex cursor-pointer list-none items-center gap-1.5 rounded border border-slate-300 bg-surface px-3 py-1.5 text-sm font-medium text-brand-text hover:bg-slate-50 [&::-webkit-details-marker]:hidden">
                   <Icon name="check" className="size-4" /> Resolver
                 </summary>
-                <form action={resolveConversationAction} className="absolute right-0 z-10 mt-1 w-64 rounded border border-line bg-surface p-3 text-sm shadow-lg">
-                  {hidden}
-                  <p className="text-slate-700">Sale de Mías y de Sin asignar. Si el cliente vuelve a escribir, se reabre sola.</p>
-                  <button className="mt-2 rounded bg-brand px-3 py-1.5 font-medium text-brand-contrast hover:bg-brand-strong">Sí, resolver</button>
-                </form>
+                {c.opportunityId ? (
+                  <form action={resolveConversationAction} className="absolute right-0 z-10 mt-1 w-64 rounded border border-line bg-surface p-3 text-sm shadow-lg">
+                    {hidden}
+                    <p className="text-slate-700">Sale de Mías y de Sin asignar. Si el cliente vuelve a escribir, se reabre sola.</p>
+                    <button className="mt-2 rounded bg-brand px-3 py-1.5 font-medium text-brand-contrast hover:bg-brand-strong">Sí, resolver</button>
+                  </form>
+                ) : (
+                  // Sin oportunidad: antes de cerrar, una pregunta para no perder una venta (AC-284).
+                  <div className="absolute right-0 z-10 mt-1 w-72 rounded border border-line bg-surface p-3 text-sm shadow-lg">
+                    <p className="font-semibold text-slate-900">¿Era una consulta de viaje?</p>
+                    <p className="mt-1 text-slate-700">Si lo era, crea la oportunidad para seguirla en el embudo. Si no (un proveedor, un cliente con viaje en curso), resuélvela.</p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <form action={createConversationOpportunityAction}>
+                        {hidden}
+                        <button className="rounded bg-brand px-3 py-1.5 font-medium text-brand-contrast hover:bg-brand-strong">Sí, crear oportunidad</button>
+                      </form>
+                      <form action={resolveConversationAction}>
+                        {hidden}
+                        <button className="rounded border border-slate-300 bg-surface px-3 py-1.5 font-medium text-brand-text hover:bg-slate-50">No, resolver</button>
+                      </form>
+                    </div>
+                  </div>
+                )}
               </details>
             )}
           </div>
@@ -322,7 +349,7 @@ function Conversation({
           <form action={assignConversationAction} className="flex flex-wrap items-center gap-2 border-b border-slate-100 bg-slate-50 px-4 py-2 text-sm">
             {hidden}
             <label htmlFor={`asignar-${c.id}`} className="text-slate-700">Asignar a</label>
-            <select id={`asignar-${c.id}`} name="assigneeId" defaultValue={c.assigneeId ?? ""} className="rounded border border-slate-300 bg-surface px-2 py-1 text-slate-900">
+            <select key={c.assigneeId ?? "cola"} id={`asignar-${c.id}`} name="assigneeId" defaultValue={c.assigneeId ?? ""} className="rounded border border-slate-300 bg-surface px-2 py-1 text-slate-900">
               <option value="">Sin asignar (cola)</option>
               {members.filter((m) => m.role !== "lectura").map((m) => (
                 <option key={m.userId} value={m.userId}>{m.email}</option>
@@ -335,7 +362,7 @@ function Conversation({
           {thread.map((item) =>
             item.type === "m" ? (
               <li key={item.m.id} className={`max-w-[85%] rounded-lg px-3 py-2 text-sm leading-relaxed ${item.m.direction === "entrante" ? "self-start border border-slate-200 bg-surface" : "self-end bg-brand-soft"}`}>
-                <p className="whitespace-pre-wrap text-slate-900">{item.m.body}</p>
+                <p className="whitespace-pre-wrap [overflow-wrap:anywhere] text-slate-900">{item.m.body}</p>
                 <p className="mt-1 text-xs text-slate-600">
                   {item.m.direction === "entrante" ? detail.contactName.split(" ")[0] : who(item.m.authorId)} · {fechaHora.format(item.m.createdAt)} · {VIA_LABELS[item.m.via]}
                   {item.m.direction === "saliente" && item.m.via !== "chat" ? " (enviado desde su app)" : ""}
@@ -359,7 +386,9 @@ function Conversation({
             hint={
               c.status === "resuelta"
                 ? "Esta conversación está resuelta. Si respondes, vuelve a Pendiente, esperando al cliente."
-                : "El formulario se responde por WhatsApp o correo: se abre tu app con el texto y aquí queda registrado."
+                : isChat
+                  ? "Tu respuesta aparece en la ventana del chat del cliente, con tu nombre de pila."
+                  : "El formulario se responde por WhatsApp o correo: se abre tu app con el texto y aquí queda registrado."
             }
           />
         ) : (
@@ -384,10 +413,27 @@ function Conversation({
                         Definir paso <Icon name="arrow" className="size-3.5" />
                       </Link>
                     )}
-                    {s.key === "oportunidad" && s.state !== "hecho" && (
-                      <Link href={`/app/oportunidades/nueva?contactId=${c.contactId}`} className="mt-1 inline-flex items-center gap-1 text-xs font-semibold text-brand-text hover:underline">
-                        <Icon name="plus" className="size-3.5" /> Crear oportunidad
-                      </Link>
+                    {s.key === "oportunidad" && s.state !== "hecho" && acts.reply && (
+                      <div className="mt-1.5 flex flex-col gap-1.5">
+                        <form action={createConversationOpportunityAction}>
+                          {hidden}
+                          <button className="inline-flex items-center gap-1 rounded bg-brand px-2.5 py-1 text-xs font-semibold text-brand-contrast hover:bg-brand-strong">
+                            <Icon name="plus" className="size-3.5" /> Crear oportunidad
+                          </button>
+                        </form>
+                        {detail.linkableOpportunities.length > 0 && (
+                          <form action={linkConversationOpportunityAction} className="flex flex-wrap items-center gap-1.5">
+                            {hidden}
+                            <label htmlFor={`vincular-${c.id}`} className="sr-only">Oportunidad para vincular</label>
+                            <select id={`vincular-${c.id}`} name="opportunityId" required className="max-w-full rounded border border-slate-300 bg-surface px-2 py-1 text-xs text-slate-900">
+                              {detail.linkableOpportunities.map((o) => (
+                                <option key={o.id} value={o.id}>{(o.destination || "Destino sin definir") + " · " + o.stageName}</option>
+                              ))}
+                            </select>
+                            <button className="rounded border border-slate-300 bg-surface px-2.5 py-1 text-xs font-semibold text-brand-text hover:bg-slate-50">Vincular</button>
+                          </form>
+                        )}
+                      </div>
                     )}
                   </div>
                 </div>
