@@ -559,6 +559,8 @@ export function describeActivity(kind: string, data: Record<string, unknown>, me
       return data.creada ? "Creó la oportunidad desde la conversación" : "Vinculó la conversación a una oportunidad";
     case "bandeja.resuelta":
       return "Conversación resuelta";
+    case "cotizacion.creada":
+      return `Cotización N.º ${String(data.numero ?? "").padStart(4, "0")} creada en borrador`;
     case "correo.abierto":
       return `Correo abierto para ${s("correo")}: “${s("asunto")}”`;
     default:

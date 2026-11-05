@@ -1,6 +1,6 @@
 # Estado del proyecto
 
-Última actualización: 2 de noviembre de 2026 · Sprint S00 Arranque (19 oct a 1 nov), con S01, S02, S02b, el nuevo diseño y la parte 1 de S03 adelantados
+Última actualización: 5 de noviembre de 2026 · Sprint S00 Arranque (19 oct a 1 nov), con S01, S02, S02b, el nuevo diseño, S03 (partes 1 y 2) y la parte 1 de S04 adelantados
 
 ## Hecho
 
@@ -12,9 +12,12 @@
 - Nuevo diseño SPEC-002c en código (rama `claude/project-thread-ss572g`, sobre la de S02b, PR #4): estilo A, marca por agencia, menú y tema por persona, plan del día, camino de etapas y "¿Cuál es el siguiente paso?". Migración `20261104000000_diseno_marca.sql` aplicada en PostgreSQL local y, con permiso de Felipe, en `crm-viajes-pruebas` el 2 nov 2026.
 - S03 Bandeja, parte 1 en código (rama `claude/project-thread-3wyo62`, sobre la del diseño): SPEC-003 aprobada por Felipe el 2 nov 2026. Formulario web público por agencia (`/f/<código>`, incrustable), bandeja con dueño por conversación, alerta de "sin responder" a los 30 minutos de horario laboral, respuestas guardadas con "/", canales de entrada y paso "Responde los mensajes" en Mi día. ADR 0002 (entrada pública por funciones `app.*`). Decisiones de Felipe del 2 nov: D-14 (datos del formulario para un contacto existente quedan "sin verificar", migración `20261106000000_datos_sin_verificar.sql`, aplicada en `crm-viajes-pruebas` el 2 nov 2026 con su permiso) y D-15 (un asesor puede resolver conversaciones de otro). Migración `20261105000000_bandeja.sql` aplicada en PostgreSQL local y, con permiso de Felipe, en `crm-viajes-pruebas` el 2 nov 2026 (3 agencias con su formulario y 5 respuestas guardadas).
 - S03 Bandeja, parte 2 (chat web) en código (rama `claude/project-thread-3wyo62-chat`, desde `main` tras el merge de los PRs #1 a #5 el 3 nov 2026): spec `specs/003-bandeja/spec-parte-2-chat.md` con D-16 y D-17 aprobadas por Felipe el 3 nov. Migración `20261108000000_chat_web.sql` aplicada en `crm-viajes-pruebas` (que también usa producción) por Felipe el 3 nov 2026; el chat queda apagado en cada agencia hasta que su administrador lo encienda.
+- S04 Cotizador, parte 1 en código (rama `claude/project-thread-1yn7j4`, desde `main`): SPEC-004 aprobada por Felipe el 5 nov 2026 con las decisiones por defecto (PDF desglosado con opción de solo total, COP o USD con tipo de cambio escrito, Lectura no ve costes, margen mínimo de 10 % como aviso). Datos, cálculo de dinero y reglas de versiones en la base; sin pantallas todavía. Migración `20261109000000_cotizador.sql` aplicada solo en PostgreSQL local. ADR 0003. Prueba independiente hecha y corregida (PR #8).
 - Pruebas: 14 unitarias y 21 de integración contra PostgreSQL 16 real (aislamiento A/B, roles, invitaciones vencidas, revocadas y de otro correo, membresía revocada, auditoría, coherencia del esquema).
 
 ## Comandos verificados
+
+5 nov 2026 en la rama de S04 parte 1, tras corregir la prueba independiente (Sonnet, T-082): lint, typecheck, 144 unitarias, 190 de integración y build sin errores.
 
 5 nov 2026, informe de pruebas del chat web (4 nov): los registros de `app.inbound_hits` en pruebas muestran que el límite sí funcionó. Los 5 envíos seguidos del formulario del 3 nov a las 18:19 (Colombia) frenaron el sexto. Los 6 envíos de las 21:13 a las 22:12 se repartieron en una hora (nunca más de 3 en 10 minutos). Ese día solo se crearon 4 chats nuevos, nunca 5 en 10 minutos. No se cambió el límite; un límite adicional por navegador quedó propuesto (`/mnt/project-files/propuestas/limite-por-navegador.patch`). El 404 en inglés no se reprodujo en local y los registros de Vercel ya no cubrían ese día; se cubrieron las dos rutas que sí daban texto técnico en inglés (error inesperado y "%" mal escrito). En celular (375 y 390 px, Playwright) se corrigió el mensaje largo que se cortaba. Lint, typecheck, 112 unitarias, 158 de integración y build sin errores (rama `claude/project-thread-mj6vav`).
 
@@ -55,6 +58,7 @@
 
 ## Pendiente
 
+- S04: aplicar `20261109000000_cotizador.sql` en `crm-viajes-pruebas` (con permiso de Felipe) cuando lleguen las pantallas; partes 2 a 4 (pantallas, envío, PDF); Felipe consigue una o dos cotizaciones reales sin datos del cliente (T-026) y confirma si el IVA como ítem manual le sirve al piloto.
 - Antes del piloto: conectar un servicio de correo propio (SMTP) en Supabase; el correo incluido solo envía unos 2 por hora y bloqueó el registro y la recuperación de contraseña el 31 oct.
 - Antes del piloto con datos reales: pasar Supabase y Vercel a planes Pro (el plan Hobby de Vercel no permite uso comercial y el gratuito de Supabase no tiene copias).
 - Felipe: iniciar la verificación de Meta Business (ahora es crítica para la bandeja).

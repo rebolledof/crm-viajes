@@ -18,6 +18,10 @@ const PERMISSIONS = {
   "pipeline.manage": ["admin"],
   "followups.manage": ["admin"],
   "inbox.manage": ["admin"],
+  "quotes.manage": ["admin"],
+  "quotes.write": ["admin", "asesor"],
+  /** Ver coste, utilidad y margen (SPEC-004 RF-406). */
+  "quotes.costs": ["admin", "asesor"],
   "crm.write": ["admin", "asesor"],
   "crm.read": ["admin", "asesor", "lectura"],
 } as const satisfies Record<string, readonly Role[]>;

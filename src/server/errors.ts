@@ -38,6 +38,15 @@ export const ERROR_MESSAGES = {
   channel_closed: "Este formulario no está recibiendo mensajes por ahora. Escríbenos por otro medio.",
   rate_limited: "Recibimos muchos envíos seguidos. Espera unos minutos y vuelve a intentarlo.",
   shortcut_taken: "Ya existe una respuesta guardada con ese atajo. Usa otro.",
+  quote_version_locked: "Esta versión ya se envió y no se puede cambiar. Crea una versión nueva para hacer el cambio.",
+  invalid_quote_transition: "Ese cambio de estado no es posible para esta versión.",
+  quote_no_items: "Agrega al menos un servicio antes de enviar la cotización.",
+  exchange_rate_required: "Escribe el tipo de cambio que usaste (por ejemplo 4.000 pesos por dólar).",
+  valid_until_required: "Escribe hasta qué fecha es válida la cotización.",
+  valid_until_past: "La fecha de validez ya pasó. Elige hoy o una fecha posterior.",
+  amount_too_large: "El importe es demasiado grande (máximo 999.999.999.999). Revisa la cantidad, el precio y el tipo de cambio.",
+  quote_last_version: "No se puede borrar la única versión de una cotización.",
+  quote_draft_exists: "Otra persona acaba de crear la versión nueva de esta cotización. Recarga la página para abrirla.",
 } as const;
 
 export type ErrorCode = keyof typeof ERROR_MESSAGES;
@@ -91,6 +100,21 @@ const FIELD_MESSAGES: Record<string, string> = {
   "invalid_input:shortcut": "El atajo va sin espacios: letras, números, guion o guion bajo (máximo 30), por ejemplo saludo.",
   "invalid_input:maxMinutes": "El tiempo máximo va en minutos, de 5 a 1440 (24 horas).",
   "invalid_input:privacyUrl": "El enlace del aviso de privacidad debe empezar por https://",
+  "invalid_input:quoteTitle": "Escribe un título de 1 a 160 caracteres, por ejemplo Cartagena, 4 noches.",
+  "invalid_input:clientName": "Escribe el nombre del cliente (máximo 160 caracteres).",
+  "invalid_input:destination": "El destino tiene como máximo 160 caracteres.",
+  "invalid_input:validUntil": "Elige la fecha hasta la que vale la cotización.",
+  "invalid_input:exchangeRate": "Escribe el tipo de cambio en pesos por dólar, mayor que cero, por ejemplo 4.000.",
+  "invalid_input:saleCurrency": "Elige COP o USD.",
+  "invalid_input:conditions": "Cada texto de condiciones tiene como máximo 4000 caracteres.",
+  "invalid_input:items": "La cotización admite hasta 60 servicios.",
+  "invalid_input:description": "Escribe qué servicio es (máximo 300 caracteres).",
+  "invalid_input:supplier": "El proveedor tiene como máximo 160 caracteres.",
+  "invalid_input:quantity": "La cantidad debe ser mayor que cero, hasta 9.999 y con máximo 2 decimales.",
+  "invalid_input:unit": "Elige la unidad: persona, noche, habitación o servicio.",
+  "invalid_input:unitPrice": "Escribe el precio de venta, por ejemplo 1.250.000 (máximo 4 decimales).",
+  "invalid_input:unitCost": "Escribe el coste, por ejemplo 1.000.000 (máximo 4 decimales). Si no tiene coste, escribe 0.",
+  "invalid_input:costCurrency": "Elige la moneda del coste: COP o USD.",
 };
 
 export function errorMessage(code: ErrorCode, field?: string): string {
@@ -112,6 +136,10 @@ export const CODE_FIELDS: Partial<Record<ErrorCode, string>> = {
   logo_too_big: "logo",
   logo_type: "logo",
   shortcut_taken: "shortcut",
+  quote_no_items: "items",
+  exchange_rate_required: "exchangeRate",
+  valid_until_required: "validUntil",
+  valid_until_past: "validUntil",
 };
 
 export function isErrorCode(value: unknown): value is ErrorCode {
@@ -135,5 +163,6 @@ export function rethrowBusiness(err: unknown): never {
   const pg = pgError(err);
   if (pg?.code === "P0001" && isErrorCode(pg.message)) throw new AppError(pg.message);
   if (pg?.code === "42501") throw new AppError("permission_denied");
+  if (pg?.code === "22003") throw new AppError("amount_too_large");
   throw err;
 }
