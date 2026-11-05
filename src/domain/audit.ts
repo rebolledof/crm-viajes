@@ -5,6 +5,7 @@ import { EDIT_LEVEL_SHORT, describeDelay, TRIGGER_LABELS, isDelayUnit, isEditLev
 import { ROLE_LABELS, type Role } from "./permissions";
 import { LOSS_REASON_LABELS, STAGE_KIND_LABELS, isLossReason, type StageKind } from "./pipeline";
 import { formatPhone } from "./phone";
+import { formatQuoteNumber } from "./quotes";
 import { PRIORITY_LABELS, TASK_KIND_LABELS, isPriority, isTaskKind } from "./tasks";
 
 export type AuditEventLike = {
@@ -237,6 +238,14 @@ export function describeAudit(e: AuditEventLike, n: AuditNames = {}): AuditDescr
       return { text: `Editó ${str(c.title) ? `el paso «${str(c.title)}»` : "un paso"} de ${template}`, details: stepDetails(c) };
     case "followup.step_deleted":
       return { text: `Borró ${str(c.title) ? `el paso «${str(c.title)}»` : "un paso"} de ${template}`, details: [] };
+
+    case "quote.created":
+      return { text: `Creó la cotización N.º ${typeof c.numero === "number" ? formatQuoteNumber(c.numero) : "nueva"}`, details: lines([["Oportunidad", c.oportunidad ? n.opportunity?.(String(c.oportunidad)) : undefined]]) };
+    case "quote.version_created":
+      return {
+        text: `Creó la versión ${typeof c.version === "number" ? c.version : "nueva"} de una cotización`,
+        details: lines([["A partir de la versión", typeof c.desde === "number" ? String(c.desde) : undefined]]),
+      };
 
     case "settings.updated":
       return {

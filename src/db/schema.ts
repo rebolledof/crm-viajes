@@ -318,7 +318,109 @@ export const savedReplies = pgTable("saved_replies", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+// SPEC-004 · Cotizador.
+export const quoteStatus = pgEnum("quote_status", ["borrador", "enviada", "sustituida", "aceptada", "rechazada"]);
+export const quoteUnit = pgEnum("quote_unit", ["persona", "noche", "habitacion", "servicio"]);
+
+export const quoteSettings = pgTable("quote_settings", {
+  agencyId: uuid("agency_id").primaryKey(),
+  minMarginPct: numeric("min_margin_pct", { precision: 5, scale: 2 }).notNull().default("10"),
+  validityDays: integer("validity_days").notNull().default(5),
+  defaultIncludes: text("default_includes"),
+  defaultExcludes: text("default_excludes"),
+  defaultPaymentTerms: text("default_payment_terms"),
+  defaultCancellation: text("default_cancellation"),
+  updatedBy: uuid("updated_by").notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const catalogServices = pgTable("catalog_services", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  agencyId: uuid("agency_id").notNull(),
+  description: text("description").notNull(),
+  supplier: text("supplier"),
+  unit: quoteUnit("unit").notNull().default("servicio"),
+  unitCost: numeric("unit_cost", { precision: 16, scale: 4 }).notNull().default("0"),
+  costCurrency: currencyCode("cost_currency").notNull(),
+  unitPrice: numeric("unit_price", { precision: 16, scale: 4 }).notNull().default("0"),
+  priceCurrency: currencyCode("price_currency").notNull(),
+  active: boolean("active").notNull().default(true),
+  createdBy: uuid("created_by").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const quotes = pgTable("quotes", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  agencyId: uuid("agency_id").notNull(),
+  opportunityId: uuid("opportunity_id").notNull(),
+  /** Lo asigna la base (trigger); el valor que se mande se ignora. */
+  number: integer("number").notNull().default(0),
+  createdBy: uuid("created_by").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const quoteVersions = pgTable("quote_versions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  agencyId: uuid("agency_id").notNull(),
+  quoteId: uuid("quote_id").notNull(),
+  /** Lo asigna la base (trigger). */
+  version: integer("version").notNull().default(0),
+  status: quoteStatus("status").notNull().default("borrador"),
+  title: text("title").notNull(),
+  clientName: text("client_name").notNull(),
+  destination: text("destination"),
+  travelStart: date("travel_start"),
+  travelEnd: date("travel_end"),
+  travelers: integer("travelers"),
+  saleCurrency: currencyCode("sale_currency").notNull().default("COP"),
+  exchangeRate: numeric("exchange_rate", { precision: 14, scale: 4 }),
+  validUntil: date("valid_until"),
+  includes: text("includes"),
+  excludes: text("excludes"),
+  paymentTerms: text("payment_terms"),
+  cancellationPolicy: text("cancellation_policy"),
+  showItemPrices: boolean("show_item_prices").notNull().default(true),
+  roundingRule: text("rounding_rule").notNull().default("half_up_item_v1"),
+  saleTotal: numeric("sale_total", { precision: 14, scale: 2 }),
+  minMarginPct: numeric("min_margin_pct", { precision: 5, scale: 2 }),
+  brand: jsonb("brand").$type<{ name: string; primary_color: string; accent_color: string }>(),
+  brandLogo: bytea("brand_logo"),
+  brandLogoType: text("brand_logo_type"),
+  sentAt: timestamp("sent_at", { withTimezone: true }),
+  sentBy: uuid("sent_by"),
+  decidedAt: timestamp("decided_at", { withTimezone: true }),
+  decidedBy: uuid("decided_by"),
+  createdBy: uuid("created_by").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const quoteItems = pgTable("quote_items", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  agencyId: uuid("agency_id").notNull(),
+  quoteVersionId: uuid("quote_version_id").notNull(),
+  position: integer("position").notNull(),
+  description: text("description").notNull(),
+  supplier: text("supplier"),
+  quantity: numeric("quantity", { precision: 10, scale: 2 }).notNull(),
+  unit: quoteUnit("unit").notNull().default("servicio"),
+  unitPrice: numeric("unit_price", { precision: 16, scale: 4 }).notNull(),
+  unitCost: numeric("unit_cost", { precision: 16, scale: 4 }).notNull().default("0"),
+  costCurrency: currencyCode("cost_currency").notNull(),
+  catalogServiceId: uuid("catalog_service_id"),
+  /** Calculados por la base. */
+  lineTotal: numeric("line_total", { precision: 14, scale: 2 }).notNull().default("0"),
+  lineCost: numeric("line_cost", { precision: 14, scale: 2 }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const schemaTables = {
+  quote_settings: quoteSettings,
+  catalog_services: catalogServices,
+  quotes,
+  quote_versions: quoteVersions,
+  quote_items: quoteItems,
   inbound_channels: inboundChannels,
   conversations,
   messages,

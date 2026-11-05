@@ -10,10 +10,10 @@ export function isCurrency(value: unknown): value is Currency {
 }
 
 /**
- * Convierte lo que escribe la persona ("4.500.000", "1250,50") en un importe exacto como texto,
- * listo para numeric(14,2). Devuelve null si no es un importe válido para la moneda.
+ * Normaliza un número escrito por la persona ("4.500.000", "1250,50", "$ 1,250.50") a texto con
+ * punto decimal y sin separadores de miles. Devuelve null si no es un número positivo bien escrito.
  */
-export function parseAmount(raw: string, currency: Currency): string | null {
+export function normalizeNumber(raw: string): string | null {
   let text = raw.trim().replace(/\s/g, "").replace(/^\$/, "");
   if (!text) return null;
   // Formato colombiano: punto de miles y coma decimal.
@@ -22,7 +22,16 @@ export function parseAmount(raw: string, currency: Currency): string | null {
   } else if (/^[1-9]\d{0,2}(,\d{3})+(\.\d+)?$/.test(text)) {
     text = text.replace(/,/g, "");
   }
-  if (!/^\d+(\.\d+)?$/.test(text)) return null;
+  return /^\d+(\.\d+)?$/.test(text) ? text : null;
+}
+
+/**
+ * Convierte lo que escribe la persona ("4.500.000", "1250,50") en un importe exacto como texto,
+ * listo para numeric(14,2). Devuelve null si no es un importe válido para la moneda.
+ */
+export function parseAmount(raw: string, currency: Currency): string | null {
+  const text = normalizeNumber(raw);
+  if (text === null) return null;
   const value = new Decimal(text);
   if (value.decimalPlaces() > CURRENCY_DECIMALS[currency]) return null;
   if (value.greaterThanOrEqualTo("1e12")) return null;
