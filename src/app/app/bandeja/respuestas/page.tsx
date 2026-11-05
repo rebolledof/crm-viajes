@@ -30,7 +30,7 @@ export default async function RespuestasPage({ searchParams }: { searchParams: S
           <span className="font-semibold text-slate-900">{r.title}</span>
           <code className="rounded bg-slate-100 px-1.5 text-xs text-slate-700">/{r.shortcut}</code>
         </div>
-        <p className="mt-1 text-sm whitespace-pre-wrap text-slate-700">{r.body}</p>
+        <p className="mt-1 text-sm whitespace-pre-wrap [overflow-wrap:anywhere] text-slate-700">{r.body}</p>
         {editable && (
           <details className="mt-2">
             <summary className="cursor-pointer text-sm font-medium text-brand-text">Editar</summary>

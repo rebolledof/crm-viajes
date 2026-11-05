@@ -362,7 +362,7 @@ function Conversation({
           {thread.map((item) =>
             item.type === "m" ? (
               <li key={item.m.id} className={`max-w-[85%] rounded-lg px-3 py-2 text-sm leading-relaxed ${item.m.direction === "entrante" ? "self-start border border-slate-200 bg-surface" : "self-end bg-brand-soft"}`}>
-                <p className="whitespace-pre-wrap text-slate-900">{item.m.body}</p>
+                <p className="whitespace-pre-wrap [overflow-wrap:anywhere] text-slate-900">{item.m.body}</p>
                 <p className="mt-1 text-xs text-slate-600">
                   {item.m.direction === "entrante" ? detail.contactName.split(" ")[0] : who(item.m.authorId)} · {fechaHora.format(item.m.createdAt)} · {VIA_LABELS[item.m.via]}
                   {item.m.direction === "saliente" && item.m.via !== "chat" ? " (enviado desde su app)" : ""}
