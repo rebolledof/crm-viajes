@@ -3,7 +3,7 @@
 // para devolver errores ligados a su campo y conservar lo escrito.
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import type { Tx } from "@/db/client";
-import { contacts, opportunities, quoteItems, quoteSettings, quoteVersionCosts, quoteVersions, quotes } from "@/db/schema";
+import { catalogServices, contacts, opportunities, pipelineStages, quoteItems, quoteSettings, quoteVersionCosts, quoteVersions, quotes } from "@/db/schema";
 import { isCurrency, type Currency } from "@/domain/money";
 import Decimal from "decimal.js";
 import { can } from "@/domain/permissions";
@@ -18,6 +18,8 @@ import {
   lineTotals,
   isQuoteUnit,
   parseExchangeRate,
+  parseMinMarginPct,
+  parseValidityDays,
   parseQuantity,
   parseUnitAmount,
   sumAmounts,
@@ -145,10 +147,10 @@ export function parseDraft(input: DraftInput) {
     if (!exchangeRate) throw fieldError("invalid_input", "exchangeRate");
   }
   const validUntil = optionalDate(input.validUntil, "validUntil");
-  const includes = optionalText(input.includes, 4000, "conditions");
-  const excludes = optionalText(input.excludes, 4000, "conditions");
-  const paymentTerms = optionalText(input.paymentTerms, 4000, "conditions");
-  const cancellationPolicy = optionalText(input.cancellationPolicy, 4000, "conditions");
+  const includes = optionalText(input.includes, 4000, "includes");
+  const excludes = optionalText(input.excludes, 4000, "excludes");
+  const paymentTerms = optionalText(input.paymentTerms, 4000, "paymentTerms");
+  const cancellationPolicy = optionalText(input.cancellationPolicy, 4000, "cancellationPolicy");
   if (input.items.length > QUOTE_LIMITS.maxItems) throw fieldError("invalid_input", "items");
   const items: ParsedItem[] = input.items.map((it, i) => {
     const description = it.description?.trim() ?? "";
@@ -383,4 +385,148 @@ export async function listOpportunityQuotes(tx: Tx, userId: string, agencyId: st
     const draft = history.find((v) => v.status === "borrador") ?? null;
     return { id: q.id, number: q.number, current, draft, history };
   });
+}
+
+/** Lo que falta en DraftInput para editar un paso sin tocar los otros (pantalla de 3 pasos). */
+export type DraftPart = Partial<DraftInput>;
+
+/**
+ * Guarda un paso del borrador: toma lo guardado de la versión y reemplaza solo lo que trae el paso
+ * (paso 1: moneda, tipo de cambio y servicios; paso 2: datos del viaje y condiciones).
+ */
+export async function saveDraftPart(tx: Tx, userId: string, agencyId: string, versionId: string, part: DraftPart): Promise<void> {
+  await requirePermission(tx, userId, agencyId, "quotes.write");
+  const v = await getQuoteVersion(tx, userId, agencyId, versionId, new Date());
+  if (!v.canSeeCosts) throw new AppError("permission_denied");
+  if (v.version.status !== "borrador") throw new AppError("quote_version_locked");
+  const h = v.version;
+  const current: DraftInput = {
+    title: h.title,
+    clientName: h.clientName,
+    destination: h.destination,
+    travelStart: h.travelStart,
+    travelEnd: h.travelEnd,
+    travelers: h.travelers == null ? null : String(h.travelers),
+    saleCurrency: h.saleCurrency,
+    exchangeRate: v.exchangeRate,
+    validUntil: h.validUntil,
+    includes: h.includes,
+    excludes: h.excludes,
+    paymentTerms: h.paymentTerms,
+    cancellationPolicy: h.cancellationPolicy,
+    showItemPrices: h.showItemPrices,
+    items: v.items.map((i) => ({ description: i.description, supplier: i.supplier, quantity: i.quantity, unit: i.unit, unitPrice: i.unitPrice, unitCost: i.unitCost, costCurrency: i.costCurrency, catalogServiceId: i.catalogServiceId })),
+  };
+  await saveDraft(tx, userId, agencyId, versionId, { ...current, ...part });
+}
+
+/** Todo lo que necesita la pantalla de una versión: la versión, su oportunidad y las demás versiones. */
+export async function getQuoteScreen(tx: Tx, userId: string, agencyId: string, versionId: string, now: Date) {
+  const v = await getQuoteVersion(tx, userId, agencyId, versionId, now);
+  const [opp] = await tx
+    .select({ id: opportunities.id, destination: opportunities.destination, contactId: opportunities.contactId, contactName: contacts.fullName, stageName: pipelineStages.name })
+    .from(opportunities)
+    .innerJoin(contacts, eq(contacts.id, opportunities.contactId))
+    .innerJoin(pipelineStages, eq(pipelineStages.id, opportunities.stageId))
+    .where(and(eq(opportunities.id, v.opportunityId), eq(opportunities.agencyId, agencyId)));
+  if (!opp) throw new AppError("not_found");
+  const today = colombiaToday(now);
+  const versions = (
+    await tx
+      .select({ id: quoteVersions.id, version: quoteVersions.version, status: quoteVersions.status, validUntil: quoteVersions.validUntil, saleTotal: quoteVersions.saleTotal, saleCurrency: quoteVersions.saleCurrency, sentAt: quoteVersions.sentAt })
+      .from(quoteVersions)
+      .where(and(eq(quoteVersions.quoteId, v.version.quoteId), eq(quoteVersions.agencyId, agencyId)))
+      .orderBy(desc(quoteVersions.version))
+  ).map((r) => ({ ...r, displayStatus: displayStatus(r.status, r.validUntil, today) }));
+  return { ...v, opportunity: opp, versions };
+}
+
+// ---------------------------------------------------------------------------------------------
+// Catálogo simple (alcance 16, T-022)
+
+export type CatalogInput = {
+  description: string;
+  supplier?: string | null;
+  unit: string;
+  unitCost: string;
+  costCurrency: string;
+  unitPrice: string;
+  priceCurrency: string;
+  active: boolean;
+};
+
+/** Servicios del catálogo. Lectura no lo ve (tiene costes). Por defecto, solo los activos. */
+export async function listCatalog(tx: Tx, userId: string, agencyId: string, opts: { includeInactive?: boolean } = {}) {
+  await requirePermission(tx, userId, agencyId, "quotes.costs");
+  const where = opts.includeInactive ? eq(catalogServices.agencyId, agencyId) : and(eq(catalogServices.agencyId, agencyId), eq(catalogServices.active, true));
+  return tx.select().from(catalogServices).where(where).orderBy(desc(catalogServices.active), asc(sql`lower(${catalogServices.description})`));
+}
+
+export function parseCatalog(input: CatalogInput) {
+  const description = input.description?.trim() ?? "";
+  if (!description || description.length > 300) throw fieldError("invalid_input", "description");
+  const supplier = optionalText(input.supplier, 160, "supplier");
+  if (!isQuoteUnit(input.unit)) throw fieldError("invalid_input", "unit");
+  const unitCost = input.unitCost?.trim() ? parseUnitAmount(input.unitCost) : "0";
+  if (unitCost === null) throw fieldError("invalid_input", "unitCost");
+  if (!isCurrency(input.costCurrency)) throw fieldError("invalid_input", "costCurrency");
+  const unitPrice = parseUnitAmount(input.unitPrice ?? "");
+  if (unitPrice === null) throw fieldError("invalid_input", "unitPrice");
+  if (!isCurrency(input.priceCurrency)) throw fieldError("invalid_input", "priceCurrency");
+  return { description, supplier, unit: input.unit, unitCost, costCurrency: input.costCurrency, unitPrice, priceCurrency: input.priceCurrency, active: !!input.active };
+}
+
+/** Crea (id null) o cambia un servicio del catálogo. Solo el administrador (RF-410). */
+export async function saveCatalogService(tx: Tx, userId: string, agencyId: string, id: string | null, input: CatalogInput): Promise<string> {
+  await requirePermission(tx, userId, agencyId, "quotes.manage");
+  requireIds(id);
+  const data = parseCatalog(input);
+  try {
+    if (!id) {
+      const [row] = await tx.insert(catalogServices).values({ ...data, agencyId, createdBy: userId }).returning({ id: catalogServices.id });
+      await recordAudit(tx, { agencyId, actorId: userId, action: "catalog.created", objectType: "catalog_service", objectId: row.id, changes: { description: data.description } });
+      return row.id;
+    }
+    const [row] = await tx.update(catalogServices).set(data).where(and(eq(catalogServices.id, id), eq(catalogServices.agencyId, agencyId))).returning({ id: catalogServices.id });
+    if (!row) throw new AppError("not_found");
+    await recordAudit(tx, { agencyId, actorId: userId, action: "catalog.updated", objectType: "catalog_service", objectId: id, changes: { description: data.description, active: data.active } });
+    return id;
+  } catch (err) {
+    rethrowBusiness(err);
+  }
+}
+
+// ---------------------------------------------------------------------------------------------
+// Configuración › Cotizaciones (alcance 17)
+
+export type QuoteSettingsInput = {
+  minMarginPct: string;
+  validityDays: string;
+  defaultIncludes?: string | null;
+  defaultExcludes?: string | null;
+  defaultPaymentTerms?: string | null;
+  defaultCancellation?: string | null;
+};
+
+export async function updateQuoteSettings(tx: Tx, userId: string, agencyId: string, input: QuoteSettingsInput): Promise<void> {
+  await requirePermission(tx, userId, agencyId, "quotes.manage");
+  const minMarginPct = parseMinMarginPct(input.minMarginPct ?? "");
+  if (minMarginPct === null) throw fieldError("invalid_input", "minMarginPct");
+  const validityDays = parseValidityDays(input.validityDays ?? "");
+  if (validityDays === null) throw fieldError("invalid_input", "validityDays");
+  const data = {
+    minMarginPct,
+    validityDays,
+    defaultIncludes: optionalText(input.defaultIncludes, 4000, "defaultIncludes"),
+    defaultExcludes: optionalText(input.defaultExcludes, 4000, "defaultExcludes"),
+    defaultPaymentTerms: optionalText(input.defaultPaymentTerms, 4000, "defaultPaymentTerms"),
+    defaultCancellation: optionalText(input.defaultCancellation, 4000, "defaultCancellation"),
+    updatedBy: userId,
+  };
+  try {
+    await tx.insert(quoteSettings).values({ agencyId, ...data }).onConflictDoUpdate({ target: quoteSettings.agencyId, set: data });
+    await recordAudit(tx, { agencyId, actorId: userId, action: "quote_settings.updated", objectType: "agency", objectId: agencyId, changes: { minMarginPct, validityDays } });
+  } catch (err) {
+    rethrowBusiness(err);
+  }
 }

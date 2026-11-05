@@ -22,12 +22,12 @@ export type FormAction = (prev: FormState, fd: FormData) => Promise<FormState>;
 
 const Ctx = createContext<FormState>({});
 
-export function ActionForm({ action, className, children }: { action: FormAction; className?: string; children: ReactNode }) {
+export function ActionForm({ action, className, children, id }: { action: FormAction; className?: string; children: ReactNode; id?: string }) {
   const [state, formAction, pending] = useActionState(action, {});
   return (
     <Ctx.Provider value={state}>
       {/* La clave nueva vuelve a montar los campos con los valores que devolvió el servidor. */}
-      <form key={state.at ?? 0} action={formAction} className={className} aria-busy={pending}>
+      <form key={state.at ?? 0} id={id} action={formAction} className={className} aria-busy={pending}>
         {state.error && (
           <div className="col-span-full">
             <Notice tone="error">
@@ -103,5 +103,22 @@ export function Select({ name, defaultValue, className, children, ...rest }: Com
     >
       {children}
     </select>
+  );
+}
+
+/** Estado del último envío (para listas que crecen en el navegador, como los servicios). */
+export function useFormState(): FormState {
+  return useContext(Ctx);
+}
+
+/** Casilla que conserva lo marcado cuando el servidor rechaza el formulario. */
+export function Checkbox({ name, defaultChecked, label, className }: { name: string; defaultChecked?: boolean; label: ReactNode; className?: string }) {
+  const state = useContext(Ctx);
+  const checked = state.values ? (state.values[name]?.[0] ?? "") === "on" : !!defaultChecked;
+  return (
+    <label className={`flex items-start gap-2 text-sm text-slate-800 ${className ?? ""}`}>
+      <input type="checkbox" name={name} defaultChecked={checked} className="mt-0.5 size-4 accent-[var(--brand)]" />
+      <span>{label}</span>
+    </label>
   );
 }

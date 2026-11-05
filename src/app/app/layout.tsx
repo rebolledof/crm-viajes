@@ -52,6 +52,9 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
         ...(can(active.role, "audit.read") ? [{ href: "/app/auditoria", label: "Auditoría", icon: "shield" } as NavItem] : []),
         ...(can(active.role, "inbox.manage") ? [{ href: "/app/configuracion/canales", label: "Canales de entrada", icon: "form" } as NavItem] : []),
         ...(can(active.role, "agency.update") ? [{ href: "/app/configuracion/marca", label: "Marca de la agencia", icon: "palette" } as NavItem] : []),
+        ...(can(active.role, "quotes.manage")
+          ? [{ href: "/app/configuracion/cotizaciones", label: "Ajustes de cotizaciones", icon: "file" } as NavItem, { href: "/app/configuracion/catalogo", label: "Catálogo de servicios", icon: "book" } as NavItem]
+          : []),
       ]
     : [];
 

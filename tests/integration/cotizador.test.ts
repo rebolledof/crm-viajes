@@ -9,7 +9,7 @@ import { acceptInvitation, createAgency, createInvitation } from "../../src/serv
 import { createContact } from "../../src/server/contacts";
 import { AppError } from "../../src/server/errors";
 import { createOpportunity } from "../../src/server/opportunities";
-import { createNextVersion, createQuote, getQuoteVersion, listOpportunityQuotes, saveDraft, type DraftInput } from "../../src/server/quotes";
+import { createNextVersion, createQuote, getQuoteScreen, getQuoteSettings, getQuoteVersion, listCatalog, listOpportunityQuotes, saveCatalogService, saveDraft, saveDraftPart, updateQuoteSettings, type DraftInput } from "../../src/server/quotes";
 import { as, createUser, testDb } from "./helpers";
 
 const t = testDb();
@@ -443,5 +443,78 @@ describe("hallazgos de la prueba independiente (QA, 5 nov 2026)", () => {
       if (r.status === "rejected") expect(r.reason).toBeInstanceOf(AppError);
       if (r.status === "rejected") expect((r.reason as AppError).code).toBe("quote_draft_exists");
     }
+  });
+});
+
+describe("parte 2: pantalla de 3 pasos, catálogo y ajustes", () => {
+  const traslado = { description: "Traslado aeropuerto–hotel", supplier: "Operador local", unit: "servicio", unitCost: "120.000", costCurrency: "COP", unitPrice: "180.000", priceCurrency: "COP", active: true };
+
+  it("guardar el paso 1 no borra las condiciones, y guardar el paso 2 no borra los servicios", async () => {
+    const q = await newDraft();
+    await as(t.db, asesorA, (tx) => saveDraftPart(tx, asesorA.id, agencyA, q.versionId, { saleCurrency: "COP", exchangeRate: "4.100", items: cartagena.items.slice(0, 2) }));
+    let v = await as(t.db, asesorA, (tx) => getQuoteVersion(tx, asesorA.id, agencyA, q.versionId, now()));
+    expect(v.version.includes).toBe("Desayuno diario");
+    expect(v.canSeeCosts && v.exchangeRate).toBe("4100.0000");
+    expect(v.items).toHaveLength(2);
+    expect(v.items[0].lineTotal).toBe("3000000.00");
+    await as(t.db, asesorA, (tx) => saveDraftPart(tx, asesorA.id, agencyA, q.versionId, { title: "Cartagena en enero", includes: "Todo incluido", showItemPrices: false }));
+    v = await as(t.db, asesorA, (tx) => getQuoteVersion(tx, asesorA.id, agencyA, q.versionId, now()));
+    expect(v.version).toMatchObject({ title: "Cartagena en enero", includes: "Todo incluido", showItemPrices: false, clientName: "Laura Pineda" });
+    expect(v.items.map((i) => i.description)).toEqual(cartagena.items.slice(0, 2).map((i) => i.description));
+    // El coste en USD sigue convertido con el tipo de cambio guardado en el paso 1 (4.100).
+    expect(v.canSeeCosts && v.items[0].lineCost).toBe("2460000.00");
+  });
+
+  it("Lectura no guarda pasos y una enviada no se cambia por ningún paso", async () => {
+    const q = await newDraft();
+    await expectCode(as(t.db, lecturaA, (tx) => saveDraftPart(tx, lecturaA.id, agencyA, q.versionId, { title: "x" })), "permission_denied");
+    await send(asesorA, q.versionId);
+    await expectCode(as(t.db, asesorA, (tx) => saveDraftPart(tx, asesorA.id, agencyA, q.versionId, { title: "x" })), "quote_version_locked");
+  });
+
+  it("la pantalla trae la oportunidad y las versiones; para Lectura, sin costes ni tipo de cambio", async () => {
+    const q = await newDraft();
+    await send(asesorA, q.versionId);
+    const next = await as(t.db, asesorA, (tx) => createNextVersion(tx, asesorA.id, agencyA, q.versionId));
+    const s = await as(t.db, asesorA, (tx) => getQuoteScreen(tx, asesorA.id, agencyA, next.versionId, now()));
+    expect(s.opportunity).toMatchObject({ id: oppA, contactName: "Laura Pineda", destination: "Cartagena" });
+    expect(s.versions.map((x) => [x.version, x.status])).toEqual([[2, "borrador"], [1, "enviada"]]);
+    const l = await as(t.db, lecturaA, (tx) => getQuoteScreen(tx, lecturaA.id, agencyA, q.versionId, now()));
+    expect(l.canSeeCosts).toBe(false);
+    const json = JSON.stringify(l);
+    expect(json).not.toMatch(/unitCost|lineCost|exchangeRate|minMargin|profit|4000/);
+    await expectCode(as(t.db, adminB, (tx) => getQuoteScreen(tx, adminB.id, agencyB, q.versionId, now())), "not_found");
+  });
+
+  it("catálogo: el administrador lo crea y lo cambia; el asesor solo lo usa; Lectura ni lo ve", async () => {
+    const id = await as(t.db, adminA, (tx) => saveCatalogService(tx, adminA.id, agencyA, null, traslado));
+    const list = await as(t.db, asesorA, (tx) => listCatalog(tx, asesorA.id, agencyA));
+    expect(list.find((c) => c.id === id)).toMatchObject({ unitCost: "120000.0000", unitPrice: "180000.0000" });
+    await expectCode(as(t.db, asesorA, (tx) => saveCatalogService(tx, asesorA.id, agencyA, null, traslado)), "permission_denied");
+    await expectCode(as(t.db, lecturaA, (tx) => listCatalog(tx, lecturaA.id, agencyA)), "permission_denied");
+    // Desactivado ya no se ofrece al armar, pero sigue en la lista completa del administrador.
+    await as(t.db, adminA, (tx) => saveCatalogService(tx, adminA.id, agencyA, id, { ...traslado, active: false }));
+    expect((await as(t.db, asesorA, (tx) => listCatalog(tx, asesorA.id, agencyA))).some((c) => c.id === id)).toBe(false);
+    expect((await as(t.db, adminA, (tx) => listCatalog(tx, adminA.id, agencyA, { includeInactive: true }))).some((c) => c.id === id)).toBe(true);
+    // Otra agencia no lo ve ni lo cambia.
+    expect((await as(t.db, adminB, (tx) => listCatalog(tx, adminB.id, agencyB, { includeInactive: true }))).some((c) => c.id === id)).toBe(false);
+    await expectCode(as(t.db, adminB, (tx) => saveCatalogService(tx, adminB.id, agencyB, id, traslado)), "not_found");
+    const audit = await t.admin`select action from audit_events where object_id = ${id} order by created_at`;
+    expect(audit.map((a) => a.action)).toEqual(["catalog.created", "catalog.updated"]);
+  });
+
+  it("ajustes: se guardan dos veces (la segunda actualiza) y la cotización nueva los usa", async () => {
+    await as(t.db, adminA, (tx) => updateQuoteSettings(tx, adminA.id, agencyA, { minMarginPct: "12", validityDays: "7", defaultPaymentTerms: "50 % al reservar" }));
+    await as(t.db, adminA, (tx) => updateQuoteSettings(tx, adminA.id, agencyA, { minMarginPct: "12,5", validityDays: "8", defaultPaymentTerms: "50 % al reservar", defaultIncludes: "Desayuno" }));
+    const s = await as(t.db, asesorA, (tx) => getQuoteSettings(tx, asesorA.id, agencyA));
+    expect(s).toMatchObject({ minMarginPct: "12.50", validityDays: 8, defaultIncludes: "Desayuno", defaultPaymentTerms: "50 % al reservar" });
+    const q = await as(t.db, asesorA, (tx) => createQuote(tx, asesorA.id, agencyA, { opportunityId: oppA, now: new Date("2026-12-14T15:00:00Z") }));
+    const v = await as(t.db, asesorA, (tx) => getQuoteVersion(tx, asesorA.id, agencyA, q.versionId, now()));
+    expect(v.version).toMatchObject({ validUntil: "2026-12-22", includes: "Desayuno", paymentTerms: "50 % al reservar" });
+    expect(v.canSeeCosts && v.minMarginPct).toBe("12.50");
+    await expectCode(as(t.db, asesorA, (tx) => updateQuoteSettings(tx, asesorA.id, agencyA, { minMarginPct: "5", validityDays: "5" })), "permission_denied");
+    await expect(as(t.db, adminA, (tx) => updateQuoteSettings(tx, adminA.id, agencyA, { minMarginPct: "95", validityDays: "5" }))).rejects.toSatisfy((e: unknown) => e instanceof AppError && e.field === "minMarginPct");
+    // Volver a los valores por defecto para no afectar otras pruebas.
+    await as(t.db, adminA, (tx) => updateQuoteSettings(tx, adminA.id, agencyA, { minMarginPct: "10", validityDays: "5" }));
   });
 });

@@ -106,7 +106,10 @@ const FIELD_MESSAGES: Record<string, string> = {
   "invalid_input:validUntil": "Elige la fecha hasta la que vale la cotización.",
   "invalid_input:exchangeRate": "Escribe el tipo de cambio en pesos por dólar, mayor que cero, por ejemplo 4.000.",
   "invalid_input:saleCurrency": "Elige COP o USD.",
-  "invalid_input:conditions": "Cada texto de condiciones tiene como máximo 4000 caracteres.",
+  "invalid_input:includes": "Cada texto de condiciones tiene como máximo 4000 caracteres.",
+  "invalid_input:excludes": "Cada texto de condiciones tiene como máximo 4000 caracteres.",
+  "invalid_input:paymentTerms": "Cada texto de condiciones tiene como máximo 4000 caracteres.",
+  "invalid_input:cancellationPolicy": "Cada texto de condiciones tiene como máximo 4000 caracteres.",
   "invalid_input:items": "La cotización admite hasta 60 servicios.",
   "invalid_input:description": "Escribe qué servicio es (máximo 300 caracteres).",
   "invalid_input:supplier": "El proveedor tiene como máximo 160 caracteres.",
@@ -115,6 +118,13 @@ const FIELD_MESSAGES: Record<string, string> = {
   "invalid_input:unitPrice": "Escribe el precio de venta, por ejemplo 1.250.000 (máximo 4 decimales).",
   "invalid_input:unitCost": "Escribe el coste, por ejemplo 1.000.000 (máximo 4 decimales). Si no tiene coste, escribe 0.",
   "invalid_input:costCurrency": "Elige la moneda del coste: COP o USD.",
+  "invalid_input:priceCurrency": "Elige la moneda de la venta: COP o USD.",
+  "invalid_input:minMarginPct": "Escribe el margen mínimo en porcentaje, de 0 a 90, por ejemplo 10.",
+  "invalid_input:validityDays": "Escribe cuántos días vale una cotización, de 1 a 90, por ejemplo 5.",
+  "invalid_input:defaultIncludes": "Cada texto tiene como máximo 4000 caracteres.",
+  "invalid_input:defaultExcludes": "Cada texto tiene como máximo 4000 caracteres.",
+  "invalid_input:defaultPaymentTerms": "Cada texto tiene como máximo 4000 caracteres.",
+  "invalid_input:defaultCancellation": "Cada texto tiene como máximo 4000 caracteres.",
 };
 
 export function errorMessage(code: ErrorCode, field?: string): string {
