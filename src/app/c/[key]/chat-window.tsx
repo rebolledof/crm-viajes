@@ -283,7 +283,7 @@ function Conversation({
       <ol className="flex flex-1 flex-col gap-2 overflow-y-auto p-4" aria-label="Mensajes" aria-live="polite">
         {messages.map((m) => (
           <li key={m.id} className={`max-w-[85%] rounded-lg px-3 py-2 text-sm ${m.direction === "entrante" ? "self-end bg-brand-soft" : "self-start border border-slate-200 bg-surface"}`}>
-            <p className="whitespace-pre-wrap text-slate-900">{m.body}</p>
+            <p className="whitespace-pre-wrap [overflow-wrap:anywhere] text-slate-900">{m.body}</p>
             <p className="mt-1 text-xs text-slate-600">
               {m.direction === "entrante" ? "Tú" : m.authorName} · {hora.format(new Date(m.createdAt))}
             </p>
