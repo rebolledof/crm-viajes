@@ -209,6 +209,17 @@ describe("acceso retirado, AC-12 (informe de pruebas S04, 6 nov 2026)", () => {
     await as(t.db, adminA, (tx) => revokeMembership(tx, adminA.id, agencyA, doble.id));
     await as(t.db, doble, (tx) => createAgency(tx, "Agencia de doble"));
   });
+
+  it("quien perdió el acceso a dos agencias ve las dos y tampoco crea una", async () => {
+    const u = await createUser(t.admin, "revocado-dos");
+    for (const [admin, agency] of [[adminA, agencyA], [adminB, agencyB]] as const) {
+      const { token } = await invite(admin, agency, u, "asesor");
+      await as(t.db, u, (tx) => acceptInvitation(tx, token));
+      await as(t.db, admin, (tx) => revokeMembership(tx, admin.id, agency, u.id));
+    }
+    expect((await as(t.db, u, (tx) => myRevokedAccess(tx))).map((r) => r.agencyName).sort()).toEqual(["Caribe Tours", "Viajes Andes"]);
+    await expectCode(as(t.db, u, (tx) => createAgency(tx, "Otra del revocado")), "access_revoked");
+  });
 });
 
 describe("auditoría (RF-14)", () => {

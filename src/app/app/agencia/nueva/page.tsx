@@ -1,10 +1,11 @@
 import { getDb, withUser } from "@/db/client";
 import { firstParams } from "@/domain/params";
 import { ActionForm, Input } from "@/components/form";
-import { Field, Notice, buttonClass } from "@/components/ui";
+import { Field, Notice, buttonClass, secondaryButtonClass } from "@/components/ui";
 import { myRevokedAccess } from "@/server/agencies";
 import { ERROR_MESSAGES, isErrorCode } from "@/server/errors";
 import { getAppContext } from "@/server/session";
+import { signOutAction } from "../../../(auth)/actions";
 import { createAgencyAction } from "../../actions";
 
 const dateFmt = new Intl.DateTimeFormat("es-CO", { dateStyle: "long", timeZone: "America/Bogota" });
@@ -30,6 +31,9 @@ export default async function NuevaAgenciaPage({ searchParams }: { searchParams:
           </ol>
           <p>Si crees que es un error, habla con el administrador de tu agencia.</p>
         </div>
+        <form action={signOutAction}>
+          <button className={secondaryButtonClass}>Cerrar sesión</button>
+        </form>
       </div>
     );
   }
