@@ -9,6 +9,9 @@ import { dueState } from "@/domain/tasks";
 import { requireActiveAgency } from "@/server/session";
 import { inboxCounts } from "@/server/inbox";
 import { activeMembers, contactChannels, myDay } from "@/server/tasks";
+import { expiringQuotes } from "@/server/quotes";
+import { formatAmount, formatQuoteNumber } from "@/domain/quotes";
+import type { Currency } from "@/domain/money";
 import { Flash, TaskItem, fechaHora, type SearchParams } from "./crm-ui";
 
 const diaLargo = new Intl.DateTimeFormat("es-CO", { weekday: "long", day: "numeric", month: "long", timeZone: "America/Bogota" });
@@ -21,8 +24,13 @@ export default async function AppHome({ searchParams }: { searchParams: SearchPa
   const { user, active } = await requireActiveAgency();
   const sp = firstParams(await searchParams);
   const now = new Date();
-  const [day, members, inbox] = await withUser(getDb(), user, (tx) =>
-    Promise.all([myDay(tx, user.id, active.agencyId, now), activeMembers(tx, user.id, active.agencyId), inboxCounts(tx, user.id, active.agencyId, now)]),
+  const [day, members, inbox, expiring] = await withUser(getDb(), user, (tx) =>
+    Promise.all([
+      myDay(tx, user.id, active.agencyId, now),
+      activeMembers(tx, user.id, active.agencyId),
+      inboxCounts(tx, user.id, active.agencyId, now),
+      expiringQuotes(tx, user.id, active.agencyId, now),
+    ]),
   );
   const channels = await withUser(getDb(), user, (tx) => contactChannels(tx, user.id, active.agencyId, [...day.due, ...day.upcoming].map((d) => d.task.contactId)));
   const overdue = day.due.filter((d) => dueState(d.task.dueAt, now) === "vencida");
@@ -101,6 +109,28 @@ export default async function AppHome({ searchParams }: { searchParams: SearchPa
         </div>
 
         <div className="flex flex-col gap-4">
+          {expiring.length > 0 && (
+            <Card id="cotizaciones-por-vencer" title={<span className="text-amber-900">Cotizaciones por vencer ({expiring.length})</span>} icon="file">
+              <p className="mb-2 text-sm text-slate-600">El cliente todavía no responde. Escríbele antes de que venzan, o crea una versión nueva con otra fecha.</p>
+              <ul className="flex flex-col">
+                {expiring.map((q) => (
+                  <li key={q.versionId} className="flex flex-wrap items-center gap-2 border-b border-slate-100 py-2 text-sm last:border-b-0">
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium text-slate-900">N.º {formatQuoteNumber(q.number)} · {q.clientName}</p>
+                      <p className="text-xs text-slate-600">
+                        <span className="font-semibold text-amber-800">{q.daysToExpire === 0 ? "Vence hoy" : q.daysToExpire === 1 ? "Vence mañana" : `Vence en ${q.daysToExpire} días`}</span>
+                        {q.saleTotal ? ` · ${formatAmount(q.saleTotal, q.saleCurrency as Currency)}` : ""} · versión {q.version}
+                      </p>
+                    </div>
+                    <Link href={`/app/cotizaciones/${q.versionId}`} className="inline-flex items-center gap-1 rounded border border-accent px-2.5 py-1 text-xs font-semibold text-accent-text hover:bg-accent-soft">
+                      Ver cotización <Icon name="arrow" className="size-3.5" />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          )}
+
           <Card id="sin-paso" title={`Sin siguiente paso (${day.withoutNextAction.length})`} icon="flag">
             {day.withoutNextAction.length === 0 ? (
               <Notice tone="ok">Todas tus oportunidades abiertas tienen un siguiente paso.</Notice>

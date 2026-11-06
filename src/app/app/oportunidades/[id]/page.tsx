@@ -129,7 +129,7 @@ export default async function OportunidadPage({ params, searchParams }: { params
           </Card>
           )}
 
-          <QuotesCard opportunityId={o.id} quotes={quotesList} canCreate={can(active.role, "quotes.write")} />
+          <QuotesCard opportunityId={o.id} quotes={quotesList} canCreate={can(active.role, "quotes.write")} members={members} />
 
           {rest.length > 0 && (
             <Card title={`Después (${rest.length})`} icon="list" bodyClassName="px-4">

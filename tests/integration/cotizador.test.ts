@@ -8,8 +8,9 @@ import { addDays, colombiaToday, quoteTotals } from "../../src/domain/quotes";
 import { acceptInvitation, createAgency, createInvitation } from "../../src/server/agencies";
 import { createContact } from "../../src/server/contacts";
 import { AppError } from "../../src/server/errors";
-import { createOpportunity } from "../../src/server/opportunities";
-import { createNextVersion, createQuote, getQuoteScreen, getQuoteSettings, getQuoteVersion, listCatalog, listOpportunityQuotes, saveCatalogService, saveDraft, saveDraftPart, updateQuoteSettings, type DraftInput } from "../../src/server/quotes";
+import { createOpportunity, moveOpportunity, updateStage } from "../../src/server/opportunities";
+import { describeAudit } from "../../src/domain/audit";
+import { createNextVersion, createQuote, decideQuoteVersion, expiringQuotes, getSendPlan, sendQuoteVersion, getQuoteScreen, getQuoteSettings, getQuoteVersion, listCatalog, listOpportunityQuotes, saveCatalogService, saveDraft, saveDraftPart, updateQuoteSettings, type DraftInput } from "../../src/server/quotes";
 import { as, createUser, testDb } from "./helpers";
 
 const t = testDb();
@@ -539,5 +540,175 @@ describe("parte 2: hallazgos de la prueba independiente (5 nov 2026)", () => {
     await as(t.db, adminA, (tx) => saveCatalogService(tx, adminA.id, agencyA, id, { description: "Traslado del catálogo", unit: "servicio", unitCost: "150.000", costCurrency: "COP", unitPrice: "200.000", priceCurrency: "COP", active: true }));
     const v = await as(t.db, asesorA, (tx) => getQuoteVersion(tx, asesorA.id, agencyA, q.versionId, now()));
     expect(v.items[0]).toMatchObject({ unitPrice: "180000.0000", lineTotal: "180000.00", catalogServiceId: id });
+  });
+});
+
+describe("parte 3: enviar, aceptar y rechazar (alcance 10 a 14)", () => {
+  let contact: string;
+  const stage = async (agencyId: string, name: string) =>
+    (await t.admin`select id from pipeline_stages where agency_id = ${agencyId} and name = ${name}`)[0].id as string;
+  const stageOf = async (opp: string) =>
+    (await t.admin`select s.name from opportunities o join pipeline_stages s on s.id = o.stage_id where o.id = ${opp}`)[0].name as string;
+  async function oppIn(stageName: string, owner: SessionUser = asesorA) {
+    const id = await as(t.db, owner, (tx) => createOpportunity(tx, owner.id, agencyA, { contactId: contact, destination: "Santa Marta", ownerId: owner.id }));
+    const target = await stage(agencyA, stageName);
+    await as(t.db, owner, (tx) => moveOpportunity(tx, owner.id, agencyA, id, { stageId: target }));
+    return id;
+  }
+
+  beforeAll(async () => {
+    contact = await as(t.db, asesorA, (tx) => createContact(tx, asesorA.id, agencyA, { fullName: "Marta Envío", phones: [{ raw: "+57 300 999 0001" }], emails: [] }));
+  });
+
+  it("AC-409: desde Calificado, enviar pasa la oportunidad a Propuesta enviada y arranca su seguimiento", async () => {
+    const opp = await oppIn("Calificado");
+    const q = await newDraft(asesorA, agencyA, opp);
+    expect(await as(t.db, asesorA, (tx) => getSendPlan(tx, asesorA.id, agencyA, q.versionId))).toMatchObject({ willMove: true, reason: "mueve", stageName: "Calificado" });
+    const r = await as(t.db, asesorA, (tx) => sendQuoteVersion(tx, asesorA.id, agencyA, q.versionId));
+    expect(r).toEqual({ movedTo: "Propuesta enviada", sustituidas: 0 });
+    expect(await stageOf(opp)).toBe("Propuesta enviada");
+    const followups = await t.admin`select t.title from tasks t join pipeline_stages s on s.id = t.trigger_stage_id where t.opportunity_id = ${opp} and s.name = 'Propuesta enviada' and t.status = 'abierta'`;
+    expect(followups.map((f) => f.title)).toContain("Confirmar que revisó la propuesta");
+    const [v] = await t.admin`select status::text, sale_total::text, sent_by from quote_versions where id = ${q.versionId}`;
+    expect(v).toMatchObject({ status: "enviada", sale_total: "5100000.00", sent_by: asesorA.id });
+  });
+
+  it("AC-409: desde Negociación, enviar una versión nueva no la retrocede; la anterior queda Sustituida", async () => {
+    const opp = await oppIn("Negociación");
+    const q = await newDraft(asesorA, agencyA, opp);
+    expect((await as(t.db, asesorA, (tx) => sendQuoteVersion(tx, asesorA.id, agencyA, q.versionId))).movedTo).toBeNull();
+    const v2 = await as(t.db, asesorA, (tx) => createNextVersion(tx, asesorA.id, agencyA, q.versionId));
+    expect(await as(t.db, asesorA, (tx) => getSendPlan(tx, asesorA.id, agencyA, v2.versionId))).toMatchObject({ willMove: false, reason: "ya_despues" });
+    expect(await as(t.db, asesorA, (tx) => sendQuoteVersion(tx, asesorA.id, agencyA, v2.versionId))).toEqual({ movedTo: null, sustituidas: 1 });
+    expect(await stageOf(opp)).toBe("Negociación");
+    const [v1] = await t.admin`select status::text from quote_versions where id = ${q.versionId}`;
+    expect(v1.status).toBe("sustituida");
+  });
+
+  it("una oportunidad cerrada no cambia de etapa; sin etapa «Propuesta enviada» tampoco", async () => {
+    const opp = await oppIn("Calificado");
+    const lost = await stage(agencyA, "Perdido");
+    await as(t.db, asesorA, (tx) => moveOpportunity(tx, asesorA.id, agencyA, opp, { stageId: lost, lostReason: "precio" }));
+    const q = await newDraft(asesorA, agencyA, opp);
+    expect(await as(t.db, asesorA, (tx) => getSendPlan(tx, asesorA.id, agencyA, q.versionId))).toMatchObject({ willMove: false, reason: "cerrada" });
+    await as(t.db, asesorA, (tx) => sendQuoteVersion(tx, asesorA.id, agencyA, q.versionId));
+    expect(await stageOf(opp)).toBe("Perdido");
+    // Agencia B renombra la etapa: no se adivina cuál es; la oportunidad se queda.
+    const propB = await stage(agencyB, "Propuesta enviada");
+    await as(t.db, adminB, (tx) => updateStage(tx, adminB.id, agencyB, propB, { name: "Cotización enviada" }));
+    const qB = await newDraft(adminB, agencyB, oppB);
+    expect(await as(t.db, adminB, (tx) => getSendPlan(tx, adminB.id, agencyB, qB.versionId))).toMatchObject({ willMove: false, reason: "sin_etapa" });
+    expect((await as(t.db, adminB, (tx) => sendQuoteVersion(tx, adminB.id, agencyB, qB.versionId))).movedTo).toBeNull();
+    await as(t.db, adminB, (tx) => updateStage(tx, adminB.id, agencyB, propB, { name: "Propuesta enviada" }));
+  });
+
+  it("AC-404 y AC-408: sin tipo de cambio se rechaza en su campo; con margen bajo se envía igual", async () => {
+    const opp = await oppIn("Calificado");
+    const q = await newDraft(asesorA, agencyA, opp, { ...cartagena, exchangeRate: "" });
+    await expect(as(t.db, asesorA, (tx) => sendQuoteVersion(tx, asesorA.id, agencyA, q.versionId))).rejects.toSatisfy((e: unknown) => e instanceof AppError && e.code === "exchange_rate_required");
+    const [still] = await t.admin`select status::text from quote_versions where id = ${q.versionId}`;
+    expect(still.status).toBe("borrador");
+    expect(await stageOf(opp)).toBe("Calificado");
+    const low = await newDraft(asesorA, agencyA, opp, { ...cartagena, items: [{ description: "Seguro", quantity: "1", unit: "persona", unitPrice: "60.000", unitCost: "55.000", costCurrency: "COP" }] });
+    const lowV = await as(t.db, asesorA, (tx) => getQuoteVersion(tx, asesorA.id, agencyA, low.versionId, now()));
+    expect(lowV.canSeeCosts && lowV.lowMarginTotal).toBe(true);
+    await as(t.db, asesorA, (tx) => sendQuoteVersion(tx, asesorA.id, agencyA, low.versionId));
+    expect((await t.admin`select status::text from quote_versions where id = ${low.versionId}`)[0].status).toBe("enviada");
+  });
+
+  it("enviar dos veces la misma versión se rechaza sin tocar nada", async () => {
+    const q = await newDraft(asesorA, agencyA, await oppIn("Calificado"));
+    await as(t.db, asesorA, (tx) => sendQuoteVersion(tx, asesorA.id, agencyA, q.versionId));
+    await expectCode(as(t.db, adminA, (tx) => sendQuoteVersion(tx, adminA.id, agencyA, q.versionId)), "quote_already_sent");
+  });
+
+  it("AC-415: aceptar queda con quién y cuándo; la auditoría dice quién creó, envió y marcó aceptada", async () => {
+    const q = await newDraft(asesorA, agencyA, await oppIn("Calificado"));
+    await as(t.db, asesorA, (tx) => sendQuoteVersion(tx, asesorA.id, agencyA, q.versionId));
+    await as(t.db, adminA, (tx) => decideQuoteVersion(tx, adminA.id, agencyA, q.versionId, "aceptada"));
+    const [v] = await t.admin`select status::text, decided_by from quote_versions where id = ${q.versionId}`;
+    expect(v).toEqual({ status: "aceptada", decided_by: adminA.id });
+    const events = await t.admin`select action, actor_id, changes from audit_events where object_id = ${q.quoteId} order by created_at`;
+    expect(events.map((e) => [e.action, e.actor_id])).toEqual([
+      ["quote.created", asesorA.id],
+      ["quote.sent", asesorA.id],
+      ["quote.accepted", adminA.id],
+    ]);
+    const accepted = events[2];
+    expect(describeAudit({ action: accepted.action, changes: accepted.changes } as never).text).toBe(`Marcó aceptada la versión 1 de la cotización N.º ${String(q.number).padStart(4, "0")}`);
+    expect(describeAudit({ action: "quote.sent", changes: events[1].changes } as never).details).toContain("Total: 5.100.000 COP");
+    // Ya decidida: ni aceptar otra vez ni rechazar.
+    // Otra persona con la ventana abierta: el mensaje dice que ya la marcaron, no un error genérico.
+    await expectCode(as(t.db, asesorA, (tx) => decideQuoteVersion(tx, asesorA.id, agencyA, q.versionId, "rechazada")), "quote_already_decided");
+    await expectCode(as(t.db, asesorA, (tx) => decideQuoteVersion(tx, asesorA.id, agencyA, q.versionId, "aceptada")), "quote_already_decided");
+  });
+
+  it("rechazar; un borrador no se acepta; solo una versión aceptada por cotización", async () => {
+    const q = await newDraft(asesorA, agencyA, await oppIn("Calificado"));
+    await expectCode(as(t.db, asesorA, (tx) => decideQuoteVersion(tx, asesorA.id, agencyA, q.versionId, "aceptada")), "invalid_quote_transition");
+    await as(t.db, asesorA, (tx) => sendQuoteVersion(tx, asesorA.id, agencyA, q.versionId));
+    await as(t.db, asesorA, (tx) => decideQuoteVersion(tx, asesorA.id, agencyA, q.versionId, "rechazada"));
+    expect((await t.admin`select status::text from quote_versions where id = ${q.versionId}`)[0].status).toBe("rechazada");
+    // Otra cotización de la misma oportunidad: v1 aceptada; luego v2 enviada no puede quedar aceptada también.
+    const q2 = await newDraft(asesorA, agencyA, await oppIn("Calificado"));
+    await as(t.db, asesorA, (tx) => sendQuoteVersion(tx, asesorA.id, agencyA, q2.versionId));
+    await as(t.db, asesorA, (tx) => decideQuoteVersion(tx, asesorA.id, agencyA, q2.versionId, "aceptada"));
+    const v2 = await as(t.db, asesorA, (tx) => createNextVersion(tx, asesorA.id, agencyA, q2.versionId));
+    await as(t.db, asesorA, (tx) => sendQuoteVersion(tx, asesorA.id, agencyA, v2.versionId));
+    await expectCode(as(t.db, asesorA, (tx) => decideQuoteVersion(tx, asesorA.id, agencyA, v2.versionId, "aceptada")), "quote_already_accepted");
+  });
+
+  it("AC-410 y AC-411: Lectura no envía ni decide; otra agencia recibe «no encontrado»", async () => {
+    const q = await newDraft(asesorA, agencyA, await oppIn("Calificado"));
+    await expectCode(as(t.db, lecturaA, (tx) => sendQuoteVersion(tx, lecturaA.id, agencyA, q.versionId)), "permission_denied");
+    await expectCode(as(t.db, lecturaA, (tx) => getSendPlan(tx, lecturaA.id, agencyA, q.versionId)), "permission_denied");
+    await as(t.db, asesorA, (tx) => sendQuoteVersion(tx, asesorA.id, agencyA, q.versionId));
+    await expectCode(as(t.db, lecturaA, (tx) => decideQuoteVersion(tx, lecturaA.id, agencyA, q.versionId, "aceptada")), "permission_denied");
+    // B pide la versión de A con su propia agencia: no existe para B.
+    await expectCode(as(t.db, adminB, (tx) => decideQuoteVersion(tx, adminB.id, agencyB, q.versionId, "aceptada")), "not_found");
+    const q2 = await newDraft(asesorA, agencyA, await oppIn("Calificado"));
+    await expectCode(as(t.db, adminB, (tx) => sendQuoteVersion(tx, adminB.id, agencyB, q2.versionId)), "not_found");
+    await expectCode(as(t.db, adminB, (tx) => getSendPlan(tx, adminB.id, agencyB, q2.versionId)), "not_found");
+    // Aunque B mande el id de la agencia A, no es miembro: no la encuentra.
+    await expectCode(as(t.db, adminB, (tx) => sendQuoteVersion(tx, adminB.id, agencyA, q2.versionId)), "not_found");
+    expect((await t.admin`select status::text from quote_versions where id = ${q2.versionId}`)[0].status).toBe("borrador");
+  });
+
+  it("AC-416: Mi día muestra las enviadas que vencen en 2 días o menos, y una vencida sale de la lista", async () => {
+    const opp = await oppIn("Calificado");
+    const today = colombiaToday(now());
+    const ids: Record<string, string> = {};
+    for (const days of [0, 1, 2, 3]) {
+      const q = await newDraft(asesorA, agencyA, opp, { ...cartagena, validUntil: addDays(today, days) });
+      await as(t.db, asesorA, (tx) => sendQuoteVersion(tx, asesorA.id, agencyA, q.versionId));
+      ids[days] = q.versionId;
+    }
+    const list = await as(t.db, asesorA, (tx) => expiringQuotes(tx, asesorA.id, agencyA, now()));
+    const mine = list.filter((x) => Object.values(ids).includes(x.versionId));
+    expect(mine.map((x) => [x.versionId, x.daysToExpire])).toEqual([
+      [ids[0], 0],
+      [ids[1], 1],
+      [ids[2], 2],
+    ]);
+    // Al día siguiente de vencer: ya no está (se muestra Vencida en la cotización).
+    const later = await as(t.db, asesorA, (tx) => expiringQuotes(tx, asesorA.id, agencyA, new Date(now().getTime() + 86_400_000)));
+    expect(later.map((x) => x.versionId)).not.toContain(ids[0]);
+    expect((await as(t.db, asesorA, (tx) => getQuoteVersion(tx, asesorA.id, agencyA, ids[0], new Date(now().getTime() + 86_400_000)))).status).toBe("vencida");
+    // Aceptada ya no avisa; y otra persona de la agencia que no es dueña ni la envió no la ve.
+    await as(t.db, asesorA, (tx) => decideQuoteVersion(tx, asesorA.id, agencyA, ids[1], "aceptada"));
+    expect((await as(t.db, asesorA, (tx) => expiringQuotes(tx, asesorA.id, agencyA, now()))).map((x) => x.versionId)).not.toContain(ids[1]);
+    expect((await as(t.db, lecturaA, (tx) => expiringQuotes(tx, lecturaA.id, agencyA, now()))).map((x) => x.versionId)).not.toContain(ids[2]);
+    expect(await as(t.db, adminB, (tx) => expiringQuotes(tx, adminB.id, agencyB, now()))).toEqual([]);
+  });
+});
+
+describe("parte 3: hallazgos de la prueba independiente (6 nov 2026)", () => {
+  it("Mi día también avisa a quien envió la cotización aunque no sea responsable de la oportunidad", async () => {
+    const c = await as(t.db, adminA, (tx) => createContact(tx, adminA.id, agencyA, { fullName: "Pedro Dueño", phones: [], emails: [] }));
+    const opp = await as(t.db, adminA, (tx) => createOpportunity(tx, adminA.id, agencyA, { contactId: c, destination: "Leticia", ownerId: adminA.id }));
+    const q = await newDraft(asesorA, agencyA, opp, { ...cartagena, validUntil: addDays(colombiaToday(now()), 1) });
+    await as(t.db, asesorA, (tx) => sendQuoteVersion(tx, asesorA.id, agencyA, q.versionId));
+    expect((await as(t.db, asesorA, (tx) => expiringQuotes(tx, asesorA.id, agencyA, now()))).map((x) => x.versionId)).toContain(q.versionId);
+    expect((await as(t.db, adminA, (tx) => expiringQuotes(tx, adminA.id, agencyA, now()))).map((x) => x.versionId)).toContain(q.versionId);
   });
 });

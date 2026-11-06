@@ -7,7 +7,7 @@ import { redirect } from "next/navigation";
 import type { FormState } from "@/components/form";
 import { getDb, withUser } from "@/db/client";
 import { AppError, CODE_FIELDS, errorMessage, type ErrorCode } from "@/server/errors";
-import { createNextVersion, createQuote, saveCatalogService, saveDraftPart, updateQuoteSettings, type DraftItemInput, type DraftPart } from "@/server/quotes";
+import { createNextVersion, createQuote, decideQuoteVersion, saveCatalogService, saveDraftPart, sendQuoteVersion, updateQuoteSettings, type DraftItemInput, type DraftPart } from "@/server/quotes";
 import { requireActiveAgency } from "@/server/session";
 
 const str = (fd: FormData, k: string) => fd.get(k)?.toString() ?? "";
@@ -115,6 +115,34 @@ export async function saveQuoteStepAction(_prev: FormState, fd: FormData): Promi
   if (!r.ok) return failed(fd, r);
   revalidatePath(quotePath(versionId));
   redirect(`${quotePath(versionId)}?paso=${goTo}&ok=cotizacion_guardada`);
+}
+
+/** Paso de la cotización donde se corrige cada campo que puede impedir el envío. */
+const STEP_OF_FIELD: Record<string, string> = { items: "1", exchangeRate: "1", validUntil: "2" };
+
+/** "Sí, enviar" en la confirmación (alcance 10). Si falta algo, dice qué y enlaza al paso. */
+export async function sendQuoteAction(_prev: FormState, fd: FormData): Promise<FormState> {
+  const { user, agencyId, db } = await ctx();
+  const versionId = str(fd, "versionId");
+  const r = await run(() => withUser(db, user, (tx) => sendQuoteVersion(tx, user.id, agencyId, versionId)));
+  if (!r.ok) {
+    const step = r.field ? STEP_OF_FIELD[r.field] : undefined;
+    return { error: errorMessage(r.code, r.field), field: r.field, at: Date.now(), ...(step ? { link: { href: `${quotePath(versionId)}?paso=${step}`, label: "Corregir" } } : {}) };
+  }
+  revalidatePath(quotePath(versionId));
+  redirect(`${quotePath(versionId)}?ok=cotizacion_enviada`);
+}
+
+/** "El cliente aceptó esta versión" / "El cliente la rechazó" (alcance 13). */
+export async function decideQuoteAction(_prev: FormState, fd: FormData): Promise<FormState> {
+  const { user, agencyId, db } = await ctx();
+  const versionId = str(fd, "versionId");
+  const decision = str(fd, "decision") === "aceptada" ? "aceptada" : "rechazada";
+  const r = await run(() => withUser(db, user, (tx) => decideQuoteVersion(tx, user.id, agencyId, versionId, decision)));
+  if (!r.ok) return { error: errorMessage(r.code, r.field), at: Date.now() };
+  revalidatePath(quotePath(versionId));
+  revalidatePath(`/app/oportunidades/${r.value.opportunityId}`);
+  redirect(`${quotePath(versionId)}?ok=${decision === "aceptada" ? "cotizacion_aceptada" : "cotizacion_rechazada"}`);
 }
 
 /** Configuración › Catálogo: crear o cambiar un servicio (solo administrador). */

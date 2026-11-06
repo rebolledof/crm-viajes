@@ -20,12 +20,15 @@ import {
   type QuoteDisplayStatus,
 } from "@/domain/quotes";
 import { errorMessage } from "@/server/errors";
-import { getQuoteScreen, listCatalog } from "@/server/quotes";
+import { getQuoteScreen, getSendPlan, listCatalog } from "@/server/quotes";
+import { listStages } from "@/server/opportunities";
+import { activeMembers } from "@/server/tasks";
 import { requireActiveAgency } from "@/server/session";
 import { Flash, fecha, fechaHora, formatDay, loadOr404, type SearchParams } from "../../crm-ui";
 import { ExternalSubmit, PendingButton, UnsavedGuard } from "@/components/unsaved-guard";
 import { createNextVersionAction, saveQuoteStepAction } from "../../quote-actions";
 import { ItemsStep, type CatalogOption } from "./items-step";
+import { ClientAnswer, SendPanel, WinOffer } from "./send-panel";
 
 const STATUS_TONES: Record<QuoteDisplayStatus, ChipTone> = {
   borrador: "gray",
@@ -64,6 +67,14 @@ export default async function CotizacionPage({ params, searchParams }: { params:
   const draft = q.versions.find((x) => x.status === "borrador");
   const nextNumber = (q.versions[0]?.version ?? v.version) + 1;
   const canWrite = can(active.role, "quotes.write");
+  const members = await withUser(getDb(), user, (tx) => activeMembers(tx, user.id, active.agencyId));
+  const plan = editable && step === 3 ? await withUser(getDb(), user, (tx) => getSendPlan(tx, user.id, active.agencyId, v.id)) : null;
+  // Aceptada con la oportunidad abierta: se ofrece marcarla ganada (alcance 13).
+  const wonStage =
+    v.status === "aceptada" && q.opportunity.stageKind === "abierta" && can(active.role, "crm.write")
+      ? (await withUser(getDb(), user, (tx) => listStages(tx, user.id, active.agencyId))).find((st) => st.kind === "ganada" && st.active)
+      : undefined;
+  const who = (id: string | null) => (id ? (members.find((m) => m.userId === id)?.email ?? "alguien que ya no está en la agencia") : "");
 
   return (
     <div className="flex flex-col gap-4 pb-4">
@@ -102,10 +113,19 @@ export default async function CotizacionPage({ params, searchParams }: { params:
       >
         <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-slate-600">
           <Chip tone={STATUS_TONES[q.status]}>{QUOTE_STATUS_LABELS[q.status]} · versión {v.version}</Chip>
-          <span>Guardada {fechaHora.format(v.updatedAt)}</span>
+          {v.sentAt ? (
+            <span>
+              Enviada {fechaHora.format(v.sentAt)} por {who(v.sentBy)}
+              {v.decidedAt && ` · ${v.status === "aceptada" ? "aceptada" : "rechazada"} ${fechaHora.format(v.decidedAt)} por ${who(v.decidedBy)}`}
+            </span>
+          ) : (
+            <span>Guardada {fechaHora.format(v.updatedAt)}</span>
+          )}
         </p>
       </PageHeader>
       <Flash sp={sp} />
+      {sp.ok === "cotizacion_enviada" && <Notice>La oportunidad está en «{q.opportunity.stageName}». <Link href={`/app/oportunidades/${q.opportunity.id}`} className="font-medium underline">Ver la oportunidad</Link></Notice>}
+      {wonStage && <WinOffer opportunityId={q.opportunity.id} wonStageId={wonStage.id} number={q.number} version={v.version} versionId={v.id} />}
 
       {editable && <Stepper step={step} />}
       {editable && step !== 3 && <UnsavedGuard formId="cotizacion-paso" />}
@@ -131,7 +151,7 @@ export default async function CotizacionPage({ params, searchParams }: { params:
         />
       )}
       {editable && step === 2 && <ConditionsStep q={q} />}
-      {step === 3 && <Review q={q} editable={editable} now={now} />}
+      {step === 3 && <Review q={q} editable={editable} now={now} plan={plan} canAnswer={canWrite} />}
     </div>
   );
 }
@@ -250,7 +270,7 @@ function ConditionsStep({ q }: { q: Screen }) {
 
 const STEP_OF_FIELD: Record<string, 1 | 2> = { items: 1, exchangeRate: 1, validUntil: 2 };
 
-function Review({ q, editable, now }: { q: Screen; editable: boolean; now: Date }) {
+function Review({ q, editable, now, plan, canAnswer }: { q: Screen; editable: boolean; now: Date; plan: Awaited<ReturnType<typeof getSendPlan>> | null; canAnswer: boolean }) {
   const v = q.version;
   const currency = v.saleCurrency as Currency;
   const total = v.saleTotal ?? q.saleTotal;
@@ -318,7 +338,7 @@ function Review({ q, editable, now }: { q: Screen; editable: boolean; now: Date 
               </div>
             ) : null,
           )}
-          <p className="text-xs text-slate-600">El PDF con el logo y los colores de la agencia se genera al enviar (próxima entrega).</p>
+          <p className="text-xs text-slate-600">El PDF con el logo y los colores de la agencia llega en la próxima entrega; se hará con los datos congelados al enviar.</p>
         </div>
       </section>
 
@@ -362,15 +382,28 @@ function Review({ q, editable, now }: { q: Screen; editable: boolean; now: Date 
             ) : (
               <p className="mt-2 flex gap-2 text-sm text-emerald-900"><Icon name="done" className="mt-0.5 size-4" /> Está lista: tiene servicios, vigencia y tipo de cambio si hace falta.</p>
             )}
-            <p className="mt-3 text-sm text-slate-700">
-              El botón <strong>Enviar</strong> llega en la próxima entrega: congelará esta versión, generará el PDF y pasará la oportunidad a «Propuesta enviada». Por ahora la cotización queda guardada en borrador.
-            </p>
+            {plan && (
+              <SendPanel
+                versionId={v.id}
+                number={q.number}
+                version={v.version}
+                total={total}
+                currency={currency}
+                lowMargin={q.canSeeCosts && (q.lowMarginTotal || q.items.some((i) => i.lowMargin))}
+                minMarginPct={q.canSeeCosts ? q.minMarginPct : "0"}
+                plan={plan}
+                replaces={q.versions.find((x) => x.status === "enviada")?.version ?? null}
+                accepted={q.versions.find((x) => x.status === "aceptada")?.version ?? null}
+                ready={problems.length === 0}
+              />
+            )}
             <div className="mt-3 flex flex-wrap gap-2">
               <Link href="?paso=2" className={secondaryButtonClass}><Icon name="left" className="size-4" /> Condiciones</Link>
               <Link href={`/app/oportunidades/${q.opportunity.id}`} className={secondaryButtonClass}>Volver a la oportunidad</Link>
             </div>
           </section>
         )}
+        {canAnswer && v.status === "enviada" && <ClientAnswer versionId={v.id} version={v.version} expired={q.status === "vencida"} />}
         {!editable && v.status === "borrador" && <Notice>Esta versión está en borrador. {q.canSeeCosts ? "Solo administradores y asesores pueden cambiarla." : "Solo administradores y asesores pueden cambiarla y ver sus costes."}</Notice>}
       </aside>
     </div>
