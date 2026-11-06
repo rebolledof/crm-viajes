@@ -247,6 +247,19 @@ export function describeAudit(e: AuditEventLike, n: AuditNames = {}): AuditDescr
         details: lines([["A partir de la versión", typeof c.desde === "number" ? String(c.desde) : undefined]]),
       };
 
+    case "catalog.created":
+      return { text: `Agregó «${str(c.description) ?? "un servicio"}» al catálogo`, details: [] };
+    case "catalog.updated":
+      return { text: `Cambió «${str(c.description) ?? "un servicio"}» del catálogo`, details: lines([["Estado", typeof c.active === "boolean" ? (c.active ? "activo" : "desactivado") : undefined]]) };
+    case "quote_settings.updated":
+      return {
+        text: "Cambió los ajustes de las cotizaciones",
+        details: lines([
+          ["Margen mínimo de aviso", c.minMarginPct != null ? `${String(c.minMarginPct).replace(".", ",")} %` : undefined],
+          ["Vigencia por defecto", typeof c.validityDays === "number" ? `${c.validityDays} días` : undefined],
+        ]),
+      };
+
     case "settings.updated":
       return {
         text: "Cambió el horario laboral y las reglas de seguimiento",

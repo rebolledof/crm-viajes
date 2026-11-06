@@ -72,6 +72,12 @@ const OK_MESSAGES: Record<string, string> = {
   respuesta_creada: "Respuesta guardada creada. Úsala escribiendo / en la caja de respuesta.",
   respuesta_guardada: "Respuesta guardada actualizada.",
   respuesta_borrada: "Respuesta guardada borrada.",
+  cotizacion_creada: "Cotización creada en borrador con los datos de la oportunidad. Agrega los servicios y sus precios.",
+  cotizacion_guardada: "Cotización guardada. Sigue en borrador hasta que la envíes.",
+  version_creada: "Versión nueva creada como copia. Haz los cambios y guárdala; la anterior no cambia.",
+  borrador_abierto: "Esta cotización ya tenía una versión en borrador: la abrimos para que sigas ahí.",
+  servicio_creado: "Servicio agregado al catálogo. Ya aparece en «Agregar del catálogo» al armar una cotización.",
+  servicio_guardado: "Servicio del catálogo guardado. Las cotizaciones que ya lo usan no cambian.",
 };
 
 export function Flash({ sp }: { sp: Record<string, string | undefined> }) {

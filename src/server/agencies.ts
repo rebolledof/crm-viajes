@@ -24,6 +24,15 @@ export async function listMyMemberships(tx: Tx, userId: string): Promise<MyMembe
     .orderBy(agencies.name);
 }
 
+/**
+ * Agencias donde a la persona le retiraron el acceso (solo nombre y fecha). Sirve para explicarle
+ * por qué no entra; sin otra agencia activa tampoco puede crear una (create_agency lo impide).
+ */
+export async function myRevokedAccess(tx: Tx): Promise<{ agencyName: string; revokedAt: Date }[]> {
+  const rows = await tx.execute<{ agency_name: string; revoked_at: string | Date }>(sql`select agency_name, revoked_at from public.my_revoked_access()`);
+  return rows.map((r) => ({ agencyName: r.agency_name, revokedAt: new Date(r.revoked_at) }));
+}
+
 export async function requirePermission(tx: Tx, userId: string, agencyId: string, permission: Permission): Promise<Role> {
   const [row] = await tx
     .select({ role: memberships.role })
@@ -58,6 +67,7 @@ export async function createAgency(tx: Tx, name: string): Promise<string> {
     return rows[0].id;
   } catch (err) {
     if (pgCode(err) === "23505") throw new AppError("slug_taken");
+    if (pgMessage(err) === "access_revoked") throw new AppError("access_revoked");
     throw err;
   }
 }

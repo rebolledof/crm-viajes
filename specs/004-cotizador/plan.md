@@ -47,6 +47,19 @@ Lectura no puede leer `quote_items`, `catalog_services` ni `quote_version_costs`
 - Unitarias (`tests/unit/cotizador.test.ts`): AC-400, AC-402, AC-403, AC-404 (cálculo), AC-408, AC-416, AC-417 (validación con campo), redondeo por ítem, conversión en los dos sentidos, permisos y el ejemplo de la propuesta.
 - Integración (`tests/integration/cotizador.test.ts`): numeración y AC-412 en paralelo, cálculo de la base igual al dominio, AC-402 y AC-403 en la base, totales enviados por el cliente ignorados, recálculo al cambiar el tipo de cambio, AC-404 y validaciones al enviar, congelado y AC-407, AC-405, AC-406 (también como dueño de la base), transiciones, AC-414, versión 3 desde la 1, ficha, AC-410, AC-411 y AC-413.
 
+## Parte 2: pantallas (5 nov 2026)
+
+- `/app/cotizaciones/[versión]?paso=1|2|3`: el borrador se arma en 3 pasos. Paso 1, servicios y precios: moneda de venta, tipo de cambio (aparece cuando algún coste está en otra moneda), servicios con cantidad, unidad, coste por unidad y su moneda, venta por unidad, subir, bajar, quitar y "Agregar del catálogo". Paso 2: cliente, viaje y condiciones, y la casilla para mostrar o no el precio de cada servicio. Paso 3: "Así la verá el cliente" (sin datos internos), "Solo para la agencia" y "Antes de enviar" con lo que falta y su enlace para corregir.
+- Se escribe el precio **por unidad** (como se guarda) y debajo se ve la cuenta del servicio: "4 × 750.000 = 3.000.000 COP" y el coste convertido. Así también se ve cómo se entendió el número (hallazgo B4: "10.005" es diez mil cinco).
+- Los totales se calculan en el navegador con `src/domain/quotes.ts` mientras se escribe; al guardar, la base recalcula y lo guardado es lo que vale.
+- Cada paso guarda solo lo suyo con `saveDraftPart` (toma lo guardado y reemplaza lo del paso). Cambiar de paso con los botones o el indicador de pasos guarda primero, para no perder lo escrito.
+- Un rechazo conserva todo, resalta el campo y dice en qué servicio está ("Servicio 2: escribe qué servicio es…").
+- Una versión que no es borrador, o cualquier versión vista por Lectura, se muestra como en el paso 3, con la lista de versiones y "Crear versión N" (o "Abrir el borrador" si ya hay uno).
+- Ficha de la oportunidad: tarjeta "Cotizaciones" con "Nueva cotización" y cada cotización con su estado y versión. La tarjeta completa (historial, aceptar y rechazar) llega en la parte 3.
+- Administración › Ajustes de cotizaciones (margen mínimo, vigencia y textos por defecto) y Administración › Catálogo de servicios (crear, cambiar y desactivar), solo para el administrador. Auditoría: `catalog.created`, `catalog.updated`, `quote_settings.updated`.
+- Si hay cambios sin guardar, salir por un enlace o cerrar la pestaña pregunta antes (`UnsavedGuard`). Los botones que guardan no se pueden pulsar dos veces mientras guardan. `saveDraftPart` bloquea la versión (`for update`) para que dos pestañas no se pisen.
+- Enviar todavía no está: el paso 3 lo dice. Llega en la parte 3 junto con el PDF de la parte 4.
+
 ## Siguientes partes
 
 2. Pantalla de armar la cotización (3 pasos), condiciones, catálogo y Configuración › Cotizaciones.

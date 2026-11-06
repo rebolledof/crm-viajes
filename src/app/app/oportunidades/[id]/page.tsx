@@ -16,6 +16,8 @@ import { Flash, NewTaskForm, TaskItem, budget, fechaHora, formatDay, loadOr404, 
 import { WhatsappButton } from "../../contactos/whatsapp-button";
 import { MoveForm } from "../move-form";
 import { StagePath } from "../../stage-path";
+import { listOpportunityQuotes } from "@/server/quotes";
+import { QuotesCard } from "./quotes-card";
 
 const UNKNOWN = "Desconocido";
 
@@ -27,8 +29,13 @@ export default async function OportunidadPage({ params, searchParams }: { params
     withUser(getDb(), user, (tx) => Promise.all([getOpportunity(tx, user.id, active.agencyId, id), listStages(tx, user.id, active.agencyId), activeMembers(tx, user.id, active.agencyId)])),
   );
   const o = data.opp;
-  const [contact, draft, channels] = await withUser(getDb(), user, (tx) =>
-    Promise.all([getContactDetail(tx, user.id, active.agencyId, o.contactId), whatsappDraft(tx, active.agencyId, o.contactId, o.id), contactChannels(tx, user.id, active.agencyId, [o.contactId])]),
+  const [contact, draft, channels, quotesList] = await withUser(getDb(), user, (tx) =>
+    Promise.all([
+      getContactDetail(tx, user.id, active.agencyId, o.contactId),
+      whatsappDraft(tx, active.agencyId, o.contactId, o.id),
+      contactChannels(tx, user.id, active.agencyId, [o.contactId]),
+      listOpportunityQuotes(tx, user.id, active.agencyId, o.id, new Date()),
+    ]),
   );
   const canWrite = can(active.role, "crm.write");
   const now = new Date();
@@ -121,6 +128,8 @@ export default async function OportunidadPage({ params, searchParams }: { params
             )}
           </Card>
           )}
+
+          <QuotesCard opportunityId={o.id} quotes={quotesList} canCreate={can(active.role, "quotes.write")} />
 
           {rest.length > 0 && (
             <Card title={`Después (${rest.length})`} icon="list" bodyClassName="px-4">

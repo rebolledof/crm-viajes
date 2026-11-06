@@ -41,7 +41,7 @@ API oficial de WhatsApp, Instagram y Messenger (fase B, tras la verificación de
 ## Requisitos funcionales
 
 - RF-01: Un usuario solo ve y modifica registros de la agencia activa de su sesión.
-- RF-02: Una invitación caducada o revocada no da acceso.
+- RF-02: Una invitación caducada o revocada no da acceso. A quien le retiraron el acceso y no tiene otra agencia activa se le explica que su acceso fue retirado y cómo pedir una invitación nueva; no puede crear una agencia propia (decisión de Felipe, 6 nov 2026).
 - RF-03: Un asesor ve y edita las oportunidades de su agencia según su rol; lectura no modifica nada.
 - RF-04: Una consulta crea un contacto (o reutiliza uno existente con el mismo teléfono o correo) y una oportunidad, con origen y fecha.
 - RF-05: Una segunda consulta del mismo contacto sobre otro viaje crea otra oportunidad sin sobrescribir la anterior.
@@ -72,6 +72,7 @@ API oficial de WhatsApp, Instagram y Messenger (fase B, tras la verificación de
 - AC-09 (RF-15): Dado el mismo correo entrante recibido dos veces, entonces la bandeja muestra un solo mensaje.
 - AC-10 (RF-17): Dado un tiempo máximo de 30 minutos, cuando un cliente escribe y nadie responde en 31 minutos, entonces la conversación aparece como sin responder y el supervisor recibe la alerta.
 - AC-11 (RF-18): Dada una respuesta del asesor Ana, entonces el historial muestra "Ana" y la hora del envío.
+- AC-12 (RF-02): Dado un asesor al que el administrador le retiró el acceso y que no tiene otra agencia activa, cuando inicia sesión, entonces ve "Tu acceso fue retirado" con el nombre de la agencia y cómo pedir una invitación nueva, no ve el botón "Crear agencia" y la base rechaza crear una agencia aunque la llame directo; con una invitación nueva vuelve a entrar.
 
 ## Preguntas pendientes
 

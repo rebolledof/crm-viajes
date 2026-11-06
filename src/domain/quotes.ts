@@ -17,6 +17,11 @@ export const QUOTE_UNIT_LABELS: Record<QuoteUnit, string> = {
   habitacion: "habitación",
   servicio: "servicio",
 };
+const QUOTE_UNIT_PLURALS: Record<QuoteUnit, string> = { persona: "personas", noche: "noches", habitacion: "habitaciones", servicio: "servicios" };
+/** "4 noches", "1 servicio", "1,5 noches": la cantidad con su unidad en singular o plural. */
+export function unitLabel(unit: QuoteUnit, quantity: string, format: (v: string) => string = (v) => v): string {
+  return `${format(quantity)} ${new D(quantity).equals(1) ? QUOTE_UNIT_LABELS[unit] : QUOTE_UNIT_PLURALS[unit]}`;
+}
 export function isQuoteUnit(value: unknown): value is QuoteUnit {
   return typeof value === "string" && (QUOTE_UNITS as readonly string[]).includes(value);
 }
@@ -210,4 +215,41 @@ export function sendProblems(
 /** Número visible de la cotización: 42 → "0042". */
 export function formatQuoteNumber(n: number): string {
   return String(n).padStart(4, "0");
+}
+
+/** Número con punto de miles y coma decimal, sin perder decimales: "10005.5" → "10.005,5". */
+export function formatDecimal(value: Decimal.Value): string {
+  const [int, frac] = new D(value).toFixed().split(".");
+  const grouped = int.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  return frac ? `${grouped},${frac}` : grouped;
+}
+
+/** Importe con la moneda escrita después, como en las imágenes aprobadas: "5.100.000 COP". */
+export function formatAmount(value: Decimal.Value, currency: Currency): string {
+  const [int, frac] = new D(value).toFixed(CURRENCY_DECIMALS[currency]).split(".");
+  const grouped = int.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  return `${frac ? `${grouped},${frac}` : grouped} ${currency}`;
+}
+
+/** Margen mínimo de aviso en puntos: de 0 a 90 con hasta 2 decimales (Configuración › Cotizaciones). */
+export function parseMinMarginPct(raw: string): string | null {
+  const text = normalizeNumber(raw.replace(/%/g, ""));
+  if (text === null) return null;
+  const value = new D(text);
+  if (value.decimalPlaces() > 2 || value.greaterThan(90)) return null;
+  return value.toFixed();
+}
+
+/** Vigencia por defecto en días: entero de 1 a 90. */
+export function parseValidityDays(raw: string): number | null {
+  const text = raw.trim();
+  if (!/^\d{1,2}$/.test(text)) return null;
+  const n = Number(text);
+  return n >= 1 && n <= 90 ? n : null;
+}
+
+/** Pasos de la guía (alcance 8). */
+export const QUOTE_STEPS = ["Servicios y precios", "Condiciones", "Revisar y enviar"] as const;
+export function parseStep(raw: string | undefined): 1 | 2 | 3 {
+  return raw === "2" ? 2 : raw === "3" ? 3 : 1;
 }

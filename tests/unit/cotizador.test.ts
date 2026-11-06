@@ -239,3 +239,77 @@ describe("validación del borrador (AC-417)", () => {
     expect(fieldOf(() => parseDraft({ ...base, saleCurrency: "EUR" }))).toBe("invalid_input:saleCurrency");
   });
 });
+
+// SPEC-004 parte 2: lo que muestra la pantalla de armar la cotización.
+import * as Q from "@/domain/quotes";
+import { parseCatalog } from "@/server/quotes";
+import { errorMessage } from "@/server/errors";
+
+describe("pantalla del cotizador (parte 2)", () => {
+  it("importes como en las imágenes aprobadas: punto de miles, coma decimal y la moneda después", () => {
+    expect(Q.formatAmount("5100000", "COP")).toBe("5.100.000 COP");
+    expect(Q.formatAmount("30.015", "USD")).toBe("30,02 USD");
+    expect(Q.formatAmount("0.3", "USD")).toBe("0,30 USD");
+    expect(Q.formatDecimal("10005.5")).toBe("10.005,5");
+    expect(Q.formatDecimal("150")).toBe("150");
+  });
+
+  it("hallazgo B4: «10.005» se muestra como se entendió (diez mil cinco) y «10,005» como diez con 5 milésimas", () => {
+    expect(Q.formatDecimal(Q.parseUnitAmount("10.005")!)).toBe("10.005");
+    expect(Q.formatDecimal(Q.parseUnitAmount("10,005")!)).toBe("10,005");
+    // Lo que escribió en la pantalla vuelve igual al recargar (sin perder decimales).
+    expect(Q.parseUnitAmount(Q.formatDecimal("10.005"))).toBe("10.005");
+    expect(Q.parseUnitAmount(Q.formatDecimal("1250000.5"))).toBe("1250000.5");
+  });
+
+  it("cantidad con su unidad en singular o plural", () => {
+    expect(Q.unitLabel("noche", "4", Q.formatDecimal)).toBe("4 noches");
+    expect(Q.unitLabel("servicio", "1")).toBe("1 servicio");
+    expect(Q.unitLabel("habitacion", "1.5", Q.formatDecimal)).toBe("1,5 habitaciones");
+  });
+
+  it("ajustes: margen mínimo de 0 a 90 % con hasta 2 decimales y vigencia de 1 a 90 días", () => {
+    expect(Q.parseMinMarginPct("10")).toBe("10");
+    expect(Q.parseMinMarginPct("12,5 %")).toBe("12.5");
+    expect(Q.parseMinMarginPct("0")).toBe("0");
+    expect(Q.parseMinMarginPct("95")).toBeNull();
+    expect(Q.parseMinMarginPct("1,234")).toBeNull();
+    expect(Q.parseMinMarginPct("diez")).toBeNull();
+    expect(Q.parseValidityDays("5")).toBe(5);
+    expect(Q.parseValidityDays("0")).toBeNull();
+    expect(Q.parseValidityDays("91")).toBeNull();
+    expect(Q.parseValidityDays("2.5")).toBeNull();
+  });
+
+  it("pasos de la guía: cualquier valor raro de la URL abre el paso 1", () => {
+    expect(Q.parseStep("2")).toBe(2);
+    expect(Q.parseStep("3")).toBe(3);
+    expect(Q.parseStep(undefined)).toBe(1);
+    expect(Q.parseStep("9")).toBe(1);
+  });
+
+  it("catálogo: valida cada campo y lo liga a su casilla", () => {
+    const ok = parseCatalog({ description: "Traslado", unit: "servicio", unitCost: "120.000", costCurrency: "COP", unitPrice: "180.000", priceCurrency: "COP", active: true });
+    expect(ok).toMatchObject({ unitCost: "120000", unitPrice: "180000", supplier: null });
+    const fieldOf = (patch: Record<string, unknown>) => {
+      try {
+        parseCatalog({ description: "Traslado", unit: "servicio", unitCost: "1", costCurrency: "COP", unitPrice: "2", priceCurrency: "COP", active: true, ...patch });
+      } catch (e) {
+        return e instanceof AppError ? e.field : "otro";
+      }
+      return null;
+    };
+    expect(fieldOf({ description: " " })).toBe("description");
+    expect(fieldOf({ unitPrice: "abc" })).toBe("unitPrice");
+    expect(fieldOf({ unitCost: "-5" })).toBe("unitCost");
+    expect(fieldOf({ priceCurrency: "EUR" })).toBe("priceCurrency");
+    expect(fieldOf({ unit: "kilo" })).toBe("unit");
+  });
+
+  it("cada campo nuevo tiene un mensaje que dice cómo corregirlo", () => {
+    for (const f of ["minMarginPct", "validityDays", "priceCurrency", "includes", "cancellationPolicy", "defaultIncludes"]) {
+      expect(errorMessage("invalid_input", f), f).not.toBe(errorMessage("invalid_input"));
+    }
+    expect(errorMessage("invalid_input", "description.3")).toBe("Escribe qué servicio es (máximo 300 caracteres).");
+  });
+});

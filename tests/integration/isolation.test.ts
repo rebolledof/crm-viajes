@@ -10,11 +10,12 @@ import {
   createInvitation,
   listAudit,
   listMyMemberships,
+  myRevokedAccess,
   renameAgency,
   revokeInvitation,
   revokeMembership,
 } from "../../src/server/agencies";
-import { AppError } from "../../src/server/errors";
+import { AppError, pgError } from "../../src/server/errors";
 import { as, createUser, testDb } from "./helpers";
 
 const t = testDb();
@@ -175,6 +176,49 @@ describe("revocar acceso", () => {
     await as(t.db, adminA, (tx) => revokeMembership(tx, adminA.id, agencyA, u.id));
     expect(await as(t.db, u, (tx) => tx.select().from(agencies))).toEqual([]);
     expect(await as(t.db, u, (tx) => listMyMemberships(tx, u.id))).toEqual([]);
+  });
+});
+
+describe("acceso retirado, AC-12 (informe de pruebas S04, 6 nov 2026)", () => {
+  it("quien perdió el acceso y no tiene otra agencia no puede crear una, ni llamando directo a la base", async () => {
+    const u = await createUser(t.admin, "revocado");
+    const { token } = await invite(adminA, agencyA, u, "asesor");
+    await as(t.db, u, (tx) => acceptInvitation(tx, token));
+    await as(t.db, adminA, (tx) => revokeMembership(tx, adminA.id, agencyA, u.id));
+    expect(await as(t.db, u, (tx) => myRevokedAccess(tx))).toEqual([{ agencyName: "Viajes Andes", revokedAt: expect.any(Date) }]);
+    await expectCode(as(t.db, u, (tx) => createAgency(tx, "Agencia del revocado")), "access_revoked");
+    const direct = await as(t.db, u, (tx) => tx.execute(sql`select public.create_agency('Directo', 'directo-revocado')`)).catch((e: unknown) => e);
+    expect(pgError(direct)?.message).toBe("access_revoked");
+    expect((await t.admin`select count(*)::int as n from agencies where created_by = ${u.id}`)[0].n).toBe(0);
+    // Con una invitación nueva vuelve a entrar.
+    const again = await invite(adminA, agencyA, u, "lectura");
+    await as(t.db, u, (tx) => acceptInvitation(tx, again.token));
+    expect(await as(t.db, u, (tx) => listMyMemberships(tx, u.id))).toHaveLength(1);
+    expect(await as(t.db, u, (tx) => myRevokedAccess(tx))).toEqual([]);
+  });
+
+  it("una cuenta nueva sí crea su agencia, y quien sigue activo en otra también", async () => {
+    const nuevo = await createUser(t.admin, "nuevo");
+    expect(await as(t.db, nuevo, (tx) => myRevokedAccess(tx))).toEqual([]);
+    await as(t.db, nuevo, (tx) => createAgency(tx, "Agencia nueva"));
+    const doble = await createUser(t.admin, "doble");
+    const i1 = await invite(adminA, agencyA, doble, "asesor");
+    await as(t.db, doble, (tx) => acceptInvitation(tx, i1.token));
+    const i2 = await invite(adminB, agencyB, doble, "asesor");
+    await as(t.db, doble, (tx) => acceptInvitation(tx, i2.token));
+    await as(t.db, adminA, (tx) => revokeMembership(tx, adminA.id, agencyA, doble.id));
+    await as(t.db, doble, (tx) => createAgency(tx, "Agencia de doble"));
+  });
+
+  it("quien perdió el acceso a dos agencias ve las dos y tampoco crea una", async () => {
+    const u = await createUser(t.admin, "revocado-dos");
+    for (const [admin, agency] of [[adminA, agencyA], [adminB, agencyB]] as const) {
+      const { token } = await invite(admin, agency, u, "asesor");
+      await as(t.db, u, (tx) => acceptInvitation(tx, token));
+      await as(t.db, admin, (tx) => revokeMembership(tx, admin.id, agency, u.id));
+    }
+    expect((await as(t.db, u, (tx) => myRevokedAccess(tx))).map((r) => r.agencyName).sort()).toEqual(["Caribe Tours", "Viajes Andes"]);
+    await expectCode(as(t.db, u, (tx) => createAgency(tx, "Otra del revocado")), "access_revoked");
   });
 });
 

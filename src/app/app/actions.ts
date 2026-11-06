@@ -38,7 +38,7 @@ function fail(path: string, code: ErrorCode): never {
 }
 
 function failedName(formData: FormData, code: ErrorCode): FormState {
-  return { error: code === "invalid_input" ? "Escribe un nombre de 2 a 120 caracteres." : ERROR_MESSAGES[code], field: "name", values: { name: [formData.get("name")?.toString() ?? ""] }, at: Date.now() };
+  return { error: code === "invalid_input" ? "Escribe un nombre de 2 a 120 caracteres." : ERROR_MESSAGES[code], field: code === "access_revoked" ? undefined : "name", values: { name: [formData.get("name")?.toString() ?? ""] }, at: Date.now() };
 }
 
 export async function createAgencyAction(_prev: FormState, formData: FormData): Promise<FormState> {
