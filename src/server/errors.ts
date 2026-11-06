@@ -10,6 +10,7 @@ export const ERROR_MESSAGES = {
   invitation_invalid: "La invitación no es válida: venció, ya se usó, fue revocada o es para otro correo.",
   slug_taken: "Ya existe una agencia con ese nombre. Prueba con otro.",
   not_authenticated: "Tu sesión terminó. Vuelve a iniciar sesión.",
+  access_revoked: "Tu acceso a la agencia fue retirado. Pide al administrador una invitación nueva para volver a entrar.",
   duplicate_contact: "Ya existe un contacto con ese teléfono o correo en tu agencia.",
   invalid_phone: "El teléfono no es válido. Escríbelo con indicativo si no es de Colombia.",
   invalid_amount: "El presupuesto no es válido para esa moneda.",
