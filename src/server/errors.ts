@@ -50,6 +50,7 @@ export const ERROR_MESSAGES = {
   quote_already_sent: "Esta versión ya se envió, quizá otra persona lo hizo hace un momento. Recarga la página para verla; para un cambio, crea una versión nueva.",
   quote_already_decided: "Alguien ya marcó la respuesta del cliente en esta versión. Recarga la página para ver cómo quedó.",
   quote_already_accepted: "Otra versión de esta cotización ya está aceptada. Solo una versión puede quedar aceptada.",
+  pdf_failed: "No pudimos generar el PDF de la cotización. No se guardó ningún cambio: inténtalo de nuevo y, si se repite, avísanos.",
   quote_draft_exists: "Otra persona acaba de crear la versión nueva de esta cotización. Recarga la página para abrirla.",
 } as const;
 

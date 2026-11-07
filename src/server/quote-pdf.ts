@@ -47,7 +47,7 @@ function hexColor(hex: string, fallback = "#0F6E6E"): RGB {
 /** Las fuentes estándar solo tienen el alfabeto WinAnsi (español incluido); lo demás se cambia por "?". */
 function safeText(font: PDFFont, text: string): string {
   let out = "";
-  for (const ch of text.replace(/\r\n?/g, "\n").replace(/\t/g, " ")) {
+  for (const ch of text.normalize("NFC").replace(/\r\n?/g, "\n").replace(/\t/g, " ")) {
     if (ch === "\n") {
       out += ch;
       continue;
@@ -60,6 +60,14 @@ function safeText(font: PDFFont, text: string): string {
     }
   }
   return out;
+}
+
+/** Recorta con "…" para que quepa en el ancho. */
+function fit(font: PDFFont, size: number, text: string, width: number): string {
+  if (font.widthOfTextAtSize(text, size) <= width) return text;
+  let t = text;
+  while (t.length > 1 && font.widthOfTextAtSize(`${t}…`, size) > width) t = t.slice(0, -1);
+  return `${t.trimEnd()}…`;
 }
 
 function wrap(font: PDFFont, size: number, text: string, width: number): string[] {
@@ -128,7 +136,7 @@ export async function renderQuotePdf(d: QuotePdfData): Promise<{ bytes: Uint8Arr
     page.drawRectangle({ x: 0, y: A4[1] - 8, width: A4[0], height: 8, color: brand });
     y = A4[1] - M;
     if (d.draft) {
-      page.drawText("BORRADOR", { x: 120, y: 330, size: 96, font: bold, color: rgb(0.93, 0.93, 0.93), rotate: degrees(35) });
+      page.drawText("BORRADOR", { x: 110, y: 300, size: 84, font: bold, color: rgb(0.93, 0.93, 0.93), rotate: degrees(35) });
     }
   };
   const ensure = (h: number) => {
@@ -150,7 +158,11 @@ export async function renderQuotePdf(d: QuotePdfData): Promise<{ bytes: Uint8Arr
     page.drawImage(logo, { x: M, y: headTop - logo.height * scale, width: logo.width * scale, height: logo.height * scale });
   } else {
     y = headTop - 18;
-    draw(d.agencyName, M, 18, bold, brand);
+    // Nombre largo: letra más pequeña y, si aún no cabe, recortado; no pisa el número de la cotización.
+    const nameWidth = width - 200;
+    let size = 18;
+    while (size > 11 && bold.widthOfTextAtSize(safeText(bold, d.agencyName), size) > nameWidth) size--;
+    draw(fit(bold, size, safeText(bold, d.agencyName), nameWidth), M, size, bold, brand);
   }
   y = headTop - 12;
   const right = (s: string, size: number, font: PDFFont = regular, color: RGB = ink) => {
@@ -184,19 +196,26 @@ export async function renderQuotePdf(d: QuotePdfData): Promise<{ bytes: Uint8Arr
   ensure(40);
   const colQty = A4[0] - M - (d.showItemPrices ? 190 : 0);
   const descWidth = colQty - M - 16;
-  page.drawRectangle({ x: M, y: y - 20, width, height: 20, color: rgb(0.95, 0.96, 0.97) });
-  y -= 14;
-  draw("SERVICIO", M + 6, 8, bold, muted);
-  draw("CANTIDAD", colQty, 8, bold, muted);
-  if (d.showItemPrices) {
-    const label = "VALOR";
-    page.drawText(label, { x: A4[0] - M - 6 - bold.widthOfTextAtSize(label, 8), y, size: 8, font: bold, color: muted });
-    text.push(label);
-  }
-  y -= 10;
+  const tableHeader = () => {
+    page.drawRectangle({ x: M, y: y - 20, width, height: 20, color: rgb(0.95, 0.96, 0.97) });
+    y -= 14;
+    draw("SERVICIO", M + 6, 8, bold, muted);
+    draw("CANTIDAD", colQty, 8, bold, muted);
+    if (d.showItemPrices) {
+      const label = "VALOR";
+      page.drawText(label, { x: A4[0] - M - 6 - bold.widthOfTextAtSize(label, 8), y, size: 8, font: bold, color: muted });
+      text.push(label);
+    }
+    y -= 10;
+  };
+  tableHeader();
   for (const it of d.items) {
     const lines = wrap(regular, 10, safeText(regular, it.description), descWidth);
-    ensure(lines.length * 14 + 8);
+    // En una página nueva se repite el encabezado de la tabla.
+    if (y - (lines.length * 14 + 8) < M + footerSpace) {
+      newPage();
+      tableHeader();
+    }
     const top = y;
     lines.forEach((l, i) => {
       y = top - 14 * (i + 1);
@@ -237,10 +256,10 @@ export async function renderQuotePdf(d: QuotePdfData): Promise<{ bytes: Uint8Arr
 
   // Pie en cada página: agencia, asesor y número de página.
   pages.forEach((p, i) => {
-    const foot = safeText(regular, [d.agencyName, d.advisorEmail ? `Asesor: ${d.advisorEmail}` : null].filter(Boolean).join(" · "));
+    const n = `Página ${i + 1} de ${pages.length}`;
+    const foot = fit(regular, 8, safeText(regular, [d.agencyName, d.advisorEmail ? `Asesor: ${d.advisorEmail}` : null].filter(Boolean).join(" · ")), width - regular.widthOfTextAtSize(n, 8) - 16);
     p.drawLine({ start: { x: M, y: M + 18 }, end: { x: A4[0] - M, y: M + 18 }, thickness: 0.5, color: line });
     p.drawText(foot, { x: M, y: M, size: 8, font: regular, color: muted });
-    const n = `Página ${i + 1} de ${pages.length}`;
     p.drawText(n, { x: A4[0] - M - regular.widthOfTextAtSize(n, 8), y: M, size: 8, font: regular, color: muted });
     if (i === 0) text.push(foot);
     text.push(n);

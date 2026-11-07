@@ -1,5 +1,6 @@
 // SPEC-004 parte 1 · Cotizador contra PostgreSQL real: numeración, cálculo en la base, versiones
 // inmutables, marca congelada, costes ocultos para Lectura, aislamiento entre agencias y catálogo.
+import { createHash } from "node:crypto";
 import { and, eq, sql } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { SessionUser } from "../../src/db/client";
@@ -789,6 +790,20 @@ describe("parte 4: PDF (alcance 15, RF-404, RF-406)", () => {
     expect(preview.draft).toBe(true);
     expect(preview.filename).toMatch(/-borrador\.pdf$/);
     expect(pdfText(preview.bytes)).toContain("BORRADOR");
+    expect(await pdfRow(q.versionId)).toBeUndefined();
+  });
+
+  it("solo admin o asesor de la misma agencia guardan un PDF: Lectura y otra agencia no pueden insertarlo", async () => {
+    const q = await newDraft(asesorA, agencyA, oppA);
+    await send(asesorA, q.versionId);
+    const pdf = Buffer.from("%PDF-falso");
+    const sha = createHash("sha256").update(pdf).digest("hex");
+    const insert = (u: SessionUser, agencyId: string) =>
+      as(t.db, u, (tx) => tx.execute(sql`insert into quote_pdfs (quote_version_id, agency_id, pdf, sha256, created_by) values (${q.versionId}, ${agencyId}, ${pdf}, ${sha}, ${u.id})`));
+    await expectDb(insert(lecturaA, agencyA), /row-level security/);
+    await expectDb(insert(adminB, agencyA), /row-level security/);
+    // Con su propia agencia pasa la política, pero la versión no es de B: la base la rechaza.
+    await expectDb(insert(adminB, agencyB), /foreign key|invalid_quote_transition|row-level security/);
     expect(await pdfRow(q.versionId)).toBeUndefined();
   });
 

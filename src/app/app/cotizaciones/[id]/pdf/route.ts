@@ -1,5 +1,5 @@
 import { getDb, withUser } from "@/db/client";
-import { AppError } from "@/server/errors";
+import { AppError, ERROR_MESSAGES } from "@/server/errors";
 import { getQuotePdf } from "@/server/quotes";
 import { getAppContext } from "@/server/session";
 
@@ -27,6 +27,9 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   } catch (err) {
     if (err instanceof AppError && (err.code === "not_found" || err.code === "permission_denied")) {
       return new Response("No encontramos esta cotización.", { status: 404, headers: { "Content-Type": "text/plain; charset=utf-8" } });
+    }
+    if (err instanceof AppError && err.code === "pdf_failed") {
+      return new Response(ERROR_MESSAGES.pdf_failed, { status: 500, headers: { "Content-Type": "text/plain; charset=utf-8" } });
     }
     throw err;
   }

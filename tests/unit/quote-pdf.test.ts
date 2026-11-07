@@ -76,4 +76,19 @@ describe("PDF de la cotización (alcance 15)", () => {
     const { text } = await renderQuotePdf({ ...base, currency: "USD", items: [{ description: "Hotel", quantity: "3", unit: "noche", lineTotal: "30.02" }], total: "30.02" });
     expect(text.join(" ")).toMatch(/30,02 USD/);
   });
+  it("prueba independiente: el encabezado de la tabla se repite en cada página y un nombre o correo largo se recorta", async () => {
+    const items = Array.from({ length: 60 }, (_, i) => ({ description: `Servicio ${i + 1}`, quantity: "1", unit: "servicio" as const, lineTotal: "1000" }));
+    const longName = "Agencia de Viajes y Turismo Internacional Los Andes y el Caribe Colombiano SAS";
+    const { text } = await renderQuotePdf({ ...base, items, agencyName: longName, advisorEmail: `${"asesora.con.un.correo.muy.largo".repeat(4)}@example.com` });
+    const pages = text.filter((t) => /^Página \d+ de \d+$/.test(t)).length;
+    expect(pages).toBeGreaterThan(1);
+    expect(text.filter((t) => t === "SERVICIO")).toHaveLength(pages);
+    expect(text.some((t) => t.endsWith("…") && t.startsWith("Agencia de Viajes"))).toBe(true);
+    expect(text.some((t) => t.includes("Asesor:") && t.endsWith("…"))).toBe(true);
+  });
+
+  it("texto con tildes compuestas (NFD) sale con la letra, no con «?»", async () => {
+    const { text } = await renderQuotePdf({ ...base, clientName: "Mari\u0301a Ibáñez" });
+    expect(text.join("\n")).toContain("Para María Ibáñez");
+  });
 });

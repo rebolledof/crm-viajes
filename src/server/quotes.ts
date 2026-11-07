@@ -745,10 +745,20 @@ async function pdfData(tx: Tx, agencyId: string, versionId: string, now: Date): 
   };
 }
 
+/** Dibuja el PDF; un fallo inesperado (por ejemplo un logo dañado) se vuelve un mensaje claro y la transacción se deshace. */
+async function renderPdf(data: QuotePdfData): Promise<Uint8Array> {
+  try {
+    return (await renderQuotePdf(data)).bytes;
+  } catch (err) {
+    console.error("quote_pdf_render_failed", err);
+    throw new AppError("pdf_failed");
+  }
+}
+
 /** Genera y guarda el PDF de una versión enviada (una sola vez; la base no deja cambiarlo). */
 async function storeQuotePdf(tx: Tx, userId: string, agencyId: string, versionId: string): Promise<Uint8Array> {
   const data = await pdfData(tx, agencyId, versionId, new Date());
-  const { bytes } = await renderQuotePdf(data);
+  const bytes = await renderPdf(data);
   const sha256 = createHash("sha256").update(bytes).digest("hex");
   try {
     await tx.insert(quotePdfs).values({ quoteVersionId: versionId, agencyId, pdf: Buffer.from(bytes), sha256, createdBy: userId }).onConflictDoNothing();
@@ -774,16 +784,14 @@ export async function getQuotePdf(tx: Tx, userId: string, agencyId: string, vers
   if (!row) throw new AppError("not_found");
   const filename = `Cotizacion-${formatQuoteNumberPlain(row.number)}-v${row.version}${row.status === "borrador" ? "-borrador" : ""}.pdf`;
   if (row.status === "borrador") {
-    const { bytes } = await renderQuotePdf(await pdfData(tx, agencyId, versionId, now));
-    return { bytes, filename, draft: true };
+    return { bytes: await renderPdf(await pdfData(tx, agencyId, versionId, now)), filename, draft: true };
   }
   const [stored] = await tx.select({ pdf: quotePdfs.pdf }).from(quotePdfs).where(eq(quotePdfs.quoteVersionId, versionId));
   if (stored) return { bytes: new Uint8Array(stored.pdf), filename, draft: false };
   // Enviada antes de que existiera el PDF: los datos están congelados, así que el resultado es el mismo
   // que se habría generado al enviar. Lectura no escribe: lo recibe sin guardarlo.
   if (can(role, "quotes.write")) return { bytes: await storeQuotePdf(tx, userId, agencyId, versionId), filename, draft: false };
-  const { bytes } = await renderQuotePdf(await pdfData(tx, agencyId, versionId, now));
-  return { bytes, filename, draft: false };
+  return { bytes: await renderPdf(await pdfData(tx, agencyId, versionId, now)), filename, draft: false };
 }
 
 const formatQuoteNumberPlain = (n: number) => String(n).padStart(4, "0");
