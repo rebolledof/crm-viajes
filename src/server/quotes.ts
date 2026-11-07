@@ -3,7 +3,9 @@
 // para devolver errores ligados a su campo y conservar lo escrito.
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import type { Tx } from "@/db/client";
-import { catalogServices, contacts, opportunities, pipelineStages, quoteItems, quoteSettings, quoteVersionCosts, quoteVersions, quotes } from "@/db/schema";
+import { agencies, agencyBranding, catalogServices, contacts, memberships, opportunities, pipelineStages, quoteItems, quotePdfs, quoteSettings, quoteVersionCosts, quoteVersions, quotes } from "@/db/schema";
+import { createHash } from "node:crypto";
+import { renderQuotePdf, type QuotePdfData } from "./quote-pdf";
 import { isCurrency, type Currency } from "@/domain/money";
 import Decimal from "decimal.js";
 import { can } from "@/domain/permissions";
@@ -610,6 +612,8 @@ export async function sendQuoteVersion(tx: Tx, userId: string, agencyId: string,
     rethrowBusiness(err);
   }
   if (!sent) throw new AppError("not_found");
+  // El PDF se genera una vez, con los datos ya congelados, y se guarda con la versión (RF-404).
+  await storeQuotePdf(tx, userId, agencyId, versionId);
   const plan = await sendPlan(tx, agencyId, v.opportunity_id);
   if (plan.willMove && plan.target) {
     // Reusa el cambio de etapa del embudo: actividad, auditoría y la plantilla de seguimiento.
@@ -686,3 +690,100 @@ export async function expiringQuotes(tx: Tx, userId: string, agencyId: string, n
     .orderBy(asc(quoteVersions.validUntil), asc(quotes.number));
   return rows.map((r) => ({ ...r, daysToExpire: daysToExpire("enviada", r.validUntil, today) ?? 0 }));
 }
+
+// ---------------------------------------------------------------------------------------------
+// Parte 4: PDF (alcance 15; RF-404, RF-406; AC-401, AC-405, AC-407).
+
+/** Datos del PDF: solo lo que ve el cliente. Una enviada usa la marca y el logo congelados al enviar. */
+async function pdfData(tx: Tx, agencyId: string, versionId: string, now: Date): Promise<QuotePdfData & { status: string }> {
+  const [row] = await tx
+    .select({ v: quoteVersions, number: quotes.number })
+    .from(quoteVersions)
+    .innerJoin(quotes, eq(quotes.id, quoteVersions.quoteId))
+    .where(and(eq(quoteVersions.id, versionId), eq(quoteVersions.agencyId, agencyId)));
+  if (!row) throw new AppError("not_found");
+  const v = row.v;
+  const items = (await tx.execute(
+    sql`select description, quantity::text as quantity, unit::text as unit, line_total::text as line_total from app.quote_items_for_client(${versionId}) order by position`,
+  )) as unknown as { description: string; quantity: string; unit: string; line_total: string }[];
+  let brand: { name: string; primaryColor: string; logo: QuotePdfData["logo"] };
+  if (v.status !== "borrador" && v.brand) {
+    const b = v.brand as { name?: string; primary_color?: string };
+    brand = { name: b.name ?? "", primaryColor: b.primary_color ?? "#0F6E6E", logo: v.brandLogo && v.brandLogoType ? { bytes: new Uint8Array(v.brandLogo), type: v.brandLogoType } : null };
+  } else {
+    const [a] = await tx.select({ name: agencies.name }).from(agencies).where(eq(agencies.id, agencyId));
+    const [b] = await tx.select().from(agencyBranding).where(eq(agencyBranding.agencyId, agencyId));
+    brand = { name: a?.name ?? "", primaryColor: b?.primaryColor ?? "#0F6E6E", logo: b?.logo && b.logoType ? { bytes: new Uint8Array(b.logo), type: b.logoType } : null };
+  }
+  const advisorId = v.sentBy ?? v.createdBy;
+  const [advisor] = await tx.select({ email: memberships.email }).from(memberships).where(and(eq(memberships.agencyId, agencyId), eq(memberships.userId, advisorId)));
+  return {
+    status: v.status,
+    agencyName: brand.name,
+    primaryColor: brand.primaryColor,
+    logo: brand.logo,
+    number: row.number,
+    version: v.version,
+    draft: v.status === "borrador",
+    issuedAt: v.sentAt ?? now,
+    validUntil: v.validUntil,
+    title: v.title,
+    clientName: v.clientName,
+    destination: v.destination,
+    travelStart: v.travelStart,
+    travelEnd: v.travelEnd,
+    travelers: v.travelers,
+    currency: v.saleCurrency as Currency,
+    showItemPrices: v.showItemPrices,
+    items: items.map((i) => ({ description: i.description, quantity: i.quantity, unit: i.unit as QuoteUnit, lineTotal: i.line_total })),
+    total: v.saleTotal ?? sumAmounts(items.map((i) => i.line_total)),
+    includes: v.includes,
+    excludes: v.excludes,
+    paymentTerms: v.paymentTerms,
+    cancellationPolicy: v.cancellationPolicy,
+    advisorEmail: advisor?.email ?? null,
+  };
+}
+
+/** Genera y guarda el PDF de una versión enviada (una sola vez; la base no deja cambiarlo). */
+async function storeQuotePdf(tx: Tx, userId: string, agencyId: string, versionId: string): Promise<Uint8Array> {
+  const data = await pdfData(tx, agencyId, versionId, new Date());
+  const { bytes } = await renderQuotePdf(data);
+  const sha256 = createHash("sha256").update(bytes).digest("hex");
+  try {
+    await tx.insert(quotePdfs).values({ quoteVersionId: versionId, agencyId, pdf: Buffer.from(bytes), sha256, createdBy: userId }).onConflictDoNothing();
+  } catch (err) {
+    rethrowBusiness(err);
+  }
+  const [stored] = await tx.select({ pdf: quotePdfs.pdf }).from(quotePdfs).where(eq(quotePdfs.quoteVersionId, versionId));
+  return stored ? new Uint8Array(stored.pdf) : bytes;
+}
+
+/**
+ * "Descargar PDF": el guardado de una versión enviada; si es de antes de la parte 4, se genera con
+ * los datos congelados y se guarda. Un borrador da una vista previa marcada "BORRADOR" que no se guarda.
+ */
+export async function getQuotePdf(tx: Tx, userId: string, agencyId: string, versionId: string, now: Date): Promise<{ bytes: Uint8Array; filename: string; draft: boolean }> {
+  const role = await requirePermission(tx, userId, agencyId, "crm.read");
+  requireIds(versionId);
+  const [row] = await tx
+    .select({ status: quoteVersions.status, version: quoteVersions.version, number: quotes.number })
+    .from(quoteVersions)
+    .innerJoin(quotes, eq(quotes.id, quoteVersions.quoteId))
+    .where(and(eq(quoteVersions.id, versionId), eq(quoteVersions.agencyId, agencyId)));
+  if (!row) throw new AppError("not_found");
+  const filename = `Cotizacion-${formatQuoteNumberPlain(row.number)}-v${row.version}${row.status === "borrador" ? "-borrador" : ""}.pdf`;
+  if (row.status === "borrador") {
+    const { bytes } = await renderQuotePdf(await pdfData(tx, agencyId, versionId, now));
+    return { bytes, filename, draft: true };
+  }
+  const [stored] = await tx.select({ pdf: quotePdfs.pdf }).from(quotePdfs).where(eq(quotePdfs.quoteVersionId, versionId));
+  if (stored) return { bytes: new Uint8Array(stored.pdf), filename, draft: false };
+  // Enviada antes de que existiera el PDF: los datos están congelados, así que el resultado es el mismo
+  // que se habría generado al enviar. Lectura no escribe: lo recibe sin guardarlo.
+  if (can(role, "quotes.write")) return { bytes: await storeQuotePdf(tx, userId, agencyId, versionId), filename, draft: false };
+  const { bytes } = await renderQuotePdf(await pdfData(tx, agencyId, versionId, now));
+  return { bytes, filename, draft: false };
+}
+
+const formatQuoteNumberPlain = (n: number) => String(n).padStart(4, "0");

@@ -84,8 +84,9 @@ export function SendPanel({
             )}
             {replaces !== null && <li>La versión {replaces}, que ya se había enviado, pasa a «Sustituida».</li>}
             <li>{opportunityLine(plan)}</li>
+            <li>Se genera el PDF para el cliente, con el logo y los colores de la agencia, y queda guardado con esta versión.</li>
             <li>El envío queda en la auditoría con tu nombre y la hora.</li>
-            <li>El CRM no le escribe al cliente: tú le compartes la cotización por WhatsApp o correo.</li>
+            <li>El CRM no le escribe al cliente: tú le mandas el PDF por WhatsApp o correo.</li>
           </ul>
           <div className="flex flex-wrap justify-end gap-2 pt-1">
             <CancelDialogButton className={secondaryButtonClass} />

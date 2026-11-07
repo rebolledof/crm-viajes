@@ -14,7 +14,8 @@
 - S03 Bandeja, parte 2 (chat web) en código (rama `claude/project-thread-3wyo62-chat`, desde `main` tras el merge de los PRs #1 a #5 el 3 nov 2026): spec `specs/003-bandeja/spec-parte-2-chat.md` con D-16 y D-17 aprobadas por Felipe el 3 nov. Migración `20261108000000_chat_web.sql` aplicada en `crm-viajes-pruebas` (que también usa producción) por Felipe el 3 nov 2026; el chat queda apagado en cada agencia hasta que su administrador lo encienda.
 - S04 Cotizador, parte 1 en código (rama `claude/project-thread-1yn7j4`, desde `main`): SPEC-004 aprobada por Felipe el 5 nov 2026 con las decisiones por defecto (PDF desglosado con opción de solo total, COP o USD con tipo de cambio escrito, Lectura no ve costes, margen mínimo de 10 % como aviso). Datos, cálculo de dinero y reglas de versiones en la base; sin pantallas todavía. Migración `20261109000000_cotizador.sql` aplicada solo en PostgreSQL local. ADR 0003. Prueba independiente hecha y corregida; PR #8 fusionado en main el 5 nov 2026 (3b7ffc0).
 - S04 Cotizador, parte 2 en código (rama `claude/project-thread-1yn7j4`, PR #9): pantalla de 3 pasos, tarjeta en la oportunidad, catálogo y ajustes. Felipe aplicó `20261109000000_cotizador.sql` en `crm-viajes-pruebas` y probó la vista previa el 5 nov 2026: todo cumple salvo que un usuario revocado podía entrar a "Crea tu agencia". Corregido el 6 nov 2026 (aviso de acceso retirado y bloqueo en la base); falta que Felipe aplique `20261110000000_acceso_retirado.sql` en `crm-viajes-pruebas` antes del merge.
-- S04 Cotizador, parte 3 en código (6 nov 2026): enviar con confirmación, mover la oportunidad a "Propuesta enviada", aceptar y rechazar, historial en la oportunidad y "Cotizaciones por vencer" en Mi día. Sin migración nueva. Falta la parte 4 (PDF).
+- S04 Cotizador, parte 3 en código (6 nov 2026): enviar con confirmación, mover la oportunidad a "Propuesta enviada", aceptar y rechazar, historial en la oportunidad y "Cotizaciones por vencer" en Mi día. Sin migración nueva. PR #10 fusionado el 7 nov 2026 tras la prueba manual de Felipe.
+- S04 Cotizador, parte 4 en código (7 nov 2026): PDF generado al enviar y guardado (`quote_pdfs`), descarga y vista previa del borrador. Migración `20261111000000_cotizacion_pdf.sql` pendiente en `crm-viajes-pruebas` antes del merge.
 - Pruebas: 14 unitarias y 21 de integración contra PostgreSQL 16 real (aislamiento A/B, roles, invitaciones vencidas, revocadas y de otro correo, membresía revocada, auditoría, coherencia del esquema).
 
 ## Comandos verificados
@@ -62,7 +63,7 @@
 
 ## Pendiente
 
-- S04: fusionar la parte 3 tras su prueba independiente y hacer la parte 4 (PDF); Felipe consigue una o dos cotizaciones reales sin datos del cliente (T-026) y confirma si el IVA como ítem manual le sirve al piloto.
+- S04: Felipe aplica `20261111000000_cotizacion_pdf.sql` en pruebas, prueba la parte 4 y se fusiona; Felipe consigue una o dos cotizaciones reales sin datos del cliente (T-026) y confirma si el IVA como ítem manual le sirve al piloto.
 - Antes del piloto: conectar un servicio de correo propio (SMTP) en Supabase; el correo incluido solo envía unos 2 por hora y bloqueó el registro y la recuperación de contraseña el 31 oct.
 - Antes del piloto con datos reales: pasar Supabase y Vercel a planes Pro (el plan Hobby de Vercel no permite uso comercial y el gratuito de Supabase no tiene copias).
 - Felipe: iniciar la verificación de Meta Business (ahora es crítica para la bandeja).
