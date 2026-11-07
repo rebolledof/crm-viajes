@@ -77,6 +77,7 @@ export function QuotesCard({ opportunityId, quotes, canCreate, members }: { oppo
                           {h.saleTotal && <span>{formatAmount(h.saleTotal, h.saleCurrency as Currency)}</span>}
                           <span className="text-slate-600">{h.sentAt ? `enviada ${fechaHora.format(h.sentAt)} por ${who(h.sentBy)}` : "sin enviar"}</span>
                           <Link href={`/app/cotizaciones/${h.id}`} className={linkButtonClass}>Ver</Link>
+                          {h.sentAt && <a href={`/app/cotizaciones/${h.id}/pdf`} className={linkButtonClass}>Descargar PDF</a>}
                         </li>
                       ))}
                     </ul>

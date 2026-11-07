@@ -404,6 +404,16 @@ export const quoteVersionCosts = pgTable("quote_version_costs", {
   minMarginPct: numeric("min_margin_pct", { precision: 5, scale: 2 }),
 });
 
+/** PDF de una versión enviada, generado una sola vez (SPEC-004 parte 4). */
+export const quotePdfs = pgTable("quote_pdfs", {
+  quoteVersionId: uuid("quote_version_id").primaryKey(),
+  agencyId: uuid("agency_id").notNull(),
+  pdf: bytea("pdf").notNull(),
+  sha256: text("sha256").notNull(),
+  createdBy: uuid("created_by").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const quoteItems = pgTable("quote_items", {
   id: uuid("id").primaryKey().defaultRandom(),
   agencyId: uuid("agency_id").notNull(),
@@ -430,6 +440,7 @@ export const schemaTables = {
   quote_versions: quoteVersions,
   quote_items: quoteItems,
   quote_version_costs: quoteVersionCosts,
+  quote_pdfs: quotePdfs,
   inbound_channels: inboundChannels,
   conversations,
   messages,
