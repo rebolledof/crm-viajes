@@ -76,6 +76,9 @@ const OK_MESSAGES: Record<string, string> = {
   cotizacion_guardada: "Cotización guardada. Sigue en borrador hasta que la envíes.",
   version_creada: "Versión nueva creada como copia. Haz los cambios y guárdala; la anterior no cambia.",
   borrador_abierto: "Esta cotización ya tenía una versión en borrador: la abrimos para que sigas ahí.",
+  cotizacion_enviada: "Cotización enviada. Esta versión ya no cambia: compártela con el cliente por WhatsApp o correo. Si necesitas un cambio, crea una versión nueva.",
+  cotizacion_aceptada: "Marcaste que el cliente aceptó esta versión.",
+  cotizacion_rechazada: "Marcaste que el cliente rechazó esta versión. Si quiere otra propuesta, crea una versión nueva.",
   servicio_creado: "Servicio agregado al catálogo. Ya aparece en «Agregar del catálogo» al armar una cotización.",
   servicio_guardado: "Servicio del catálogo guardado. Las cotizaciones que ya lo usan no cambian.",
 };

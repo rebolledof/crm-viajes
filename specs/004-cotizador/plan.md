@@ -58,7 +58,18 @@ Lectura no puede leer `quote_items`, `catalog_services` ni `quote_version_costs`
 - Ficha de la oportunidad: tarjeta "Cotizaciones" con "Nueva cotización" y cada cotización con su estado y versión. La tarjeta completa (historial, aceptar y rechazar) llega en la parte 3.
 - Administración › Ajustes de cotizaciones (margen mínimo, vigencia y textos por defecto) y Administración › Catálogo de servicios (crear, cambiar y desactivar), solo para el administrador. Auditoría: `catalog.created`, `catalog.updated`, `quote_settings.updated`.
 - Si hay cambios sin guardar, salir por un enlace o cerrar la pestaña pregunta antes (`UnsavedGuard`). Los botones que guardan no se pueden pulsar dos veces mientras guardan. `saveDraftPart` bloquea la versión (`for update`) para que dos pestañas no se pisen.
-- Enviar todavía no está: el paso 3 lo dice. Llega en la parte 3 junto con el PDF de la parte 4.
+
+## Parte 3: enviar, aceptar y rechazar (6 nov 2026)
+
+- Sin migración nueva: la base ya validaba y congelaba al pasar a `enviada` (parte 1).
+- `sendQuoteVersion` bloquea la versión (`for update`), la pasa a enviada (la base valida, congela y deja Sustituida la enviada anterior), mueve la oportunidad con `moveOpportunity` (actividad, auditoría y plantilla de seguimiento de S02b) y registra `quote.sent` con número, versión, total y etapa.
+- **Etapa "Propuesta enviada" (RF-408):** se busca por nombre entre las etapas abiertas activas de la agencia, sin distinguir mayúsculas ni tildes. La oportunidad avanza solo si está en una etapa abierta anterior. Si está en esa etapa o después, si está cerrada o si la agencia renombró o desactivó la etapa, se queda donde está y la confirmación lo dice antes de enviar (`getSendPlan`).
+- La confirmación ("¿Enviar la versión N?") muestra el total, el aviso de margen bajo (no bloquea), que la versión se congela, cuál pasa a Sustituida, qué pasa con la oportunidad y que el CRM no le escribe al cliente. Si falta algo, el botón no aparece y "Antes de enviar" dice qué corregir; si la base lo rechaza igual, el aviso enlaza al paso.
+- `decideQuoteVersion`: "El cliente aceptó esta versión" y "El cliente la rechazó", con confirmación, desde la cotización y desde la tarjeta de la oportunidad. Solo una versión enviada; quién y cuándo quedan en la versión y en la auditoría (`quote.accepted`, `quote.rejected`: "Marcó aceptada la versión 1 de la cotización N.º 0003"). Solo una aceptada por cotización (`quote_already_accepted`).
+- Aceptada con la oportunidad abierta: la cotización ofrece "Marcar ganada" con la evidencia precargada ("Aceptó la cotización N.º 0003, versión 1"), usando el mismo cambio de etapa del embudo.
+- Tarjeta de la oportunidad: versión vigente, total, estado y vencimiento, los botones de respuesta del cliente y el historial de versiones (estado, total, quién la envió y cuándo, "Ver").
+- Mi día: "Cotizaciones por vencer" con las enviadas sin respuesta que vencen hoy o en los próximos 2 días (hora de Colombia), de oportunidades de la persona o que ella envió (`expiringQuotes`). Una vencida sale de la lista y se ve "Vencida" en la cotización.
+- El PDF y "Descargar PDF" llegan en la parte 4; se generarán con los datos congelados al enviar (marca y logo copiados), así que las versiones enviadas antes también tendrán su PDF.
 
 ## Siguientes partes
 

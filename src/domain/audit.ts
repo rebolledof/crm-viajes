@@ -5,7 +5,8 @@ import { EDIT_LEVEL_SHORT, describeDelay, TRIGGER_LABELS, isDelayUnit, isEditLev
 import { ROLE_LABELS, type Role } from "./permissions";
 import { LOSS_REASON_LABELS, STAGE_KIND_LABELS, isLossReason, type StageKind } from "./pipeline";
 import { formatPhone } from "./phone";
-import { formatQuoteNumber } from "./quotes";
+import { isCurrency, type Currency } from "./money";
+import { formatAmount, formatQuoteNumber } from "./quotes";
 import { PRIORITY_LABELS, TASK_KIND_LABELS, isPriority, isTaskKind } from "./tasks";
 
 export type AuditEventLike = {
@@ -245,6 +246,21 @@ export function describeAudit(e: AuditEventLike, n: AuditNames = {}): AuditDescr
       return {
         text: `Creó la versión ${typeof c.version === "number" ? c.version : "nueva"} de una cotización`,
         details: lines([["A partir de la versión", typeof c.desde === "number" ? String(c.desde) : undefined]]),
+      };
+
+    case "quote.sent":
+      return {
+        text: `Envió la versión ${typeof c.version === "number" ? c.version : ""} de la cotización N.º ${typeof c.numero === "number" ? formatQuoteNumber(c.numero) : ""}`.replace(/\s+/g, " "),
+        details: lines([
+          ["Total", c.total != null && isCurrency(String(c.moneda)) ? formatAmount(String(c.total), String(c.moneda) as Currency) : undefined],
+          ["La oportunidad pasó a", str(c.etapa)],
+        ]),
+      };
+    case "quote.accepted":
+    case "quote.rejected":
+      return {
+        text: `Marcó ${e.action === "quote.accepted" ? "aceptada" : "rechazada"} la versión ${typeof c.version === "number" ? c.version : ""} de la cotización N.º ${typeof c.numero === "number" ? formatQuoteNumber(c.numero) : ""}`.replace(/\s+/g, " "),
+        details: [],
       };
 
     case "catalog.created":

@@ -27,6 +27,7 @@ import {
 } from "@/domain/quotes";
 import { recordAudit, requirePermission } from "./agencies";
 import { logActivity } from "./contacts";
+import { moveOpportunity } from "./opportunities";
 import { AppError, fieldError, pgError, requireIds, rethrowBusiness } from "./errors";
 
 const DEFAULT_SETTINGS = { minMarginPct: "10.00", validityDays: 5, defaultIncludes: null, defaultExcludes: null, defaultPaymentTerms: null, defaultCancellation: null };
@@ -428,7 +429,7 @@ export async function saveDraftPart(tx: Tx, userId: string, agencyId: string, ve
 export async function getQuoteScreen(tx: Tx, userId: string, agencyId: string, versionId: string, now: Date) {
   const v = await getQuoteVersion(tx, userId, agencyId, versionId, now);
   const [opp] = await tx
-    .select({ id: opportunities.id, destination: opportunities.destination, contactId: opportunities.contactId, contactName: contacts.fullName, stageName: pipelineStages.name })
+    .select({ id: opportunities.id, destination: opportunities.destination, contactId: opportunities.contactId, contactName: contacts.fullName, stageName: pipelineStages.name, stageKind: pipelineStages.kind })
     .from(opportunities)
     .innerJoin(contacts, eq(contacts.id, opportunities.contactId))
     .innerJoin(pipelineStages, eq(pipelineStages.id, opportunities.stageId))
@@ -437,7 +438,7 @@ export async function getQuoteScreen(tx: Tx, userId: string, agencyId: string, v
   const today = colombiaToday(now);
   const versions = (
     await tx
-      .select({ id: quoteVersions.id, version: quoteVersions.version, status: quoteVersions.status, validUntil: quoteVersions.validUntil, saleTotal: quoteVersions.saleTotal, saleCurrency: quoteVersions.saleCurrency, sentAt: quoteVersions.sentAt })
+      .select({ id: quoteVersions.id, version: quoteVersions.version, status: quoteVersions.status, validUntil: quoteVersions.validUntil, saleTotal: quoteVersions.saleTotal, saleCurrency: quoteVersions.saleCurrency, sentAt: quoteVersions.sentAt, sentBy: quoteVersions.sentBy, decidedAt: quoteVersions.decidedAt, decidedBy: quoteVersions.decidedBy })
       .from(quoteVersions)
       .where(and(eq(quoteVersions.quoteId, v.version.quoteId), eq(quoteVersions.agencyId, agencyId)))
       .orderBy(desc(quoteVersions.version))
@@ -533,4 +534,155 @@ export async function updateQuoteSettings(tx: Tx, userId: string, agencyId: stri
   } catch (err) {
     rethrowBusiness(err);
   }
+}
+
+// ---------------------------------------------------------------------------------------------
+// Parte 3: enviar, aceptar y rechazar (alcance 10 a 14; RF-404, RF-408, RF-409).
+
+/** Nombre de la etapa a la que se mueve la oportunidad al enviar (RF-408). */
+export const PROPOSAL_STAGE_NAME = "Propuesta enviada";
+const normalizeStage = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").trim().toLowerCase().replace(/\s+/g, " ");
+
+type SendPlan = { stageName: string; target: { id: string; name: string } | null; willMove: boolean; reason: "mueve" | "ya_despues" | "cerrada" | "sin_etapa" };
+
+/**
+ * Qué pasará con la oportunidad al enviar: pasa a "Propuesta enviada" si está en una etapa abierta
+ * anterior; se queda si ya está en esa etapa o después, si está cerrada o si la agencia no tiene una
+ * etapa activa con ese nombre (la renombró o la desactivó).
+ */
+async function sendPlan(tx: Tx, agencyId: string, opportunityId: string): Promise<SendPlan> {
+  const [cur] = await tx
+    .select({ name: pipelineStages.name, position: pipelineStages.position, kind: pipelineStages.kind })
+    .from(opportunities)
+    .innerJoin(pipelineStages, eq(pipelineStages.id, opportunities.stageId))
+    .where(and(eq(opportunities.id, opportunityId), eq(opportunities.agencyId, agencyId)));
+  if (!cur) throw new AppError("not_found");
+  const stages = await tx
+    .select({ id: pipelineStages.id, name: pipelineStages.name, position: pipelineStages.position })
+    .from(pipelineStages)
+    .where(and(eq(pipelineStages.agencyId, agencyId), eq(pipelineStages.active, true), eq(pipelineStages.kind, "abierta")));
+  const target = stages.find((s) => normalizeStage(s.name) === normalizeStage(PROPOSAL_STAGE_NAME)) ?? null;
+  if (cur.kind !== "abierta") return { stageName: cur.name, target, willMove: false, reason: "cerrada" };
+  if (!target) return { stageName: cur.name, target: null, willMove: false, reason: "sin_etapa" };
+  if (cur.position >= target.position) return { stageName: cur.name, target, willMove: false, reason: "ya_despues" };
+  return { stageName: cur.name, target: { id: target.id, name: target.name }, willMove: true, reason: "mueve" };
+}
+
+/** Para la confirmación de envío: qué pasará con la oportunidad. */
+export async function getSendPlan(tx: Tx, userId: string, agencyId: string, versionId: string): Promise<SendPlan> {
+  await requirePermission(tx, userId, agencyId, "quotes.write");
+  requireIds(versionId);
+  const [row] = await tx
+    .select({ opportunityId: quotes.opportunityId })
+    .from(quoteVersions)
+    .innerJoin(quotes, eq(quotes.id, quoteVersions.quoteId))
+    .where(and(eq(quoteVersions.id, versionId), eq(quoteVersions.agencyId, agencyId)));
+  if (!row) throw new AppError("not_found");
+  return sendPlan(tx, agencyId, row.opportunityId);
+}
+
+async function lockVersion(tx: Tx, agencyId: string, versionId: string) {
+  requireIds(versionId);
+  const rows = await tx.execute<{ id: string; quote_id: string; version: number; status: string; number: number; opportunity_id: string; sale_currency: string }>(sql`
+    select v.id, v.quote_id, v.version, v.status::text as status, q.number, q.opportunity_id, v.sale_currency::text as sale_currency
+    from public.quote_versions v join public.quotes q on q.id = v.quote_id
+    where v.id = ${versionId} and v.agency_id = ${agencyId}
+    for update of v`);
+  if (!rows[0]) throw new AppError("not_found");
+  return rows[0];
+}
+
+/**
+ * Envía un borrador (alcance 10): la base valida y congela la versión (total, marca, margen mínimo),
+ * las enviadas anteriores pasan a Sustituida, la oportunidad avanza a "Propuesta enviada" si estaba
+ * antes (con su seguimiento automático de S02b) y queda en la auditoría.
+ */
+export async function sendQuoteVersion(tx: Tx, userId: string, agencyId: string, versionId: string): Promise<{ movedTo: string | null; sustituidas: number }> {
+  await requirePermission(tx, userId, agencyId, "quotes.write");
+  const v = await lockVersion(tx, agencyId, versionId);
+  // Otra persona la envió hace un momento (o se pulsó dos veces): decirlo claro.
+  if (v.status !== "borrador") throw new AppError("quote_already_sent");
+  const before = await tx.select({ id: quoteVersions.id }).from(quoteVersions).where(and(eq(quoteVersions.quoteId, v.quote_id), eq(quoteVersions.status, "enviada"))).for("update");
+  let sent;
+  try {
+    [sent] = await tx.update(quoteVersions).set({ status: "enviada" }).where(and(eq(quoteVersions.id, versionId), eq(quoteVersions.agencyId, agencyId))).returning({ saleTotal: quoteVersions.saleTotal });
+  } catch (err) {
+    rethrowBusiness(err);
+  }
+  if (!sent) throw new AppError("not_found");
+  const plan = await sendPlan(tx, agencyId, v.opportunity_id);
+  if (plan.willMove && plan.target) {
+    // Reusa el cambio de etapa del embudo: actividad, auditoría y la plantilla de seguimiento.
+    await moveOpportunity(tx, userId, agencyId, v.opportunity_id, { stageId: plan.target.id });
+  }
+  await recordAudit(tx, {
+    agencyId,
+    actorId: userId,
+    action: "quote.sent",
+    objectType: "quote",
+    objectId: v.quote_id,
+    changes: { numero: v.number, version: v.version, total: sent.saleTotal, moneda: v.sale_currency, etapa: plan.willMove ? plan.target?.name : null },
+  });
+  return { movedTo: plan.willMove ? plan.target!.name : null, sustituidas: before.length };
+}
+
+/** "El cliente aceptó esta versión" o "El cliente la rechazó" (alcance 13, AC-415). */
+export async function decideQuoteVersion(tx: Tx, userId: string, agencyId: string, versionId: string, decision: "aceptada" | "rechazada"): Promise<{ opportunityId: string }> {
+  await requirePermission(tx, userId, agencyId, "quotes.write");
+  const v = await lockVersion(tx, agencyId, versionId);
+  if (v.status === "aceptada" || v.status === "rechazada") throw new AppError("quote_already_decided");
+  if (v.status !== "enviada") throw new AppError("invalid_quote_transition");
+  try {
+    await tx.update(quoteVersions).set({ status: decision }).where(and(eq(quoteVersions.id, versionId), eq(quoteVersions.agencyId, agencyId)));
+  } catch (err) {
+    // Otra versión de la misma cotización ya está aceptada (índice de una sola aceptada).
+    if (pgError(err)?.code === "23505") throw new AppError("quote_already_accepted");
+    rethrowBusiness(err);
+  }
+  await recordAudit(tx, {
+    agencyId,
+    actorId: userId,
+    action: decision === "aceptada" ? "quote.accepted" : "quote.rejected",
+    objectType: "quote",
+    objectId: v.quote_id,
+    changes: { numero: v.number, version: v.version },
+  });
+  return { opportunityId: v.opportunity_id };
+}
+
+/** Días de anticipación del aviso de Mi día (alcance 14). */
+export const EXPIRING_SOON_DAYS = 2;
+
+/**
+ * Mi día (alcance 14, AC-416): cotizaciones enviadas sin respuesta que vencen hoy o en los próximos
+ * 2 días (hora de Colombia), de oportunidades de la persona o que ella envió.
+ */
+export async function expiringQuotes(tx: Tx, userId: string, agencyId: string, now: Date) {
+  await requirePermission(tx, userId, agencyId, "crm.read");
+  const today = colombiaToday(now);
+  const rows = await tx
+    .select({
+      versionId: quoteVersions.id,
+      version: quoteVersions.version,
+      number: quotes.number,
+      title: quoteVersions.title,
+      clientName: quoteVersions.clientName,
+      saleTotal: quoteVersions.saleTotal,
+      saleCurrency: quoteVersions.saleCurrency,
+      validUntil: quoteVersions.validUntil,
+      opportunityId: quotes.opportunityId,
+    })
+    .from(quoteVersions)
+    .innerJoin(quotes, eq(quotes.id, quoteVersions.quoteId))
+    .innerJoin(opportunities, eq(opportunities.id, quotes.opportunityId))
+    .where(
+      and(
+        eq(quoteVersions.agencyId, agencyId),
+        eq(quoteVersions.status, "enviada"),
+        sql`${quoteVersions.validUntil} between ${today}::date and ${addDays(today, EXPIRING_SOON_DAYS)}::date`,
+        sql`(${opportunities.ownerId} = ${userId} or ${quoteVersions.sentBy} = ${userId})`,
+      ),
+    )
+    .orderBy(asc(quoteVersions.validUntil), asc(quotes.number));
+  return rows.map((r) => ({ ...r, daysToExpire: daysToExpire("enviada", r.validUntil, today) ?? 0 }));
 }

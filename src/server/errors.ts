@@ -47,6 +47,9 @@ export const ERROR_MESSAGES = {
   valid_until_past: "La fecha de validez ya pasó. Elige hoy o una fecha posterior.",
   amount_too_large: "El importe es demasiado grande (máximo 999.999.999.999). Revisa la cantidad, el precio y el tipo de cambio.",
   quote_last_version: "No se puede borrar la única versión de una cotización.",
+  quote_already_sent: "Esta versión ya se envió, quizá otra persona lo hizo hace un momento. Recarga la página para verla; para un cambio, crea una versión nueva.",
+  quote_already_decided: "Alguien ya marcó la respuesta del cliente en esta versión. Recarga la página para ver cómo quedó.",
+  quote_already_accepted: "Otra versión de esta cotización ya está aceptada. Solo una versión puede quedar aceptada.",
   quote_draft_exists: "Otra persona acaba de crear la versión nueva de esta cotización. Recarga la página para abrirla.",
 } as const;
 
