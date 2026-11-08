@@ -1,5 +1,6 @@
 // SPEC-004 parte 1 · Cotizador contra PostgreSQL real: numeración, cálculo en la base, versiones
 // inmutables, marca congelada, costes ocultos para Lectura, aislamiento entre agencias y catálogo.
+import { createHash } from "node:crypto";
 import { and, eq, sql } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { SessionUser } from "../../src/db/client";
@@ -10,8 +11,10 @@ import { createContact } from "../../src/server/contacts";
 import { AppError } from "../../src/server/errors";
 import { createOpportunity, moveOpportunity, updateStage } from "../../src/server/opportunities";
 import { describeAudit } from "../../src/domain/audit";
-import { createNextVersion, createQuote, decideQuoteVersion, expiringQuotes, getSendPlan, sendQuoteVersion, getQuoteScreen, getQuoteSettings, getQuoteVersion, listCatalog, listOpportunityQuotes, saveCatalogService, saveDraft, saveDraftPart, updateQuoteSettings, type DraftInput } from "../../src/server/quotes";
+import { getQuotePdf, createNextVersion, createQuote, decideQuoteVersion, expiringQuotes, getSendPlan, sendQuoteVersion, getQuoteScreen, getQuoteSettings, getQuoteVersion, listCatalog, listOpportunityQuotes, saveCatalogService, saveDraft, saveDraftPart, updateQuoteSettings, type DraftInput } from "../../src/server/quotes";
 import { as, createUser, testDb } from "./helpers";
+import { updateBranding } from "../../src/server/branding";
+import { pdfText, tinyPng } from "../pdf-helpers";
 
 const t = testDb();
 let adminA: SessionUser, asesorA: SessionUser, lecturaA: SessionUser, adminB: SessionUser;
@@ -710,5 +713,105 @@ describe("parte 3: hallazgos de la prueba independiente (6 nov 2026)", () => {
     await as(t.db, asesorA, (tx) => sendQuoteVersion(tx, asesorA.id, agencyA, q.versionId));
     expect((await as(t.db, asesorA, (tx) => expiringQuotes(tx, asesorA.id, agencyA, now()))).map((x) => x.versionId)).toContain(q.versionId);
     expect((await as(t.db, adminA, (tx) => expiringQuotes(tx, adminA.id, agencyA, now()))).map((x) => x.versionId)).toContain(q.versionId);
+  });
+});
+
+describe("parte 4: PDF (alcance 15, RF-404, RF-406)", () => {
+  const pdfRow = async (versionId: string) => (await t.admin`select pdf, sha256, created_by from quote_pdfs where quote_version_id = ${versionId}`)[0];
+  const oneItem = (unitCost: string, unitPrice: string): DraftInput => ({
+    ...cartagena,
+    exchangeRate: "",
+    items: [{ description: "Traslado privado", supplier: "Proveedor neto SAS", quantity: "1", unit: "servicio", unitPrice, unitCost, costCurrency: "COP" }],
+  });
+
+  it("AC-401: el PDF muestra 1.250 y nunca coste, utilidad, margen, recargo ni proveedor", async () => {
+    const q = await newDraft(asesorA, agencyA, oppA, oneItem("1.000", "1.250"));
+    await as(t.db, asesorA, (tx) => sendQuoteVersion(tx, asesorA.id, agencyA, q.versionId));
+    const row = await pdfRow(q.versionId);
+    expect(row.created_by).toBe(asesorA.id);
+    const text = pdfText(new Uint8Array(row.pdf)).join("\n");
+    expect(text).toContain("1.250 COP");
+    expect(text).toContain("Traslado privado");
+    for (const hidden of ["1.000", "20 %", "25 %", "20,0", "25,0", "Proveedor neto", "Utilidad", "Margen", "Coste", "cambio"]) expect(text).not.toContain(hidden);
+    // La utilidad (250) no aparece suelta; solo como parte de 1.250.
+    expect(text).not.toMatch(/(^|[^.\d])250\b/m);
+  });
+
+  it("AC-405 y AC-407: el PDF de la versión 1 no cambia (byte a byte) con la versión 2 ni con un logo nuevo", async () => {
+    await as(t.db, adminA, (tx) => updateBranding(tx, adminA.id, agencyA, { primary: "#0F6E6E", accent: "#F28C28", logo: tinyPng(200, 0, 0) }));
+    const q = await newDraft(asesorA, agencyA, oppA);
+    await as(t.db, asesorA, (tx) => sendQuoteVersion(tx, asesorA.id, agencyA, q.versionId));
+    const v1 = await pdfRow(q.versionId);
+    await as(t.db, adminA, (tx) => updateBranding(tx, adminA.id, agencyA, { primary: "#123456", accent: "#F28C28", logo: tinyPng(0, 0, 200) }));
+    const v2 = await as(t.db, asesorA, (tx) => createNextVersion(tx, asesorA.id, agencyA, q.versionId));
+    await as(t.db, asesorA, (tx) => sendQuoteVersion(tx, asesorA.id, agencyA, v2.versionId));
+    const again = await pdfRow(q.versionId);
+    expect(Buffer.from(again.pdf).equals(Buffer.from(v1.pdf))).toBe(true);
+    const downloaded = await as(t.db, lecturaA, (tx) => getQuotePdf(tx, lecturaA.id, agencyA, q.versionId, now()));
+    expect(Buffer.from(downloaded.bytes).equals(Buffer.from(v1.pdf))).toBe(true);
+    expect(downloaded.filename).toBe(`Cotizacion-${String(q.number).padStart(4, "0")}-v1.pdf`);
+    // La versión 2 lleva la marca nueva: otro color y otro logo, así que otro PDF.
+    const v2pdf = await pdfRow(v2.versionId);
+    expect(Buffer.from(v2pdf.pdf).equals(Buffer.from(v1.pdf))).toBe(false);
+    const [frozen] = await t.admin`select brand->>'primary_color' as color from quote_versions where id = ${q.versionId}`;
+    expect(frozen.color).toBe("#0F6E6E");
+  });
+
+  it("un PDF guardado no se cambia ni se borra, ni siquiera como dueño de la base; tampoco se guarda para un borrador o con otra huella", async () => {
+    const q = await newDraft(asesorA, agencyA, oppA);
+    await as(t.db, asesorA, (tx) => sendQuoteVersion(tx, asesorA.id, agencyA, q.versionId));
+    await expectDb(t.admin`update quote_pdfs set pdf = 'x'::bytea where quote_version_id = ${q.versionId}`, "quote_version_locked");
+    await expectDb(t.admin`delete from quote_pdfs where quote_version_id = ${q.versionId}`, "quote_version_locked");
+    const draft = await newDraft(asesorA, agencyA, oppA);
+    const sha = "0".repeat(64);
+    await expectDb(as(t.db, asesorA, (tx) => tx.execute(sql`insert into quote_pdfs (quote_version_id, agency_id, pdf, sha256, created_by) values (${draft.versionId}, ${agencyA}, 'x'::bytea, ${sha}, ${asesorA.id})`)), "invalid_quote_transition");
+    // Versión enviada "a mano" (como antes de la parte 4) y huella falsa.
+    const old = await newDraft(asesorA, agencyA, oppA);
+    await send(asesorA, old.versionId);
+    await expectDb(as(t.db, asesorA, (tx) => tx.execute(sql`insert into quote_pdfs (quote_version_id, agency_id, pdf, sha256, created_by) values (${old.versionId}, ${agencyA}, 'x'::bytea, ${sha}, ${asesorA.id})`)), "invalid_input");
+  });
+
+  it("una versión enviada antes de la parte 4: Lectura la descarga sin guardarla; el asesor la guarda una vez", async () => {
+    const q = await newDraft(asesorA, agencyA, oppA);
+    await send(asesorA, q.versionId);
+    expect(await pdfRow(q.versionId)).toBeUndefined();
+    const forReader = await as(t.db, lecturaA, (tx) => getQuotePdf(tx, lecturaA.id, agencyA, q.versionId, now()));
+    expect(await pdfRow(q.versionId)).toBeUndefined();
+    const first = await as(t.db, asesorA, (tx) => getQuotePdf(tx, asesorA.id, agencyA, q.versionId, now()));
+    const second = await as(t.db, adminA, (tx) => getQuotePdf(tx, adminA.id, agencyA, q.versionId, now()));
+    expect(Buffer.from(first.bytes).equals(Buffer.from(second.bytes))).toBe(true);
+    expect(Buffer.from(first.bytes).equals(Buffer.from(forReader.bytes))).toBe(true);
+    expect((await pdfRow(q.versionId)).created_by).toBe(asesorA.id);
+  });
+
+  it("borrador: vista previa marcada BORRADOR que no se guarda", async () => {
+    const q = await newDraft(asesorA, agencyA, oppA);
+    const preview = await as(t.db, asesorA, (tx) => getQuotePdf(tx, asesorA.id, agencyA, q.versionId, now()));
+    expect(preview.draft).toBe(true);
+    expect(preview.filename).toMatch(/-borrador\.pdf$/);
+    expect(pdfText(preview.bytes)).toContain("BORRADOR");
+    expect(await pdfRow(q.versionId)).toBeUndefined();
+  });
+
+  it("solo admin o asesor de la misma agencia guardan un PDF: Lectura y otra agencia no pueden insertarlo", async () => {
+    const q = await newDraft(asesorA, agencyA, oppA);
+    await send(asesorA, q.versionId);
+    const pdf = Buffer.from("%PDF-falso");
+    const sha = createHash("sha256").update(pdf).digest("hex");
+    const insert = (u: SessionUser, agencyId: string) =>
+      as(t.db, u, (tx) => tx.execute(sql`insert into quote_pdfs (quote_version_id, agency_id, pdf, sha256, created_by) values (${q.versionId}, ${agencyId}, ${pdf}, ${sha}, ${u.id})`));
+    await expectDb(insert(lecturaA, agencyA), /row-level security/);
+    await expectDb(insert(adminB, agencyA), /row-level security/);
+    // Con su propia agencia pasa la política, pero la versión no es de B: la base la rechaza.
+    await expectDb(insert(adminB, agencyB), /foreign key|invalid_quote_transition|row-level security/);
+    expect(await pdfRow(q.versionId)).toBeUndefined();
+  });
+
+  it("AC-411: otra agencia no obtiene ni ve el PDF", async () => {
+    const q = await newDraft(asesorA, agencyA, oppA);
+    await as(t.db, asesorA, (tx) => sendQuoteVersion(tx, asesorA.id, agencyA, q.versionId));
+    await expectCode(as(t.db, adminB, (tx) => getQuotePdf(tx, adminB.id, agencyB, q.versionId, now())), "not_found");
+    await expectCode(as(t.db, adminB, (tx) => getQuotePdf(tx, adminB.id, agencyA, q.versionId, now())), "not_found");
+    expect(await as(t.db, adminB, (tx) => tx.execute(sql`select 1 from quote_pdfs where quote_version_id = ${q.versionId}`))).toHaveLength(0);
   });
 });

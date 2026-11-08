@@ -98,6 +98,11 @@ export default async function CotizacionPage({ params, searchParams }: { params:
                 </ExternalSubmit>
               </span>
             )}
+            {v.status !== "borrador" && (
+              <a href={`/app/cotizaciones/${v.id}/pdf`} className={secondaryButtonClass}>
+                <Icon name="file" className="size-4" /> Descargar PDF
+              </a>
+            )}
             {!editable && canWrite && v.status !== "borrador" && (
               draft ? (
                 <Link href={`/app/cotizaciones/${draft.id}`} className={buttonClass}>Abrir el borrador (versión {draft.version})</Link>
@@ -124,7 +129,17 @@ export default async function CotizacionPage({ params, searchParams }: { params:
         </p>
       </PageHeader>
       <Flash sp={sp} />
-      {sp.ok === "cotizacion_enviada" && <Notice>La oportunidad está en «{q.opportunity.stageName}». <Link href={`/app/oportunidades/${q.opportunity.id}`} className="font-medium underline">Ver la oportunidad</Link></Notice>}
+      {sp.ok === "cotizacion_enviada" && (
+        <div className="flex flex-col gap-3 rounded border border-line bg-surface px-4 py-3 text-sm shadow-[0_2px_2px_rgba(0,0,0,0.05)] sm:flex-row sm:items-center">
+          {/* En el celular van uno debajo del otro: con flex-1 el texto se encogía a una columna y desbordaba (prueba de Felipe F-02). */}
+          <a href={`/app/cotizaciones/${v.id}/pdf`} className={`${buttonClass} w-full shrink-0 sm:w-auto`}>
+            <Icon name="file" className="size-4" /> Descargar el PDF para el cliente
+          </a>
+          <span className="min-w-0 break-words text-slate-700 sm:flex-1">
+            La oportunidad está en «{q.opportunity.stageName}». <Link href={`/app/oportunidades/${q.opportunity.id}`} className="font-medium underline">Ver la oportunidad</Link>
+          </span>
+        </div>
+      )}
       {wonStage && <WinOffer opportunityId={q.opportunity.id} wonStageId={wonStage.id} number={q.number} version={v.version} versionId={v.id} />}
 
       {editable && <Stepper step={step} />}
@@ -338,7 +353,16 @@ function Review({ q, editable, now, plan, canAnswer }: { q: Screen; editable: bo
               </div>
             ) : null,
           )}
-          <p className="text-xs text-slate-600">El PDF con el logo y los colores de la agencia llega en la próxima entrega; se hará con los datos congelados al enviar.</p>
+          {v.status === "borrador" ? (
+            <p className="text-xs text-slate-600">
+              <a href={`/app/cotizaciones/${v.id}/pdf?ver=1`} target="_blank" rel="noopener" className="font-medium text-brand-text underline">Ver el PDF de prueba</a>{" "}
+              (sale marcado «BORRADOR»). El PDF definitivo se genera al enviar, con el logo y los colores de la agencia de ese momento.
+            </p>
+          ) : (
+            <p className="text-xs text-slate-600">
+              El PDF se generó al enviar y no cambia aunque la agencia cambie su logo o sus datos. <a href={`/app/cotizaciones/${v.id}/pdf?ver=1`} target="_blank" rel="noopener" className="font-medium text-brand-text underline">Abrirlo</a>
+            </p>
+          )}
         </div>
       </section>
 

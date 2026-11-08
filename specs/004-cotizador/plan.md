@@ -71,6 +71,14 @@ Lectura no puede leer `quote_items`, `catalog_services` ni `quote_version_costs`
 - Mi día: "Cotizaciones por vencer" con las enviadas sin respuesta que vencen hoy o en los próximos 2 días (hora de Colombia), de oportunidades de la persona o que ella envió (`expiringQuotes`). Una vencida sale de la lista y se ve "Vencida" en la cotización.
 - El PDF y "Descargar PDF" llegan en la parte 4; se generarán con los datos congelados al enviar (marca y logo copiados), así que las versiones enviadas antes también tendrán su PDF.
 
+## Parte 4: PDF (7 nov 2026)
+
+- Migración `20261111000000_cotizacion_pdf.sql`: tabla `quote_pdfs` (un PDF por versión enviada, con huella SHA-256), que no se cambia ni se borra, la leen todos los miembros y la escriben administrador y asesor. ADR 0004.
+- `src/server/quote-pdf.ts` dibuja el PDF con `pdf-lib`: barra con el color principal, logo (PNG o JPG; WebP va como nombre), número, versión, fecha de envío, válida hasta, cliente y viaje, servicios con su valor (o solo el total), total con la moneda, condiciones y pie con agencia, asesor y página. Textos largos pasan de línea y de página.
+- `sendQuoteVersion` lo genera y guarda en la misma transacción del envío. `getQuotePdf` entrega el guardado; una versión enviada antes de esta parte se genera con sus datos congelados (y se guarda si la pide un administrador o asesor); un borrador da una vista previa "BORRADOR" sin guardarla.
+- `/app/cotizaciones/[versión]/pdf` (descarga; `?ver=1` lo abre). Botones: "Descargar el PDF para el cliente" al enviar, "Descargar PDF" en la cotización y en el historial de la oportunidad, y "Ver el PDF de prueba" en el paso 3 del borrador.
+- Pie sin teléfono ni web de la agencia: todavía no existen en los datos de la agencia; se agregan cuando estén.
+
 ## Siguientes partes
 
 2. Pantalla de armar la cotización (3 pasos), condiciones, catálogo y Configuración › Cotizaciones.
