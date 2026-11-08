@@ -130,11 +130,12 @@ export default async function CotizacionPage({ params, searchParams }: { params:
       </PageHeader>
       <Flash sp={sp} />
       {sp.ok === "cotizacion_enviada" && (
-        <div className="flex flex-wrap items-center gap-3 rounded border border-line bg-surface px-4 py-3 text-sm shadow-[0_2px_2px_rgba(0,0,0,0.05)]">
-          <a href={`/app/cotizaciones/${v.id}/pdf`} className={buttonClass}>
+        <div className="flex flex-col gap-3 rounded border border-line bg-surface px-4 py-3 text-sm shadow-[0_2px_2px_rgba(0,0,0,0.05)] sm:flex-row sm:items-center">
+          {/* En el celular van uno debajo del otro: con flex-1 el texto se encogía a una columna y desbordaba (prueba de Felipe F-02). */}
+          <a href={`/app/cotizaciones/${v.id}/pdf`} className={`${buttonClass} w-full shrink-0 sm:w-auto`}>
             <Icon name="file" className="size-4" /> Descargar el PDF para el cliente
           </a>
-          <span className="min-w-0 flex-1 text-slate-700">
+          <span className="min-w-0 break-words text-slate-700 sm:flex-1">
             La oportunidad está en «{q.opportunity.stageName}». <Link href={`/app/oportunidades/${q.opportunity.id}`} className="font-medium underline">Ver la oportunidad</Link>
           </span>
         </div>

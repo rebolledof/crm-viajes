@@ -96,7 +96,10 @@ function wrap(font: PDFFont, size: number, text: string, width: number): string[
   return lines;
 }
 
-export async function renderQuotePdf(d: QuotePdfData): Promise<{ bytes: Uint8Array; text: string[] }> {
+/** Texto dibujado y su caja (en puntos), para comprobar en pruebas que nada se sale del margen. */
+export type PdfBox = { text: string; page: number; x: number; y: number; width: number };
+
+export async function renderQuotePdf(d: QuotePdfData): Promise<{ bytes: Uint8Array; text: string[]; boxes: PdfBox[] }> {
   const doc = await PDFDocument.create();
   const title = `Cotización N.º ${formatQuoteNumber(d.number)} · versión ${d.version}`;
   doc.setTitle(title);
@@ -112,6 +115,7 @@ export async function renderQuotePdf(d: QuotePdfData): Promise<{ bytes: Uint8Arr
   const muted = rgb(0.38, 0.42, 0.48);
   const line = rgb(0.85, 0.87, 0.9);
   const text: string[] = [];
+  const boxes: PdfBox[] = [];
   let logo = null;
   if (d.logo) {
     // PNG y JPG se incrustan; un logo en WebP no se puede: va el nombre de la agencia.
@@ -125,10 +129,17 @@ export async function renderQuotePdf(d: QuotePdfData): Promise<{ bytes: Uint8Arr
   const width = A4[0] - 2 * M;
   const footerSpace = 56;
 
-  const draw = (s: string, x: number, size: number, font: PDFFont = regular, color: RGB = ink) => {
-    const t = safeText(font, s);
-    page.drawText(t, { x, y, size, font, color });
+  /** Dibuja texto ya seguro en la página actual y lo anota. */
+  const put = (t: string, x: number, size: number, font: PDFFont, color: RGB, p: PDFPage = page, at = y) => {
+    p.drawText(t, { x, y: at, size, font, color });
     text.push(t);
+    boxes.push({ text: t, page: pages.indexOf(p) + 1, x, y: at, width: font.widthOfTextAtSize(t, size) });
+  };
+  const draw = (s: string, x: number, size: number, font: PDFFont = regular, color: RGB = ink) => put(safeText(font, s), x, size, font, color);
+  /** Alineado a la derecha: termina en `edge`. */
+  const drawRight = (s: string, edge: number, size: number, font: PDFFont = regular, color: RGB = ink) => {
+    const t = safeText(font, s);
+    put(t, edge - font.widthOfTextAtSize(t, size), size, font, color);
   };
   const newPage = () => {
     page = doc.addPage(A4);
@@ -165,11 +176,7 @@ export async function renderQuotePdf(d: QuotePdfData): Promise<{ bytes: Uint8Arr
     draw(fit(bold, size, safeText(bold, d.agencyName), nameWidth), M, size, bold, brand);
   }
   y = headTop - 12;
-  const right = (s: string, size: number, font: PDFFont = regular, color: RGB = ink) => {
-    const t = safeText(font, s);
-    page.drawText(t, { x: A4[0] - M - font.widthOfTextAtSize(t, size), y, size, font, color });
-    text.push(t);
-  };
+  const right = (s: string, size: number, font: PDFFont = regular, color: RGB = ink) => drawRight(s, A4[0] - M, size, font, color);
   right(`Cotización N.º ${formatQuoteNumber(d.number)}`, 12, bold);
   y -= 15;
   right(`Versión ${d.version} · ${fechaLarga.format(d.issuedAt)}`, 9, regular, muted);
@@ -194,17 +201,22 @@ export async function renderQuotePdf(d: QuotePdfData): Promise<{ bytes: Uint8Arr
   // Servicios.
   y -= 14;
   ensure(40);
-  const colQty = A4[0] - M - (d.showItemPrices ? 190 : 0);
+  // Con precios: SERVICIO | CANTIDAD | VALOR. Solo total: SERVICIO | CANTIDAD, con la cantidad
+  // alineada a la derecha de la tabla (antes empezaba en el margen y se salía del papel).
+  const tableRight = A4[0] - M - 6;
+  const qtyWidth = 100;
+  const colQty = d.showItemPrices ? tableRight - 100 - qtyWidth : tableRight - qtyWidth;
   const descWidth = colQty - M - 16;
+  const qtyText = (s: string) => fit(regular, 10, safeText(regular, s), qtyWidth);
   const tableHeader = () => {
     page.drawRectangle({ x: M, y: y - 20, width, height: 20, color: rgb(0.95, 0.96, 0.97) });
     y -= 14;
     draw("SERVICIO", M + 6, 8, bold, muted);
-    draw("CANTIDAD", colQty, 8, bold, muted);
     if (d.showItemPrices) {
-      const label = "VALOR";
-      page.drawText(label, { x: A4[0] - M - 6 - bold.widthOfTextAtSize(label, 8), y, size: 8, font: bold, color: muted });
-      text.push(label);
+      draw("CANTIDAD", colQty, 8, bold, muted);
+      drawRight("VALOR", tableRight, 8, bold, muted);
+    } else {
+      drawRight("CANTIDAD", tableRight, 8, bold, muted);
     }
     y -= 10;
   };
@@ -222,11 +234,12 @@ export async function renderQuotePdf(d: QuotePdfData): Promise<{ bytes: Uint8Arr
       draw(l, M + 6, 10);
     });
     y = top - 14;
-    draw(unitLabel(it.unit, it.quantity, formatDecimal), colQty, 10);
+    const qty = qtyText(unitLabel(it.unit, it.quantity, formatDecimal));
     if (d.showItemPrices) {
-      const amount = safeText(regular, formatAmount(it.lineTotal, d.currency));
-      page.drawText(amount, { x: A4[0] - M - 6 - regular.widthOfTextAtSize(amount, 10), y, size: 10, font: regular, color: ink });
-      text.push(amount);
+      put(qty, colQty, 10, regular, ink);
+      drawRight(formatAmount(it.lineTotal, d.currency), tableRight, 10);
+    } else {
+      put(qty, tableRight - regular.widthOfTextAtSize(qty, 10), 10, regular, ink);
     }
     y = top - 14 * lines.length - 6;
     page.drawLine({ start: { x: M, y }, end: { x: A4[0] - M, y }, thickness: 0.5, color: line });
@@ -234,9 +247,7 @@ export async function renderQuotePdf(d: QuotePdfData): Promise<{ bytes: Uint8Arr
   ensure(34);
   y -= 22;
   draw("Total", M + 6, 13, bold);
-  const totalText = safeText(bold, formatAmount(d.total, d.currency));
-  page.drawText(totalText, { x: A4[0] - M - 6 - bold.widthOfTextAtSize(totalText, 13), y, size: 13, font: bold, color: brand });
-  text.push(totalText);
+  drawRight(formatAmount(d.total, d.currency), tableRight, 13, bold, brand);
   y -= 8;
   page.drawLine({ start: { x: M, y }, end: { x: A4[0] - M, y }, thickness: 1.5, color: brand });
 
@@ -259,11 +270,9 @@ export async function renderQuotePdf(d: QuotePdfData): Promise<{ bytes: Uint8Arr
     const n = `Página ${i + 1} de ${pages.length}`;
     const foot = fit(regular, 8, safeText(regular, [d.agencyName, d.advisorEmail ? `Asesor: ${d.advisorEmail}` : null].filter(Boolean).join(" · ")), width - regular.widthOfTextAtSize(n, 8) - 16);
     p.drawLine({ start: { x: M, y: M + 18 }, end: { x: A4[0] - M, y: M + 18 }, thickness: 0.5, color: line });
-    p.drawText(foot, { x: M, y: M, size: 8, font: regular, color: muted });
-    p.drawText(n, { x: A4[0] - M - regular.widthOfTextAtSize(n, 8), y: M, size: 8, font: regular, color: muted });
-    if (i === 0) text.push(foot);
-    text.push(n);
+    put(foot, M, 8, regular, muted, p, M);
+    put(n, A4[0] - M - regular.widthOfTextAtSize(n, 8), 8, regular, muted, p, M);
   });
 
-  return { bytes: await doc.save(), text };
+  return { bytes: await doc.save(), text, boxes };
 }

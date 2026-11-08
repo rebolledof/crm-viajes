@@ -91,4 +91,26 @@ describe("PDF de la cotización (alcance 15)", () => {
     const { text } = await renderQuotePdf({ ...base, clientName: "Mari\u0301a Ibáñez" });
     expect(text.join("\n")).toContain("Para María Ibáñez");
   });
+  it("prueba de Felipe F-01: con «solo total» o con precios, nada se sale de los márgenes (cantidad «2 personas» incluida)", async () => {
+    const items = [
+      { description: "Tiquetes Bogotá–Cartagena", quantity: "2", unit: "persona" as const, lineTotal: "1800000" },
+      { description: "Hotel", quantity: "1234.5", unit: "noche" as const, lineTotal: "999999999999" },
+    ];
+    for (const showItemPrices of [false, true]) {
+      const { boxes } = await renderQuotePdf({ ...base, items, total: "1001799999999", showItemPrices, agencyName: "Agencia de Viajes y Turismo Internacional Los Andes SAS" });
+      expect(boxes.some((b) => b.text === "2 personas")).toBe(true);
+      for (const b of boxes) {
+        expect(b.x, `${b.text} empieza fuera`).toBeGreaterThanOrEqual(48 - 0.01);
+        expect(b.x + b.width, `${b.text} se sale (${showItemPrices ? "con precios" : "solo total"})`).toBeLessThanOrEqual(595.28 - 48 + 0.01);
+      }
+      // Ninguna celda de la tabla pisa a la siguiente en la misma fila.
+      const rows = new Map<string, typeof boxes>();
+      for (const b of boxes) rows.set(`${b.page}:${b.y}`, [...(rows.get(`${b.page}:${b.y}`) ?? []), b]);
+      for (const row of rows.values()) {
+        const sorted = [...row].sort((a, z) => a.x - z.x);
+        for (let k = 1; k < sorted.length; k++) expect(sorted[k - 1].x + sorted[k - 1].width, `${sorted[k - 1].text} pisa ${sorted[k].text}`).toBeLessThanOrEqual(sorted[k].x);
+      }
+    }
+  });
+
 });
